@@ -1,43 +1,24 @@
-# Project Plan: Offline-First Expiration Tracker
+# Code Audit and Refactoring Plan
 
-This document outlines the steps to build the Expiration Tracker application.
+This plan outlines the steps to audit the existing codebase and refactor it according to the provided clean code principles.
 
-## 1. Project Setup
+## I. Audit Existing Codebase
 
-- [ ] Initialize a new Next.js project.
-- [ ] Install Prisma and configure it for SQLite.
+1.  **`services/notifications.ts`**: Review for SOLID principles, error handling, and type safety.
+2.  **`pages/dashboard.tsx`**: Analyze for separation of concerns (logic vs. view), component architecture, and state management.
+3.  **`scripts/startup.ts`**: Examine for clarity, error handling, and adherence to best practices.
 
-## 2. Database Schema
+## II. Refactoring and Implementation
 
-- [x] Create `prisma/schema.prisma`.
-- [x] Define `User` model with fields: `id`, `email`, `name`, `notifyDaysBefore`, `smtpHost`, `smtpPort`, `smtpUser`, `smtpPass`, `telegramChatId`.
-- [x] Define `Product` model with fields: `id`, `name`, `barcode`, `productionDate`, `expirationDate`, `ownerId`.
+1.  **Type Definitions**: Create a `types/index.ts` file to centralize all type definitions for `Product`, `User`, and other data structures.
+2.  **Notification Service**: Refactor `services/notifications.ts` to improve modularity and error handling. Abstract transport-specific logic (email, Telegram) into separate functions.
+3.  **Dashboard Page**: Refactor `pages/dashboard.tsx` to separate business logic from the view. Introduce a custom hook (e.g., `useProducts`) to handle data fetching, state management, and interactions.
+4.  **API Routes**: Create API routes for product management (CRUD operations) and notification settings.
+5.  **Barcode Scanner**: Improve the `BarcodeScanner` component with better error handling and a more robust scanning implementation.
+6.  **Environment Variables**: Move sensitive information like SMTP credentials and database URLs to a `.env` file.
+7.  **Global Error Handling**: Implement a global error handling strategy to catch unhandled exceptions and provide user-friendly feedback.
 
-## 3. Barcode Scanner Component
+## III. Documentation and Final Review
 
-- [-] Install `html5-qrcode` library (skipped due to installation issues).
-- [x] Create `src/components/BarcodeScanner.tsx`.
-- [ ] Implement camera access and barcode scanning logic.
-- [ ] The component should have a callback function to return the scanned code.
-
-## 4. Notification System
-
-- [x] Install `node-cron`, `nodemailer`, and `telegraf`.
-- [x] Create a new service file `services/notifications.js`.
-- [ ] Implement a cron job to run daily.
-- [ ] The job will fetch users and their products.
-- [ ] It will check for products expiring soon based on `user.notifyDaysBefore`.
-- [ ] Send email notifications via `nodemailer`.
-- [ ] Send Telegram messages via `telegraf`.
-
-## 5. Dashboard UI
-
-- [x] Create a new page `pages/dashboard.js`.
-- [ ] Fetch and display a list of all products.
-- [ ] Implement filters for "Expiring Soon", "Expired", and "All".
-- [ ] Add a "Print Report" button.
-
-## 6. Application Logic & Security
-
-- [x] Create a script to check for the database on startup and run `prisma migrate deploy`.
-- [ ] Ensure sensitive data (passwords, API keys) is stored securely in environment variables.
+1.  **JSDoc Comments**: Add JSDoc comments to all functions and components to improve code clarity.
+2.  **Final Review**: Perform a final review of the entire codebase to ensure all clean code principles have been applied consistently.

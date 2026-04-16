@@ -7,19 +7,30 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  id                 String  @id @default(cuid())
-  notifyDaysBefore   Int     @default(5)
-  smtpHost           String?
-  smtpPort           Int?
-  smtpUser           String?
-  smtpPass           String?
-  telegramChatId     String?
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  barcode     String   @unique
+  expiryDate  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
 }
 
-model Product {
-  id               String   @id @default(cuid())
-  name             String
-  productionDate   DateTime
-  expirationDate   DateTime
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  products  Product[] // Relation to products
+}
+
+model Settings {
+  id                Int    @id @default(1)
+  telegramToken     String?
+  telegramChatId    String?
+  smtpHost          String?
+  smtpPort          Int?    @default(587)
+  smtpUser          String?
+  smtpPass          String?
 }

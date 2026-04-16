@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST="{\"dashboard.tsx -> ../components/ScannerModal\":{\"id\":\"dashboard.tsx -> ../components/ScannerModal\",\"files\":[\"static/chunks/src_components_ScannerModal_tsx.js\"]}}"
