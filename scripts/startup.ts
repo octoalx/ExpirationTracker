@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-import { execSync } from 'child_process';
+import { PrismaClient } from "@prisma/client";
+import { execSync } from "child_process";
 
 const prisma = new PrismaClient();
 
@@ -7,15 +7,15 @@ async function initializeDatabase() {
   try {
     // Attempt a simple query to check if the database is accessible
     await prisma.user.findFirst();
-    console.log('Database is already initialized.');
+    console.log("Database is already initialized.");
   } catch (error) {
-    console.warn('Database not accessible, running migrations...');
+    console.warn("Database not accessible, running migrations...");
     try {
       // Execute prisma migrate deploy command
-      execSync('npx prisma migrate deploy', { stdio: 'inherit' });
-      console.log('Prisma migrations deployed successfully.');
+      execSync("npx prisma migrate deploy", { stdio: "inherit" });
+      console.log("Prisma migrations deployed successfully.");
     } catch (migrationError) {
-      console.error('Failed to deploy Prisma migrations:', migrationError);
+      console.error("Failed to deploy Prisma migrations:", migrationError);
       process.exit(1); // Exit if migrations fail
     }
   } finally {

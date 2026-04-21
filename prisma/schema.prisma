@@ -7,30 +7,95 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model Product {
-  id          String   @id @default(cuid())
-  name        String
-  barcode     String   @unique
-  expiryDate  DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          String    @default("user")
+  accounts      Account[]
+  sessions      Session[]
+  products      Product[]
+  settings      Settings?
 }
 
-model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String
-  products  Product[] // Relation to products
+model Product {
+  id         String   @id @default(cuid())
+  name       String
+  barcode    String   // Убрал @unique, чтобы не блокировать добавление одинаковых товаров
+  expiryDate DateTime
+  status     String   @default("ACTIVE") // ACTIVE, CONSUMED, DISCARDED
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Позволяет одному пользователю иметь несколько одинаковых товаров с разными датами,
+  // но защищает от дубликатов при случайном двойном клике.
+  @@index([userId])
+  @@index([barcode])
 }
 
 model Settings {
-  id                Int    @id @default(1)
-  telegramToken     String?
-  telegramChatId    String?
-  smtpHost          String?
-  smtpPort          Int?    @default(587)
-  smtpUser          String?
-  smtpPass          String?
+  id                     String  @id @default(cuid())
+  userId                 String  @unique // Обязательно для связи 1-к-1 и работы upsert
+  user                   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Telegram интеграция
+  telegramToken          String?
+  telegramChatId         String?
+  telegramNotifications  Boolean @default(true)
+
+  // Email/SMTP интеграция
+  notificationEmail      String?
+  emailNotifications     Boolean @default(false)
+  smtpHost               String?
+  smtpPort               Int?    @default(587)
+  smtpUser               String?
+  smtpPass               String?
+
+  // Настройки логики уведомлений
+  notifyBeforeExpiration Int     @default(3) // За сколько дней начать слать уведомления
+  urgentThreshold        Int     @default(3) // Порог "Критично" (красный цвет)
+  warningThreshold       Int     @default(7) // Порог "Внимание" (желтый цвет)
+
+  // Интерфейс
+  theme                  String  @default("light")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }

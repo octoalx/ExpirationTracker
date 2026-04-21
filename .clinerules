@@ -1,0 +1,9 @@
+# ПРАВИЛА РАЗРАБОТКИ
+
+- Стек: Next.js (Pages Router), Prisma (SQLite), Tailwind.
+- Порядок действий: Сначала логика (API/DB), затем UI.
+- При изменении prisma/schema.prisma ВСЕГДА запускать:
+  npx prisma db push && npx prisma generate
+- Ошибки импорта: Если `@/` не работает, проверь tsconfig.json paths.
+- Стиль: Чистый код, DRY, обработка ошибок через apiErrorHandler.
+- Контекст пользователя: Всегда фильтровать данные через session.user.id.

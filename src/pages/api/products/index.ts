@@ -1,22 +1,44 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../lib/prisma";
 import { apiErrorHandler } from "../../../lib/apiErrorHandler";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../../../lib/auth";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
+  const session = await getServerSession(req, res, authOptions);
+
+  if (!session || !session.user) {
+    return res.status(401).json({ products: [] });
+  }
+
   if (req.method === "GET") {
     try {
-      const products = await prisma.product.findMany();
-      res.status(200).json(products);
+      const { status } = req.query;
+      const where: any = { userId: session.user.id };
+      if (status && typeof status === "string") {
+        where.status = status;
+      }
+
+      const products = await prisma.product.findMany({
+        where,
+      });
+      res.status(200).json({ products });
     } catch (error) {
       apiErrorHandler(error, res);
     }
   } else if (req.method === "POST") {
     try {
+      const { name, barcode, expiryDate } = req.body;
       const product = await prisma.product.create({
-        data: req.body,
+        data: {
+          name,
+          barcode,
+          expiryDate: new Date(expiryDate),
+          userId: session.user.id,
+        },
       });
       res.status(201).json(product);
     } catch (error) {
