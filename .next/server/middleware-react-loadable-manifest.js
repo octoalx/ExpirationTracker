@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"../components/Layout.tsx -> ./ScannerModal\":{\"id\":\"../components/Layout.tsx -> ./ScannerModal\",\"files\":[\"static/chunks/src_components_ScannerModal_tsx.js\"]},\"../components/Layout.tsx -> @/components/CustomCursor\":{\"id\":\"../components/Layout.tsx -> @/components/CustomCursor\",\"files\":[\"static/chunks/src_components_CustomCursor_tsx.js\"]}}"

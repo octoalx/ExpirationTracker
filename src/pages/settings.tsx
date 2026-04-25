@@ -1,10 +1,124 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { User, Bell, Palette, AlertTriangle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import confetti from "canvas-confetti";
+import toast from "react-hot-toast";
+import {
+  User,
+  Bell,
+  Palette,
+  AlertTriangle,
+  Loader2,
+  Send,
+  Mail,
+  Sun,
+  Moon,
+  Monitor,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import IntegrationCard from "@/components/IntegrationCard";
 
+/* ── Reusable focus-glow input ───────────────────────────────────────── */
+interface GlowInputProps {
+  label: string;
+  value: string | number;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+}
+
+function GlowInput({ label, value, onChange, type = "text", placeholder }: GlowInputProps) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={cn(
+          "w-full rounded-xl border bg-slate-50/80 dark:bg-slate-800/60 px-4 py-3 text-sm text-foreground",
+          "border-slate-200 dark:border-slate-700",
+          "transition-all duration-200",
+          "focus:scale-[1.01] focus:border-emerald-400 focus:bg-white dark:focus:bg-slate-800",
+          "focus:ring-2 focus:ring-emerald-300/40 focus:shadow-[0_0_16px_rgba(16,185,129,0.12)]",
+          "placeholder:text-slate-400",
+        )}
+      />
+    </div>
+  );
+}
+
+/* ── Tab definition ──────────────────────────────────────────────────── */
+interface Tab {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+}
+
+const tabs: Tab[] = [
+  { id: "personal", label: "Личные данные", icon: User },
+  { id: "integrations", label: "Интеграции", icon: Bell },
+  { id: "statuses", label: "Статусы", icon: AlertTriangle },
+  { id: "appearance", label: "Оформление", icon: Palette },
+];
+
+/* ── Theme option card ───────────────────────────────────────────────── */
+interface ThemeOptionProps {
+  label: string;
+  value: string;
+  icon: React.ElementType;
+  selected: boolean;
+  onSelect: () => void;
+}
+
+function ThemeOption({ label, value, icon: Icon, selected, onSelect }: ThemeOptionProps) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "relative flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all duration-200",
+        selected
+          ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+          : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600",
+      )}
+    >
+      <div className={cn(
+        "rounded-lg p-2.5",
+        selected
+          ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
+          : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400",
+      )}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <span className={cn(
+        "text-xs font-semibold",
+        selected ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+      )}>
+        {label}
+      </span>
+      {selected && (
+        <motion.div
+          layoutId="theme-check"
+          className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-emerald-500 flex items-center justify-center"
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        >
+          <span className="text-[8px] text-white font-bold">✓</span>
+        </motion.div>
+      )}
+    </button>
+  );
+}
+
+/* ── Settings page ───────────────────────────────────────────────────── */
 const SettingsPage = () => {
   const { data: session, update: updateSession } = useSession();
   const [activeTab, setActiveTab] = useState("personal");
+  const [isSaving, setIsSaving] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const [user, setUser] = useState({
     name: session?.user?.name || "",
@@ -38,346 +152,321 @@ const SettingsPage = () => {
       });
   }, []);
 
-  const handleSave = async () => {
-    const cleanUser = {
-      name: user.name,
-      email: user.email,
-    };
-    const res = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user: cleanUser, settings }),
+  const fireConfetti = () => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const x = (rect.left + rect.width / 2) / window.innerWidth;
+    const y = (rect.top + rect.height / 2) / window.innerHeight;
+    confetti({
+      particleCount: 60,
+      spread: 50,
+      origin: { x, y },
+      colors: ["#059669", "#10b981", "#34d399", "#6ee7b7"],
+      ticks: 100,
+      gravity: 1.3,
+      scalar: 0.85,
     });
-    if (res.ok) {
-      alert("Настройки сохранены!");
-      updateSession({ user: { ...session?.user, ...cleanUser } });
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const cleanUser = { name: user.name, email: user.email };
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: cleanUser, settings }),
+      });
+      if (res.ok) {
+        fireConfetti();
+        toast.success("Настройки сохранены!");
+        updateSession({ user: { ...session?.user, ...cleanUser } });
+      } else {
+        toast.error("Ошибка сохранения");
+      }
+    } catch {
+      toast.error("Ошибка сети");
+    } finally {
+      setIsSaving(false);
     }
   };
 
+  /* Tab content */
   const renderContent = () => {
     switch (activeTab) {
       case "personal":
         return (
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Личные данные</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Имя
-                </label>
-                <input
-                  type="text"
-                  value={user.name}
-                  onChange={(e) => setUser({ ...user, name: e.target.value })}
-                  className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={user.email}
-                  onChange={(e) => setUser({ ...user, email: e.target.value })}
-                  className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
-              </div>
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Личные данные</h2>
+              <p className="text-sm text-muted-foreground">Управление профилем</p>
             </div>
+            <GlowInput
+              label="Имя"
+              value={user.name}
+              onChange={(v) => setUser({ ...user, name: v })}
+              placeholder="Ваше имя"
+            />
+            <GlowInput
+              label="Email"
+              value={user.email}
+              onChange={(v) => setUser({ ...user, email: v })}
+              type="email"
+              placeholder="name@example.com"
+            />
           </div>
         );
+
       case "integrations":
         return (
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Интеграции</h2>
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Telegram</h3>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Включить Telegram уведомления
-                  </span>
-                  <button
-                    onClick={() =>
-                      setSettings({
-                        ...settings,
-                        telegramNotifications: !settings.telegramNotifications,
-                      })
-                    }
-                    className={`${settings.telegramNotifications ? "bg-indigo-600" : "bg-gray-200"} relative inline-flex h-6 w-11 items-center rounded-full`}
-                  >
-                    <span
-                      className={`${settings.telegramNotifications ? "translate-x-6" : "translate-x-1"} inline-block h-4 w-4 transform rounded-full bg-white transition`}
-                    />
-                  </button>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Telegram Token
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.telegramToken || ""}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        telegramToken: e.target.value,
-                      })
-                    }
-                    className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Telegram Chat ID
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.telegramChatId || ""}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        telegramChatId: e.target.value,
-                      })
-                    }
-                    className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm"
-                  />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Email (SMTP)</h3>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Включить Email уведомления
-                  </span>
-                  <button
-                    onClick={() =>
-                      setSettings({
-                        ...settings,
-                        emailNotifications: !settings.emailNotifications,
-                      })
-                    }
-                    className={`${settings.emailNotifications ? "bg-indigo-600" : "bg-gray-200"} relative inline-flex h-6 w-11 items-center rounded-full`}
-                  >
-                    <span
-                      className={`${settings.emailNotifications ? "translate-x-6" : "translate-x-1"} inline-block h-4 w-4 transform rounded-full bg-white transition`}
-                    />
-                  </button>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    SMTP Host
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.smtpHost || ""}
-                    onChange={(e) =>
-                      setSettings({ ...settings, smtpHost: e.target.value })
-                    }
-                    className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    SMTP Port
-                  </label>
-                  <input
-                    type="number"
-                    value={settings.smtpPort || ""}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        smtpPort: parseInt(e.target.value),
-                      })
-                    }
-                    className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    SMTP User
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.smtpUser || ""}
-                    onChange={(e) =>
-                      setSettings({ ...settings, smtpUser: e.target.value })
-                    }
-                    className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    SMTP Password
-                  </label>
-                  <input
-                    type="password"
-                    value={settings.smtpPass || ""}
-                    onChange={(e) =>
-                      setSettings({ ...settings, smtpPass: e.target.value })
-                    }
-                    className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Email для уведомлений
-                  </label>
-                  <input
-                    type="email"
-                    value={settings.notificationEmail || ""}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        notificationEmail: e.target.value,
-                      })
-                    }
-                    className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm"
-                  />
-                </div>
-              </div>
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Интеграции</h2>
+              <p className="text-sm text-muted-foreground">Уведомления и подключения</p>
             </div>
+
+            {/* Telegram */}
+            <IntegrationCard
+              title="Telegram"
+              description="Мгновенные уведомления в мессенджер"
+              icon={<Send className="h-5 w-5 text-white" />}
+              gradient="from-sky-400 to-blue-500"
+              enabled={settings.telegramNotifications}
+              onToggle={(v) => setSettings({ ...settings, telegramNotifications: v })}
+            >
+              <GlowInput
+                label="Bot Token"
+                value={settings.telegramToken || ""}
+                onChange={(v) => setSettings({ ...settings, telegramToken: v })}
+                placeholder="123456:ABC-DEF..."
+              />
+              <GlowInput
+                label="Chat ID"
+                value={settings.telegramChatId || ""}
+                onChange={(v) => setSettings({ ...settings, telegramChatId: v })}
+                placeholder="123456789"
+              />
+            </IntegrationCard>
+
+            {/* Email */}
+            <IntegrationCard
+              title="Email (SMTP)"
+              description="Уведомления на электронную почту"
+              icon={<Mail className="h-5 w-5 text-white" />}
+              gradient="from-rose-400 to-pink-500"
+              enabled={settings.emailNotifications}
+              onToggle={(v) => setSettings({ ...settings, emailNotifications: v })}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <GlowInput
+                  label="SMTP Host"
+                  value={settings.smtpHost || ""}
+                  onChange={(v) => setSettings({ ...settings, smtpHost: v })}
+                  placeholder="smtp.example.com"
+                />
+                <GlowInput
+                  label="SMTP Port"
+                  value={settings.smtpPort || ""}
+                  onChange={(v) => setSettings({ ...settings, smtpPort: parseInt(v) || 0 })}
+                  type="number"
+                  placeholder="587"
+                />
+              </div>
+              <GlowInput
+                label="SMTP User"
+                value={settings.smtpUser || ""}
+                onChange={(v) => setSettings({ ...settings, smtpUser: v })}
+                placeholder="user@example.com"
+              />
+              <GlowInput
+                label="SMTP Password"
+                value={settings.smtpPass || ""}
+                onChange={(v) => setSettings({ ...settings, smtpPass: v })}
+                type="password"
+              />
+              <GlowInput
+                label="Email для уведомлений"
+                value={settings.notificationEmail || ""}
+                onChange={(v) => setSettings({ ...settings, notificationEmail: v })}
+                type="email"
+                placeholder="notify@example.com"
+              />
+            </IntegrationCard>
           </div>
         );
+
       case "statuses":
         return (
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Статусы</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  "Срочно" (дней до)
-                </label>
-                <input
-                  type="number"
-                  value={settings.urgentThreshold}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      urgentThreshold: parseInt(e.target.value),
-                    })
-                  }
-                  className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Статусы</h2>
+              <p className="text-sm text-muted-foreground">Пороги для срочности товаров</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="relative rounded-2xl p-px overflow-hidden">
+                <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-red-400 to-rose-500 opacity-40" />
+                <div className="relative rounded-2xl bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-lg bg-red-100 dark:bg-red-900/50 p-1.5">
+                      <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">Срочно</span>
+                  </div>
+                  <GlowInput
+                    label="Дней до истечения"
+                    value={settings.urgentThreshold}
+                    onChange={(v) => setSettings({ ...settings, urgentThreshold: parseInt(v) || 0 })}
+                    type="number"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  "Внимание" (дней до)
-                </label>
-                <input
-                  type="number"
-                  value={settings.warningThreshold}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      warningThreshold: parseInt(e.target.value),
-                    })
-                  }
-                  className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
+              <div className="relative rounded-2xl p-px overflow-hidden">
+                <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-amber-400 to-orange-500 opacity-40" />
+                <div className="relative rounded-2xl bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-lg bg-amber-100 dark:bg-amber-900/50 p-1.5">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">Внимание</span>
+                  </div>
+                  <GlowInput
+                    label="Дней до истечения"
+                    value={settings.warningThreshold}
+                    onChange={(v) => setSettings({ ...settings, warningThreshold: parseInt(v) || 0 })}
+                    type="number"
+                  />
+                </div>
               </div>
             </div>
           </div>
         );
+
       case "appearance":
         return (
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Оформление</h2>
+          <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Тема
-              </label>
-              <select
-                value={settings.theme}
-                onChange={(e) =>
-                  setSettings({ ...settings, theme: e.target.value })
-                }
-                className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              >
-                <option value="light">Светлая</option>
-                <option value="dark">Темная</option>
-              </select>
+              <h2 className="text-lg font-bold text-foreground">Оформление</h2>
+              <p className="text-sm text-muted-foreground">Выберите тему интерфейса</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <ThemeOption
+                label="Светлая"
+                value="light"
+                icon={Sun}
+                selected={settings.theme === "light"}
+                onSelect={() => setSettings({ ...settings, theme: "light" })}
+              />
+              <ThemeOption
+                label="Тёмная"
+                value="dark"
+                icon={Moon}
+                selected={settings.theme === "dark"}
+                onSelect={() => setSettings({ ...settings, theme: "dark" })}
+              />
+              <ThemeOption
+                label="Системная"
+                value="system"
+                icon={Monitor}
+                selected={settings.theme === "system"}
+                onSelect={() => setSettings({ ...settings, theme: "system" })}
+              />
             </div>
           </div>
         );
+
       default:
         return null;
     }
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-6">Настройки</h1>
-      <div className="flex space-x-8">
-        {/* Sidebar */}
-        <div className="w-1/4">
-          <ul className="space-y-2">
-            <li>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setActiveTab("personal");
-                }}
-                className={`flex items-center space-x-3 p-2 rounded-md ${activeTab === "personal" ? "bg-slate-200" : ""}`}
-              >
-                <User size={20} />
-                <span>Личные данные</span>
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setActiveTab("integrations");
-                }}
-                className={`flex items-center space-x-3 p-2 rounded-md ${activeTab === "integrations" ? "bg-slate-200" : ""}`}
-              >
-                <Bell size={20} />
-                <span>Интеграции</span>
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setActiveTab("statuses");
-                }}
-                className={`flex items-center space-x-3 p-2 rounded-md ${activeTab === "statuses" ? "bg-slate-200" : ""}`}
-              >
-                <AlertTriangle size={20} />
-                <span>Статусы</span>
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setActiveTab("appearance");
-                }}
-                className={`flex items-center space-x-3 p-2 rounded-md ${activeTab === "appearance" ? "bg-slate-200" : ""}`}
-              >
-                <Palette size={20} />
-                <span>Оформление</span>
-              </a>
-            </li>
-          </ul>
-        </div>
+    <div className="mx-auto max-w-4xl p-4 md:p-8">
+      {/* Page title */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="mb-6"
+      >
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+          Настройки
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">Управление аккаунтом и настройками</p>
+      </motion.div>
 
-        {/* Content */}
-        <div className="w-3/4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-          {renderContent()}
-          <div className="mt-6">
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-            >
-              Сохранить изменения
-            </button>
-          </div>
+      {/* ── Animated tabs ─────────────────────────────────────────── */}
+      <div className="relative mb-8">
+        <div className="flex gap-1 overflow-x-auto pb-px scrollbar-none">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "relative flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-xl",
+                  "transition-colors duration-200",
+                  active
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <tab.icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+                {active && (
+                  <motion.div
+                    layoutId="settings-tab-underline"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-emerald-500"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="h-px bg-slate-200 dark:bg-slate-700" />
+      </div>
+
+      {/* ── Tab content ───────────────────────────────────────────── */}
+      <div className="glass-card p-6">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            {renderContent()}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Save button */}
+        <div className="mt-8 pt-5 border-t border-slate-200/60 dark:border-slate-700/40">
+          <button
+            ref={btnRef}
+            onClick={handleSave}
+            disabled={isSaving}
+            className={cn(
+              "relative inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white",
+              "bg-linear-to-r from-emerald-600 to-teal-500",
+              "shadow-lg shadow-emerald-500/20 dark:shadow-emerald-900/30",
+              "hover:shadow-emerald-500/30 hover:scale-[1.02]",
+              "active:scale-[0.98]",
+              "transition-all duration-200",
+              "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100",
+            )}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Сохранение…
+              </>
+            ) : (
+              "Сохранить изменения"
+            )}
+          </button>
         </div>
       </div>
     </div>

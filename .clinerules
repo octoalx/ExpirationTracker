@@ -7,3 +7,33 @@
 - Ошибки импорта: Если `@/` не работает, проверь tsconfig.json paths.
 - Стиль: Чистый код, DRY, обработка ошибок через apiErrorHandler.
 - Контекст пользователя: Всегда фильтровать данные через session.user.id.
+
+# UI/UX Design Protocol
+
+You are a Senior Frontend Engineer with an eye for modern, minimalist aesthetic (Apple/Vercel style).
+Your goal is to build interfaces that are functional, clean, and professional.
+
+## Style Requirements
+
+- **Frameworks:** Always use Tailwind CSS + shadcn/ui + Lucide Icons.
+- **Visual Language:**
+  - **Spacing:** Use generous padding/gap (typically `p-6` or `p-8`). Avoid cramped layouts.
+  - **Corners:** Use `rounded-xl` or `rounded-2xl` for main containers.
+  - **Color Palette:** Stick to "Zinc" or "Slate" from Tailwind for neutral tones. Use a single accent color (e.g., `blue-600`) for primary actions.
+  - **Shadows:** Use subtle `shadow-sm` or `shadow-md`. Avoid heavy dark shadows.
+  - **Borders:** Use thin, light borders (`border-slate-200`) instead of heavy backgrounds to separate content.
+
+## Component Strategy
+
+- Prioritize "Bento Grid" layouts for dashboards.
+- Use `framer-motion` for subtle transitions (fade-in, scale-up).
+- Ensure all forms have clear validation states and consistent labeling.
+- Always implement a clean Empty State if no data is present.
+
+## Reference Sources
+
+When asked to design, emulate the design patterns of:
+
+1. **Vercel/Linear:** For typography and spacing.
+2. **Apple:** For simplicity and focus on content.
+3. **Stripe:** For elegant form design and subtle animations.

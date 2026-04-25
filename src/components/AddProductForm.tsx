@@ -1,21 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { addDays, addMonths, addWeeks, format } from "date-fns";
-import { Loader2, Barcode, Calendar, Package } from "lucide-react";
+import { Loader2, Barcode, Package, Calendar, Factory } from "lucide-react";
+import toast from "react-hot-toast";
 
-const AddProductForm = ({ onProductAdded }) => {
-  const [barcode, setBarcode] = useState("");
+interface AddProductFormProps {
+  onProductAdded: (product: Record<string, unknown>) => void;
+  initialBarcode?: string;
+}
+
+type DateInputType = "expiry" | "manufacture";
+type ShelfLifeUnit = "days" | "weeks" | "months";
+
+export default function AddProductForm({
+  onProductAdded,
+  initialBarcode = "",
+}: AddProductFormProps) {
+  const [barcode, setBarcode] = useState(initialBarcode);
   const [name, setName] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [dateInputType, setDateInputType] = useState<"expiry" | "manufacture">(
-    "expiry",
-  );
+  const [dateInputType, setDateInputType] = useState<DateInputType>("expiry");
   const [manufacturingDate, setManufacturingDate] = useState("");
   const [shelfLife, setShelfLife] = useState("");
-  const [shelfLifeUnit, setShelfLifeUnit] = useState<
-    "days" | "weeks" | "months"
-  >("months");
+  const [shelfLifeUnit, setShelfLifeUnit] = useState<ShelfLifeUnit>("months");
 
+  // Автоматический расчёт срока годности
   useEffect(() => {
     if (
       dateInputType === "manufacture" &&
@@ -33,89 +42,98 @@ const AddProductForm = ({ onProductAdded }) => {
     }
   }, [dateInputType, manufacturingDate, shelfLife, shelfLifeUnit]);
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    if (initialBarcode) setBarcode(initialBarcode);
+  }, [initialBarcode]);
+
+  const resetForm = () => {
+    setBarcode("");
+    setName("");
+    setExpiryDate("");
+    setManufacturingDate("");
+    setShelfLife("");
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const productData = { name, barcode, expiryDate };
-    const res = await fetch("/api/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(productData),
-    });
-    if (res.ok) {
-      onProductAdded(await res.json());
-      setBarcode("");
-      setName("");
-      setExpiryDate("");
-      setManufacturingDate("");
-      setShelfLife("");
+    setIsLoading(true);
+
+    try {
+      const productData = { name, barcode, expiryDate };
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productData),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        toast.success("Товар добавлен!");
+        resetForm();
+        onProductAdded(data);
+      } else {
+        toast.error("Не удалось добавить товар");
+      }
+    } catch {
+      toast.error("Ошибка сети");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const inputStyles =
-    "bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-slate-900 transition-all duration-300 focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100/50 focus:shadow-inner";
-  const labelStyles =
-    "text-slate-600 font-semibold text-xs uppercase tracking-wider mb-1.5";
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Barcode Input */}
+      {/* Штрих-код */}
       <div>
-        <label htmlFor="barcode" className={labelStyles}>
+        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+          <Barcode size={14} />
           Штрих-код
         </label>
-        <div className="relative">
-          <Barcode
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            size={20}
-          />
-          <input
-            id="barcode"
-            type="text"
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-            className={`${inputStyles} pl-10`}
-            placeholder="8000500310427"
-          />
-          {isLoading && (
-            <Loader2 className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          )}
-        </div>
+        <input
+          type="text"
+          value={barcode}
+          onChange={(e) => setBarcode(e.target.value)}
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          placeholder="Введите или отсканируйте штрих-код"
+        />
+        <p className="text-xs text-slate-400 mt-1">Например: 4601234567890</p>
       </div>
 
-      {/* Name Input */}
+      {/* Название */}
       <div>
-        <label htmlFor="name" className={labelStyles}>
+        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+          <Package size={14} />
           Название продукта
         </label>
-        <div className="relative">
-          <Package
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            size={20}
-          />
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={`${inputStyles} pl-10`}
-            placeholder="Герметик"
-            required
-          />
-        </div>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          placeholder="Например: Молоко «Вкусное» 3.2%"
+          required
+        />
       </div>
 
-      {/* Date Calculation Type */}
+      {/* Разделитель */}
+      <div className="border-t border-slate-100 my-4" />
+
+      {/* Способ указания даты */}
       <div>
-        <div className="flex items-center gap-4">
+        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+          <Calendar size={14} />
+          Способ указания даты
+        </label>
+        <div className="flex gap-4">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="radio"
               value="expiry"
               checked={dateInputType === "expiry"}
               onChange={() => setDateInputType("expiry")}
-              className="accent-emerald-600"
+              className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
             />
-            <span className={labelStyles}>Срок годности</span>
+            <span className="text-sm text-slate-700">Срок годности</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -123,87 +141,115 @@ const AddProductForm = ({ onProductAdded }) => {
               value="manufacture"
               checked={dateInputType === "manufacture"}
               onChange={() => setDateInputType("manufacture")}
-              className="accent-emerald-600"
+              className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
             />
-            <span className={labelStyles}>Дата изготовления</span>
+            <span className="text-sm text-slate-700">Дата изготовления</span>
           </label>
         </div>
       </div>
 
-      <div className="min-h-30">
-        {dateInputType === "expiry" ? (
+      {/* Поля в зависимости от выбора */}
+      {dateInputType === "expiry" ? (
+        <div>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+            <Calendar size={14} />
+            Дата окончания срока годности
+          </label>
+          <input
+            type="date"
+            value={expiryDate}
+            onChange={(e) => setExpiryDate(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+            required
+          />
+        </div>
+      ) : (
+        <div className="space-y-4">
           <div>
-            <label htmlFor="expiryDate" className={labelStyles}>
-              Дата окончания срока годности
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+              <Factory size={14} />
+              Дата изготовления
             </label>
-            <div className="relative">
-              <Calendar
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={20}
-              />
-              <input
-                id="expiryDate"
-                type="date"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                className={`${inputStyles} pl-10`}
-                required
-              />
-            </div>
+            <input
+              type="date"
+              value={manufacturingDate}
+              onChange={(e) => setManufacturingDate(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+              required
+            />
           </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="manufacturingDate" className={labelStyles}>
-                Дата изготовления
-              </label>
-              <input
-                id="manufacturingDate"
-                type="date"
-                value={manufacturingDate}
-                onChange={(e) => setManufacturingDate(e.target.value)}
-                className={inputStyles}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="shelfLife" className={labelStyles}>
-                Срок годности
-              </label>
-              <div className="flex flex-wrap sm:flex-nowrap">
-                <input
-                  id="shelfLife"
-                  type="number"
-                  value={shelfLife}
-                  onChange={(e) => setShelfLife(e.target.value)}
-                  className={`${inputStyles} rounded-r-none z-10 min-w-0`}
-                  required
-                />
-                <select
-                  value={shelfLifeUnit}
-                  onChange={(e) => setShelfLifeUnit(e.target.value as any)}
-                  /* Добавляем w-[140px] для фиксации ширины и focus:z-20 для рамки */
-                  className={`${inputStyles} rounded-l-none -ml-px w-35 shrink-0 focus:z-20 relative`}
-                >
-                  <option value="days">Дней</option>
-                  <option value="weeks">Недель</option>
-                  <option value="months">Месяцев</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Submit Button */}
+          <div>
+  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">
+    Срок хранения
+  </label>
+  <div className="flex gap-3">
+    <input
+      type="number"
+      value={shelfLife}
+      onChange={(e) => setShelfLife(e.target.value)}
+      className="w-28 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400"
+      placeholder="Кол-во"
+    />
+    
+    <div className="flex-1 grid grid-cols-3 gap-2">
+      <button
+        type="button"
+        onClick={() => setShelfLifeUnit("days")}
+        className={`py-3 rounded-xl text-sm font-medium transition-all ${
+          shelfLifeUnit === "days"
+            ? "bg-emerald-600 text-white shadow-md"
+            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+        }`}
+      >
+        Дни
+      </button>
+      <button
+        type="button"
+        onClick={() => setShelfLifeUnit("weeks")}
+        className={`py-3 rounded-xl text-sm font-medium transition-all ${
+          shelfLifeUnit === "weeks"
+            ? "bg-emerald-600 text-white shadow-md"
+            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+        }`}
+      >
+        Недели
+      </button>
+      <button
+        type="button"
+        onClick={() => setShelfLifeUnit("months")}
+        className={`py-3 rounded-xl text-sm font-medium transition-all ${
+          shelfLifeUnit === "months"
+            ? "bg-emerald-600 text-white shadow-md"
+            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+        }`}
+      >
+        Месяцы
+      </button>
+    </div>
+  </div>
+</div>
+        </div>
+      )}
+
+      {/* Разделитель */}
+      <div className="border-t border-slate-100 my-4" />
+
+      {/* Кнопка отправки */}
       <button
         type="submit"
-        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-3.5 font-bold transition-all shadow-lg shadow-emerald-200/70 hover:shadow-emerald-300 hover:scale-[1.02] transform"
+        disabled={isLoading}
+        className="w-full bg-linear-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-semibold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        Добавить товар
+        {isLoading ? (
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Добавление...
+          </span>
+        ) : (
+          "Добавить товар"
+        )}
       </button>
     </form>
   );
-};
-
-export default AddProductForm;
+}

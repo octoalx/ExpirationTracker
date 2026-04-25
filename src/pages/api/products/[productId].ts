@@ -32,8 +32,19 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     } catch (error) {
       apiErrorHandler(error, res);
     }
+  } else if (req.method === "PATCH") {
+    try {
+      const { name, barcode, expiryDate } = req.body;
+      const updatedProduct = await prisma.product.update({
+        where: { id: String(productId), userId: session.user.id },
+        data: { name, barcode, expiryDate: new Date(expiryDate) },
+      });
+      res.status(200).json(updatedProduct);
+    } catch (error) {
+      apiErrorHandler(error, res);
+    }
   } else {
-    res.setHeader("Allow", ["DELETE", "PUT"]);
+    res.setHeader("Allow", ["DELETE", "PUT", "PATCH"]);
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 };

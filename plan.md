@@ -1,24 +1,57 @@
-# Code Audit and Refactoring Plan
+# Admin Panel Redesign Plan
 
-This plan outlines the steps to audit the existing codebase and refactor it according to the provided clean code principles.
+## 1. Research and Discovery
 
-## I. Audit Existing Codebase
+- [x] Explore Adobe Spectrum design system: `spectrum.adobe.com`
+- [x] Explore React Spectrum implementation: `react-spectrum.adobe.com`
+- [x] Analyze core principles: "Adaptive Design", "Hierarchy", and "Platform Scale".
+- [x] Identify key components for the redesign: Buttons, Tables, Dialogs, Nav.
 
-1.  **`services/notifications.ts`**: Review for SOLID principles, error handling, and type safety.
-2.  **`pages/dashboard.tsx`**: Analyze for separation of concerns (logic vs. view), component architecture, and state management.
-3.  **`scripts/startup.ts`**: Examine for clarity, error handling, and adherence to best practices.
+## 2. Technical Stack Setup
 
-## II. Refactoring and Implementation
+- [ ] Install necessary `@adobe/react-spectrum` packages.
+- [ ] Configure Spectrum's `Provider` for color schemes (Light/Dark) and scale (Medium).
 
-1.  **Type Definitions**: Create a `types/index.ts` file to centralize all type definitions for `Product`, `User`, and other data structures.
-2.  **Notification Service**: Refactor `services/notifications.ts` to improve modularity and error handling. Abstract transport-specific logic (email, Telegram) into separate functions.
-3.  **Dashboard Page**: Refactor `pages/dashboard.tsx` to separate business logic from the view. Introduce a custom hook (e.g., `useProducts`) to handle data fetching, state management, and interactions.
-4.  **API Routes**: Create API routes for product management (CRUD operations) and notification settings.
-5.  **Barcode Scanner**: Improve the `BarcodeScanner` component with better error handling and a more robust scanning implementation.
-6.  **Environment Variables**: Move sensitive information like SMTP credentials and database URLs to a `.env` file.
-7.  **Global Error Handling**: Implement a global error handling strategy to catch unhandled exceptions and provide user-friendly feedback.
+## 3. Design Audit and Component Replacement
 
-## III. Documentation and Final Review
+- [ ] Analyze the existing admin panel code in `src/pages/admin/index.tsx`, `src/pages/admin/users.tsx` and `src/pages/admin/issues.tsx`.
+- [ ] Identify all custom CSS and generic components that can be replaced.
+- [ ] Replace custom layout components with Spectrum’s layout primitives (`Flex`, `Grid`, `View`).
+- [ ] Replace existing `Table` components with Spectrum's `TableView`.
 
-1.  **JSDoc Comments**: Add JSDoc comments to all functions and components to improve code clarity.
-2.  **Final Review**: Perform a final review of the entire codebase to ensure all clean code principles have been applied consistently.
+## 4. Functionality Implementation
+
+- [ ] Implement "Status Grips" for expiration dates using semantic colors.
+- [ ] Red: expired
+- [ ] Orange: "due soon"
+- [ ] Green: "safe"
+- [ ] Ensure the layout is fully responsive and accessible.
+
+## 5. Refactoring and Output
+
+- [ ] Refactor the main Dashboard (`src/pages/admin/index.tsx`).
+- [ ] Refactor the Item List (`src/pages/admin/users.tsx` and `src/pages/admin/issues.tsx`).
+- [ ] Provide the refactored code for the main Dashboard and Item List.
+
+## Todo List
+
+- [ ] **Research & Discovery**
+  - [x] Explore Adobe Spectrum design system.
+  - [x] Explore React Spectrum implementation.
+  - [x] Analyze core principles.
+  - [x] Identify key components.
+- [ ] **Technical Stack Setup**
+  - [ ] Install `@adobe/react-spectrum` packages.
+  - [ ] Configure Spectrum's `Provider`.
+- [ ] **Design Audit & Component Replacement**
+  - [ ] Analyze existing admin panel code.
+  - [ ] Replace custom CSS and components.
+  - [ ] Replace layout components.
+  - [ ] Replace tables.
+- [ ] **Functionality**
+  - [ ] Implement "Status Grips".
+  - [ ] Ensure responsiveness and accessibility.
+- [ ] **Refactoring & Output**
+  - [ ] Refactor Dashboard.
+  - [ ] Refactor Item Lists.
+  - [ ] Provide refactored code.

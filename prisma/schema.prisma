@@ -14,7 +14,7 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
-  role          String    @default("user")
+  role          String    @default("USER") // USER or ADMIN
   accounts      Account[]
   sessions      Session[]
   products      Product[]
@@ -98,4 +98,12 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  level     String   // e.g., 'INFO', 'WARN', 'ERROR'
+  message   String
+  meta      String?    // Optional structured data
 }
