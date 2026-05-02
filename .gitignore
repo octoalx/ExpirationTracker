@@ -85,4 +85,5 @@ coverage/
 .windsurfrules/
 .cursor/
 skills-lock.json
-EOF
+EOF.next/server/pages/auth/
+.next/static/chunks/pages/auth/
