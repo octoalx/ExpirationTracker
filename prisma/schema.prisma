@@ -107,3 +107,19 @@ model SystemLog {
   message   String
   meta      String?    // Optional structured data
 }
+
+model EmailLog {
+  id         String    @id @default(cuid())
+  createdAt  DateTime  @default(now())
+  userId     String?
+  to         String
+  subject    String
+  status     String    @default("QUEUED") // QUEUED | SENT | FAILED
+  messageId  String?
+  error      String?
+  retryCount Int       @default(0)
+  sentAt     DateTime?
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}

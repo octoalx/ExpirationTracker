@@ -1,12 +1,12 @@
 import cron from "node-cron";
-import { checkAndSendEmails } from "./notificationService";
+import { sendExpirationNotifications } from "../services/notificationService";
 
 // Schedule to run every day at 10:00 AM
 const scheduledTask = cron.schedule(
   "0 10 * * *",
   () => {
-    console.log("Running scheduled task: checkAndSendEmails");
-    checkAndSendEmails().catch((err) => {
+    console.log("Running scheduled task: sendExpirationNotifications");
+    sendExpirationNotifications().catch((err) => {
       console.error("Error during scheduled email check:", err);
     });
   },
