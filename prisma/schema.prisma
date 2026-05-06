@@ -1,6 +1,5 @@
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -26,7 +25,9 @@ model Product {
   name       String
   barcode    String   // Убрал @unique, чтобы не блокировать добавление одинаковых товаров
   expiryDate DateTime
-  status     String   @default("ACTIVE") // ACTIVE, CONSUMED, DISCARDED
+  status     String   @default("ACTIVE") // ACTIVE, ARCHIVED, DEFECT
+  isExpired  Boolean  @default(false)   // Авто-флаг просрочки
+  quantity   Int?                         // Опциональное количество
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   userId     String
@@ -36,6 +37,7 @@ model Product {
   // но защищает от дубликатов при случайном двойном клике.
   @@index([userId])
   @@index([barcode])
+  @@index([status])
 }
 
 model Settings {

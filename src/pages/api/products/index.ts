@@ -31,12 +31,13 @@ export default async function handler(
     }
   } else if (req.method === "POST") {
     try {
-      const { name, barcode, expiryDate } = req.body;
+      const { name, barcode, expiryDate, quantity } = req.body;
       const product = await prisma.product.create({
         data: {
           name,
           barcode,
           expiryDate: new Date(expiryDate),
+          quantity: quantity || null,
           userId: session.user.id,
         },
       });
