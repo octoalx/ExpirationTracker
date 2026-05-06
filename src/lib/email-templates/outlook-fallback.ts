@@ -13,29 +13,13 @@ import {
 export function textFallbackSummary(data: SummaryEmailData): string {
   const { userName, products, appUrl } = data;
 
-  const hasExpired = products.some(p => p.urgency === "expired");
-  const hasCritical = products.some(p => p.urgency === "critical");
-  const hasWarning = products.some(p => p.urgency === "warning");
-
-  const summaryTitle = hasExpired
-    ? "⚠️ ОБНАРУЖЕНЫ ПРОСРОЧЕННЫЕ ТОВАРЫ!"
-    : hasCritical
-    ? "🚨 ТРЕБУЕТСЯ СРОЧНОЕ ВНИМАНИЕ"
-    : hasWarning
-    ? "⚡ Товары с истекающим сроком"
-    : "📋 Сводка по срокам годности";
-
   const lines: string[] = [
     "═══════════════════════════════════════",
     "           📦 EXPITRACK",
     "      Контроль сроков годности",
     "═══════════════════════════════════════",
     "",
-    `Привет${userName ? ', ' + userName : ''}!`,
-    "",
-    summaryTitle,
-    "",
-    `У вас ${products.length} ${getProductWordForm(products.length)}, требующих внимания:`,
+    `Привет${userName ? ', ' + userName : ''}! У вас ${products.length} ${getProductWordForm(products.length)} с истекающим сроком.`,
     "",
     "───────────────────────────────────────",
     "СПИСОК ТОВАРОВ:",
@@ -63,12 +47,6 @@ export function textFallbackSummary(data: SummaryEmailData): string {
 
   lines.push("───────────────────────────────────────");
   lines.push("");
-
-  if (appUrl) {
-    lines.push("🔗 Перейти в приложение:");
-    lines.push(appUrl);
-    lines.push("");
-  }
 
   lines.push("═══════════════════════════════════════");
   lines.push("ExpiTrack — система автоматического");
@@ -110,12 +88,6 @@ export function textFallbackExpiration(data: ExpirationEmailData, appUrl?: strin
     "",
     "───────────────────────────────────────",
   ];
-
-  if (appUrl) {
-    lines.push("");
-    lines.push("🔗 Перейти в приложение:");
-    lines.push(appUrl);
-  }
 
   lines.push("");
   lines.push("═══════════════════════════════════════");

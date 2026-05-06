@@ -1,6 +1,8 @@
 import cron from "node-cron";
-import { sendExpirationNotifications } from "../services/notificationService";
+import { sendDailyUrgentNotifications, sendWarningNotifications } from "../services/notificationService";
 import { prisma } from "./prisma";
+
+const TIMEZONE = "Europe/Minsk";
 
 // Update expired products flag
 async function updateExpiredProducts() {
@@ -20,27 +22,30 @@ async function updateExpiredProducts() {
   }
 }
 
-// Schedule to run every day at 10:00 AM
-const scheduledTask = cron.schedule(
+// Ежедневно в 10:00 по Минску:
+// 1. Срочные товары (≤ urgentThreshold) — каждый день
+// 2. Внимание (urgentThreshold < days ≤ warningThreshold) — один раз на товар
+const dailyTask = cron.schedule(
   "0 10 * * *",
   () => {
-    console.log("Running scheduled tasks...");
-    // Update expired products
+    console.log("[Cron] Running daily notifications at 10:00 Minsk...");
     updateExpiredProducts().catch((err) => {
-      console.error("Error during expired products update:", err);
+      console.error("[Cron] Error updating expired products:", err);
     });
-    // Send notifications
-    sendExpirationNotifications().catch((err) => {
-      console.error("Error during scheduled email check:", err);
+    sendDailyUrgentNotifications().catch((err) => {
+      console.error("[Cron] Error sending daily urgent notifications:", err);
+    });
+    sendWarningNotifications().catch((err) => {
+      console.error("[Cron] Error sending warning notifications:", err);
     });
   },
   {
-    scheduled: false, // Don't start immediately
-    timezone: "Europe/Moscow", // User's timezone
+    scheduled: false,
+    timezone: TIMEZONE,
   },
 );
 
 export function startCronJobs() {
-  console.log("Starting cron jobs...");
-  scheduledTask.start();
+  console.log("[Cron] Starting cron jobs (timezone: " + TIMEZONE + ")...");
+  dailyTask.start();
 }

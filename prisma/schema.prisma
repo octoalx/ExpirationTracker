@@ -26,8 +26,9 @@ model Product {
   barcode    String   // Убрал @unique, чтобы не блокировать добавление одинаковых товаров
   expiryDate DateTime
   status     String   @default("ACTIVE") // ACTIVE, ARCHIVED, DEFECT
-  isExpired  Boolean  @default(false)   // Авто-флаг просрочки
-  quantity   Int?                         // Опциональное количество
+  isExpired          Boolean   @default(false)   // Авто-флаг просрочки
+  quantity           Int?                         // Опциональное количество
+  warningNotifiedAt  DateTime?                    // Дата отправки разового уведомления "Внимание"
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   userId     String
