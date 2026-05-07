@@ -12,8 +12,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
-const CustomCursor = dynamic(() => import("@/components/CustomCursor"), { ssr: false });
 import BackToTop from "@/components/BackToTop";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 const ScannerModal = dynamic(() => import("./ScannerModal"), { ssr: false });
 
@@ -106,6 +106,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-animated-gradient">
+      <AnimatedBackground />
       {/* ─── Desktop Sidebar ────────────────────────────────────────── */}
       <aside
         className={cn(
@@ -319,7 +320,6 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* ─── Global UI ────────────────────────────────────────────── */}
       <BackToTop />
-      <CustomCursor />
     </div>
   );
 }

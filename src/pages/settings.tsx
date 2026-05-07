@@ -10,7 +10,6 @@ import {
   Loader2,
   Send,
   Mail,
-  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import IntegrationCard from "@/components/IntegrationCard";
@@ -67,7 +66,6 @@ const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState("personal");
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingEmail, setIsTestingEmail] = useState(false);
-  const [isSendingNow, setIsSendingNow] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
 
   const [user, setUser] = useState({
@@ -155,23 +153,6 @@ const SettingsPage = () => {
       toast.error("Ошибка отправки тестового письма");
     } finally {
       setIsTestingEmail(false);
-    }
-  };
-
-  const handleSendNow = async () => {
-    setIsSendingNow(true);
-    try {
-      const res = await fetch("/api/email/send-now", { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(data.message);
-      } else {
-        toast.error(data.message);
-      }
-    } catch {
-      toast.error("Ошибка отправки уведомлений");
-    } finally {
-      setIsSendingNow(false);
     }
   };
 
@@ -309,24 +290,6 @@ const SettingsPage = () => {
                     <Mail className="h-3.5 w-3.5" />
                   )}
                   Тестовое письмо
-                </button>
-                <button
-                  onClick={handleSendNow}
-                  disabled={isSendingNow || !settings.emailNotifications}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium",
-                    "bg-emerald-100 text-emerald-700 hover:bg-emerald-200",
-                    "dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                    "transition-colors",
-                  )}
-                >
-                  {isSendingNow ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Play className="h-3.5 w-3.5" />
-                  )}
-                  Отправить сейчас
                 </button>
               </div>
             </IntegrationCard>
