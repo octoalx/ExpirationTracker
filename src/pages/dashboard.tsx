@@ -485,7 +485,7 @@ const Dashboard = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               aria-label="Search"
-              placeholder="Поиск по названию..."
+              placeholder="Поиск по названию и штрих-коду ..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-emerald-200 dark:border-emerald-800 focus:border-emerald-500"
