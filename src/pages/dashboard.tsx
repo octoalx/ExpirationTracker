@@ -285,6 +285,8 @@ const Dashboard = () => {
     setCurrentPage(1);
     setItemsPerPage(DEFAULT_ITEMS_PER_PAGE);
     setSelectedIds([]);
+    setSortField("createdAt");
+    setSortDesc(true);
   };
 
   /* ── Bulk actions ───────────────────────────────────────────────────── */
@@ -337,9 +339,7 @@ const Dashboard = () => {
       // Status filter - new model: ALL, ACTIVE, EXPIRED, ARCHIVED, DEFECT
       if (statusFilter !== "ALL") {
         if (statusFilter === "EXPIRED") {
-          // Expired items: isExpired flag or past date
-          const isPast = new Date(p.expiryDate) < new Date();
-          if (!p.isExpired && !isPast) return false;
+          if (p.status !== "ACTIVE" || new Date(p.expiryDate) >= new Date()) return false;
         } else if (p.status !== statusFilter) {
           return false;
         }

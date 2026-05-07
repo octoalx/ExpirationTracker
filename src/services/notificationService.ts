@@ -153,9 +153,8 @@ export async function sendDailyUrgentNotifications(userId?: string): Promise<Sen
 }
 
 /**
- * Разовое уведомление "Внимание" — товары, которые впервые вошли в диапазон
- * (urgentThreshold < daysUntil ≤ warningThreshold). Отправляется один раз,
- * повторно не шлётся (флаг warningNotifiedAt на продукте).
+ * Уведомление "Внимание" — товары у которых сегодня ровно warningThreshold дней.
+ * Отправляется каждый день в указанное время. Если таких товаров нет — ничего не делает.
  */
 export async function sendWarningNotifications(userId?: string): Promise<SendResult[]> {
   const results: SendResult[] = [];
@@ -175,12 +174,7 @@ export async function sendWarningNotifications(userId?: string): Promise<SendRes
           emailNotifications: true,
         },
       },
-      products: {
-        where: {
-          status: "ACTIVE",
-          warningNotifiedAt: null,
-        },
-      },
+      products: { where: { status: "ACTIVE" } },
     },
   });
 
@@ -191,46 +185,30 @@ export async function sendWarningNotifications(userId?: string): Promise<SendRes
       continue;
     }
 
-    const urgentThreshold = user.settings.urgentThreshold ?? 3;
     const warningThreshold = user.settings.warningThreshold ?? 7;
     const today = startOfDay(new Date());
 
-    const newWarningProducts = user.products.filter((p) => {
-      if (!p.expiryDate) return false;
-      const daysUntil = differenceInDays(startOfDay(new Date(p.expiryDate)), today);
-      return daysUntil > urgentThreshold && daysUntil <= warningThreshold;
-    });
-
-    if (newWarningProducts.length === 0) continue;
-
-    const productsForEmail: ExpirationProduct[] = newWarningProducts
-      .map((p) => {
-        const daysUntil = differenceInDays(startOfDay(new Date(p.expiryDate!)), today);
-        return {
-          name: p.name,
-          barcode: p.barcode,
-          expiryDate: p.expiryDate!.toISOString(),
-          daysUntil,
-          urgency: "warning" as const,
-        };
+    const warningProducts = user.products
+      .filter((p) => {
+        if (!p.expiryDate) return false;
+        const daysUntil = differenceInDays(startOfDay(new Date(p.expiryDate)), today);
+        return daysUntil === warningThreshold;
       })
-      .sort((a, b) => a.daysUntil - b.daysUntil);
+      .map((p) => ({
+        name: p.name,
+        barcode: p.barcode,
+        expiryDate: p.expiryDate!.toISOString(),
+        daysUntil: warningThreshold,
+        urgency: "warning" as const,
+      }));
+
+    if (warningProducts.length === 0) continue;
 
     const result = await sendEmailForProducts(
       user,
       user.settings as { notificationEmail: string | null; smtpHost: string; smtpPort: number | null; smtpUser: string; smtpPass: string },
-      productsForEmail
+      warningProducts
     );
-
-    if (result.success) {
-      await prisma.product.updateMany({
-        where: {
-          id: { in: newWarningProducts.map((p) => p.id) },
-        },
-        data: { warningNotifiedAt: new Date() },
-      });
-    }
-
     results.push(result);
   }
 

@@ -4,48 +4,63 @@ import { prisma } from "./prisma";
 
 const TIMEZONE = "Europe/Minsk";
 
-// Update expired products flag
+function currentTimeMinsk(): string {
+  return new Date().toLocaleTimeString("ru-RU", {
+    timeZone: TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
 async function updateExpiredProducts() {
   try {
     const now = new Date();
     const result = await prisma.product.updateMany({
-      where: {
-        status: "ACTIVE",
-        expiryDate: { lt: now },
-        isExpired: false,
-      },
+      where: { status: "ACTIVE", expiryDate: { lt: now }, isExpired: false },
       data: { isExpired: true },
     });
-    console.log(`[Cron] Updated ${result.count} expired products`);
+    if (result.count > 0) console.log(`[Cron] Updated ${result.count} expired products`);
   } catch (err) {
     console.error("[Cron] Error updating expired products:", err);
   }
 }
 
-// Ежедневно в 10:00 по Минску:
-// 1. Срочные товары (≤ urgentThreshold) — каждый день
-// 2. Внимание (urgentThreshold < days ≤ warningThreshold) — один раз на товар
-const dailyTask = cron.schedule(
-  "0 10 * * *",
+async function runScheduledNotifications() {
+  const nowTime = currentTimeMinsk();
+
+  const users = await prisma.settings.findMany({
+    where: { emailNotifications: true },
+    select: { userId: true, urgentNotifyTime: true, warningNotifyTime: true },
+  });
+
+  for (const s of users) {
+    if (s.urgentNotifyTime === nowTime) {
+      console.log(`[Cron] Urgent notify time matched (${nowTime}) for user ${s.userId}`);
+      sendDailyUrgentNotifications(s.userId).catch((e) =>
+        console.error("[Cron] Error sending urgent notifications:", e)
+      );
+    }
+    if (s.warningNotifyTime === nowTime) {
+      console.log(`[Cron] Warning notify time matched (${nowTime}) for user ${s.userId}`);
+      sendWarningNotifications(s.userId).catch((e) =>
+        console.error("[Cron] Error sending warning notifications:", e)
+      );
+    }
+  }
+}
+
+// Каждую минуту проверяем время и обновляем просроченные
+const minuteTask = cron.schedule(
+  "* * * * *",
   () => {
-    console.log("[Cron] Running daily notifications at 10:00 Minsk...");
-    updateExpiredProducts().catch((err) => {
-      console.error("[Cron] Error updating expired products:", err);
-    });
-    sendDailyUrgentNotifications().catch((err) => {
-      console.error("[Cron] Error sending daily urgent notifications:", err);
-    });
-    sendWarningNotifications().catch((err) => {
-      console.error("[Cron] Error sending warning notifications:", err);
-    });
+    updateExpiredProducts().catch((e) => console.error("[Cron] Error:", e));
+    runScheduledNotifications().catch((e) => console.error("[Cron] Error:", e));
   },
-  {
-    scheduled: false,
-    timezone: TIMEZONE,
-  },
+  { scheduled: false, timezone: TIMEZONE },
 );
 
 export function startCronJobs() {
   console.log("[Cron] Starting cron jobs (timezone: " + TIMEZONE + ")...");
-  dailyTask.start();
+  minuteTask.start();
 }

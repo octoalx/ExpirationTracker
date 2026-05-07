@@ -141,6 +141,8 @@ const SettingsPage = () => {
     smtpUser: "",
     smtpPass: "",
     notificationEmail: "",
+    urgentNotifyTime: "10:00",
+    warningNotifyTime: "10:00",
   });
 
   useEffect(() => {
@@ -327,6 +329,21 @@ const SettingsPage = () => {
                 type="email"
                 placeholder="notify@example.com"
               />
+              {/* Notify times */}
+              <div className="grid grid-cols-2 gap-3">
+                <GlowInput
+                  label="Время отчёта Срочно"
+                  value={settings.urgentNotifyTime || "10:00"}
+                  onChange={(v) => setSettings({ ...settings, urgentNotifyTime: v })}
+                  type="time"
+                />
+                <GlowInput
+                  label="Время уведомления Внимание"
+                  value={settings.warningNotifyTime || "10:00"}
+                  onChange={(v) => setSettings({ ...settings, warningNotifyTime: v })}
+                  type="time"
+                />
+              </div>
               {/* Action buttons */}
               <div className="flex flex-wrap gap-2 pt-2">
                 <button

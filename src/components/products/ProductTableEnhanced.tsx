@@ -33,6 +33,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { EditableCell } from "./EditableCell";
 
+// ─── Ширина колонок ───────────────────────────────────────────────────────────
+const COL_WIDTHS = {
+  select:    32,   // чекбокс
+  name:      0,    // 0 = авто (занимает всё свободное место)
+  quantity:  90,   // кол-во
+  barcode:   100,  // штрих-код (EAN-13 ~13 символов)
+  expiryDate: 200, // срок годности + дата
+  status:    110,  // статус
+  actions:   120,  // кнопки действий
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface ProductTableEnhancedProps {
   products: Product[];
   urgentThreshold?: number;
@@ -197,7 +209,7 @@ export function ProductTableEnhanced({
             aria-label="Выделить строку"
           />
         ),
-        size: 40,
+        size: 20,
       },
       {
         accessorKey: "name",
@@ -247,6 +259,7 @@ export function ProductTableEnhanced({
             </div>
           );
         },
+        size: 180,
       },
       {
         accessorKey: "quantity",
@@ -301,7 +314,7 @@ export function ProductTableEnhanced({
             </div>
           );
         },
-        size: 60,
+        size: 30,
       },
       {
         accessorKey: "barcode",
@@ -353,13 +366,14 @@ export function ProductTableEnhanced({
             </div>
           );
         },
+        size: 150,
       },
       {
         accessorKey: "expiryDate",
         header: ({ column }) => (
           <div
             className={cn(
-              "flex items-center gap-1 cursor-pointer select-none",
+              "flex items-start gap-1 cursor-pointer select-none",
               sortField === "expiryDate" && "text-emerald-600 font-medium"
             )}
             onClick={(e) => {
@@ -400,7 +414,7 @@ export function ProductTableEnhanced({
 
           return (
             <div
-              className="flex items-center gap-2 cursor-pointer group"
+              className="flex items-center justify-between gap-2 cursor-pointer group w-full min-w-0"
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 setEditingCell({ rowId: row.id, columnId: "expiryDate" });
@@ -409,7 +423,7 @@ export function ProductTableEnhanced({
             >
               <div
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors",
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors shrink-0",
                   config.bg,
                   config.border,
                   config.color
@@ -418,13 +432,14 @@ export function ProductTableEnhanced({
                 <StatusIcon className="h-3.5 w-3.5" />
                 <span>{config.label}</span>
               </div>
-              <span className="text-xs text-slate-400 group-hover:text-slate-600 transition-colors ml-auto">
+              <span className="text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
                 {format(date, "dd.MM.yyyy", { locale: ru })}
               </span>
             </div>
           );
         },
-        size: 180,
+        size: 200,
+        maxSize: 200,
       },
       {
         accessorKey: "status",
@@ -445,19 +460,8 @@ export function ProductTableEnhanced({
             )}
           </div>
         ),
-        cell: ({ getValue, row }) => {
+        cell: ({ getValue }) => {
           const status = getValue() as string;
-          const product = row.original;
-
-          // Check if expired (priority over status)
-          const isExpired = product.isExpired || new Date(product.expiryDate) < new Date();
-          if (isExpired && status === "ACTIVE") {
-            return (
-              <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                Просрочен
-              </span>
-            );
-          }
 
           const config = {
             ACTIVE: { label: "Активен", color: "bg-emerald-100 text-emerald-700" },
@@ -476,7 +480,7 @@ export function ProductTableEnhanced({
             </span>
           );
         },
-        size: 120,
+        size: 100,
       },
       {
         id: "actions",
@@ -557,7 +561,7 @@ export function ProductTableEnhanced({
             </div>
           );
         },
-        size: 140,
+        size: 60,
       },
     ],
     [
@@ -607,7 +611,7 @@ export function ProductTableEnhanced({
     <div className="space-y-4">
       {actionBar}
 
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/50">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -616,27 +620,19 @@ export function ProductTableEnhanced({
                   <th
                     key={header.id}
                     className={cn(
-                      "px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider",
+                      "py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider",
+                      header.column.id === "select" ? "px-3" : "px-4",
+                      ["quantity","barcode","expiryDate","status","actions"].includes(header.column.id) && "whitespace-nowrap",
                       header.column.getCanSort() &&
                         "cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-200"
                     )}
-                    style={{ width: header.getSize() }}
                     onClick={header.column.getToggleSortingHandler()}
+                    style={COL_WIDTHS[header.column.id as keyof typeof COL_WIDTHS] ? { width: COL_WIDTHS[header.column.id as keyof typeof COL_WIDTHS] } : undefined}
                   >
                     <div className="flex items-center gap-1">
                       {flexRender(
                         header.column.columnDef.header,
                         header.getContext()
-                      )}
-                      {header.column.getCanSort() && (
-                        <span className="text-slate-400">
-                          {{
-                            asc: <ChevronUp className="h-3.5 w-3.5" />,
-                            desc: <ChevronDown className="h-3.5 w-3.5" />,
-                          }[header.column.getIsSorted() as string] || (
-                            <GripVertical className="h-3.5 w-3.5 opacity-0 group-hover:opacity-50" />
-                          )}
-                        </span>
                       )}
                     </div>
                   </th>
@@ -654,7 +650,15 @@ export function ProductTableEnhanced({
                 )}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-3">
+                  <td
+                    key={cell.id}
+                    className={cn(
+                      "py-3",
+                      cell.column.id === "select" ? "px-3" : "px-4",
+                      ["expiryDate","status","actions"].includes(cell.column.id) && "whitespace-nowrap"
+                    )}
+                    style={COL_WIDTHS[cell.column.id as keyof typeof COL_WIDTHS] ? { width: COL_WIDTHS[cell.column.id as keyof typeof COL_WIDTHS] } : undefined}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

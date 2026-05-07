@@ -114,7 +114,7 @@ export default function AddProductForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-          placeholder="Например: Молоко «Вкусное» 3.2%"
+          placeholder="Например: Цемент М500"
           required
         />
       </div>

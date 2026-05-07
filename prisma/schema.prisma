@@ -28,7 +28,6 @@ model Product {
   status     String   @default("ACTIVE") // ACTIVE, ARCHIVED, DEFECT
   isExpired          Boolean   @default(false)   // Авто-флаг просрочки
   quantity           Int?                         // Опциональное количество
-  warningNotifiedAt  DateTime?                    // Дата отправки разового уведомления "Внимание"
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   userId     String
@@ -63,6 +62,8 @@ model Settings {
   notifyBeforeExpiration Int     @default(3) // За сколько дней начать слать уведомления
   urgentThreshold        Int     @default(3) // Порог "Критично" (красный цвет)
   warningThreshold       Int     @default(7) // Порог "Внимание" (желтый цвет)
+  urgentNotifyTime       String  @default("10:00") // Время ежедневного отчёта "Срочно" (HH:mm)
+  warningNotifyTime      String  @default("10:00") // Время разового уведомления "Внимание" (HH:mm)
 
   // Интерфейс
   theme                  String  @default("light")
