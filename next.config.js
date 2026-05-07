@@ -1,13 +1,6 @@
-const glob = require("glob");
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: [
-    "@adobe/react-spectrum",
-    "@react-spectrum/*",
-    "@spectrum-icons/*",
-  ].flatMap((spec) => glob.sync(`${spec}`, { cwd: "node_modules/" })),
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
