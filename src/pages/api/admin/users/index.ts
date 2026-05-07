@@ -25,7 +25,6 @@ export default async function handler(
         name: true,
         email: true,
         role: true,
-        createdAt: true,
       },
     });
     res.status(200).json(users);

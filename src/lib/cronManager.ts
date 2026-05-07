@@ -1,22 +1,94 @@
 import cron from "node-cron";
-import { sendExpirationNotifications } from "../services/notificationService";
+import { sendDailyUrgentNotifications, sendWarningNotifications } from "../services/notificationService";
+import { prisma } from "./prisma";
+import { createBackup } from "./backupService";
 
-// Schedule to run every day at 10:00 AM
-const scheduledTask = cron.schedule(
-  "0 10 * * *",
-  () => {
-    console.log("Running scheduled task: sendExpirationNotifications");
-    sendExpirationNotifications().catch((err) => {
-      console.error("Error during scheduled email check:", err);
+const TIMEZONE = "Europe/Minsk";
+
+function currentTimeMinsk(): string {
+  return new Date().toLocaleTimeString("ru-RU", {
+    timeZone: TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+async function updateExpiredProducts() {
+  try {
+    const now = new Date();
+    const result = await prisma.product.updateMany({
+      where: { status: "ACTIVE", expiryDate: { lt: now }, isExpired: false },
+      data: { isExpired: true },
     });
+    if (result.count > 0) console.log(`[Cron] Updated ${result.count} expired products`);
+  } catch (err) {
+    console.error("[Cron] Error updating expired products:", err);
+  }
+}
+
+async function runScheduledNotifications() {
+  const nowTime = currentTimeMinsk();
+
+  const users = await prisma.settings.findMany({
+    where: { emailNotifications: true },
+    select: { userId: true, urgentNotifyTime: true, warningNotifyTime: true },
+  });
+
+  for (const s of users) {
+    if (s.urgentNotifyTime === nowTime) {
+      console.log(`[Cron] Urgent notify time matched (${nowTime}) for user ${s.userId}`);
+      sendDailyUrgentNotifications(s.userId).catch((e) =>
+        console.error("[Cron] Error sending urgent notifications:", e)
+      );
+    }
+    if (s.warningNotifyTime === nowTime) {
+      console.log(`[Cron] Warning notify time matched (${nowTime}) for user ${s.userId}`);
+      sendWarningNotifications(s.userId).catch((e) =>
+        console.error("[Cron] Error sending warning notifications:", e)
+      );
+    }
+  }
+}
+
+let lastBackupDate: string | null = null;
+
+async function runScheduledBackup() {
+  const nowTime = currentTimeMinsk();
+  const today = new Date().toISOString().split("T")[0];
+
+  // Already ran today
+  if (lastBackupDate === today) return;
+
+  const settings = await prisma.settings.findMany({
+    where: { backupEnabled: true },
+    select: { backupTime: true },
+  });
+
+  // Check if any user has backupTime matching now
+  for (const s of settings) {
+    if (s.backupTime === nowTime) {
+      console.log(`[Cron] Backup time matched (${nowTime})`);
+      createBackup();
+      lastBackupDate = today;
+      break;
+    }
+  }
+}
+
+
+// Каждую минуту проверяем время и обновляем просроченные
+const minuteTask = cron.schedule(
+  "* * * * *",
+  () => {
+    updateExpiredProducts().catch((e) => console.error("[Cron] Error:", e));
+    runScheduledNotifications().catch((e) => console.error("[Cron] Error:", e));
+    runScheduledBackup().catch((e) => console.error("[Cron] Backup error:", e));
   },
-  {
-    scheduled: false, // Don't start immediately
-    timezone: "Europe/Moscow", // User's timezone
-  },
+  { scheduled: false, timezone: TIMEZONE },
 );
 
 export function startCronJobs() {
-  console.log("Starting cron jobs...");
-  scheduledTask.start();
+  console.log("[Cron] Starting cron jobs (timezone: " + TIMEZONE + ")...");
+  minuteTask.start();
 }

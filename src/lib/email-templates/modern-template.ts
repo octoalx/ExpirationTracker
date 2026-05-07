@@ -347,13 +347,6 @@ export function expirationEmailTemplate(data: ExpirationEmailData, appUrl?: stri
                 </table>
               </div>
 
-              ${appUrl ? `
-              <div class="cta-section">
-                <a href="${escapeHtml(appUrl)}" class="cta-button" target="_blank">
-                  Перейти в приложение →
-                </a>
-              </div>
-              ` : ''}
             </td>
           </tr>
 
@@ -365,11 +358,6 @@ export function expirationEmailTemplate(data: ExpirationEmailData, appUrl?: stri
                 Уведомление отправлено: ${formatDateTime(new Date())}<br>
                 Система автоматического контроля сроков годности
               </p>
-              <div class="footer-links">
-                <a href="${escapeHtml(appUrl || '#')}/settings" target="_blank">Настройки уведомлений</a>
-                <span class="separator">|</span>
-                <a href="mailto:support@expitrack.app">Поддержка</a>
-              </div>
             </td>
           </tr>
         </table>
@@ -391,15 +379,7 @@ export function summaryEmailTemplate(data: SummaryEmailData): string {
   // Determine summary color based on urgency
   const summaryColor = hasExpired ? "#dc2626" : hasCritical ? "#ea580c" : hasWarning ? "#ca8a04" : "#059669";
   const summaryBg = hasExpired ? "#fef2f2" : hasCritical ? "#fff7ed" : hasWarning ? "#fefce8" : "#f0fdf4";
-  const summaryBorder = hasExpired ? "#fecaca" : hasCritical ? "#fed7aa" : hasWarning ? "#fde047" : "#86efac";
-  const summaryIcon = hasExpired ? "🔴" : hasCritical ? "🟠" : hasWarning ? "🟡" : "🟢";
-  const summaryTitle = hasExpired
-    ? "⚠️ Обнаружены просроченные товары!"
-    : hasCritical
-    ? "🚨 Требуется срочное внимание"
-    : hasWarning
-    ? "⚡ Товары с истекающим сроком"
-    : "📋 Сводка по срокам годности";
+  const summaryBorder = hasExpired ? "#fecaca" : hasCritical ? "#fed7aa" : hasWarning ? "#fde047" : "#bbf7d0";
 
   // Generate product rows
   const productsHtml = products.map(product => {
@@ -475,14 +455,14 @@ export function summaryEmailTemplate(data: SummaryEmailData): string {
     /* Container */
     .email-wrapper {
       width: 100%;
-      max-width: 600px;
+      max-width: 800px;
       margin: 0 auto;
       background-color: #f8fafc;
     }
 
     .email-container {
       width: 100%;
-      max-width: 600px;
+      max-width: 800px;
       margin: 20px auto;
       background-color: #ffffff;
       border-radius: 16px;
@@ -760,17 +740,8 @@ export function summaryEmailTemplate(data: SummaryEmailData): string {
           <tr>
             <td class="content">
               <p class="greeting">
-                Привет${userName ? ', <span class="greeting-name">' + escapeHtml(userName) + '</span>!' : '!'} 👋
+                Привет${userName ? ', <span class="greeting-name">' + escapeHtml(userName) + '</span>' : ''}! У вас <span class="product-count">${products.length} ${getProductWordForm(products.length)}</span> с истекающим сроком.
               </p>
-
-              <!-- Summary Box -->
-              <div class="summary-box">
-                <span class="summary-icon">${summaryIcon}</span>
-                <h2 class="summary-title">${summaryTitle}</h2>
-                <p class="summary-text">
-                  У вас <span class="product-count">${products.length} ${getProductWordForm(products.length)}</span>, требующих внимания.
-                </p>
-              </div>
 
               <!-- Section Divider -->
               <div class="section-divider"></div>
@@ -792,14 +763,6 @@ export function summaryEmailTemplate(data: SummaryEmailData): string {
                 </table>
               </div>
 
-              <!-- CTA Button -->
-              ${appUrl ? `
-              <div class="cta-section">
-                <a href="${escapeHtml(appUrl)}" class="cta-button" target="_blank">
-                  Перейти в приложение →
-                </a>
-              </div>
-              ` : ''}
             </td>
           </tr>
 
@@ -811,13 +774,6 @@ export function summaryEmailTemplate(data: SummaryEmailData): string {
                 Уведомление отправлено: ${formatDateTime(new Date())}<br>
                 Система автоматического контроля сроков годности
               </p>
-              <div class="footer-links">
-                <a href="${escapeHtml(appUrl || '#')}/settings" target="_blank">Настройки уведомлений</a>
-                <span class="separator">|</span>
-                <a href="${escapeHtml(appUrl || '#')}/dashboard" target="_blank">Дашборд</a>
-                <span class="separator">|</span>
-                <a href="mailto:support@expitrack.app">Поддержка</a>
-              </div>
             </td>
           </tr>
         </table>

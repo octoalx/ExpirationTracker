@@ -34,10 +34,23 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     }
   } else if (req.method === "PATCH") {
     try {
-      const { name, barcode, expiryDate } = req.body;
+      const { name, barcode, expiryDate, quantity } = req.body;
+
+      // Build update data only with provided fields
+      const updateData: { name?: string; barcode?: string; expiryDate?: Date; isExpired?: boolean; quantity?: number | null } = {};
+      if (name !== undefined) updateData.name = name;
+      if (barcode !== undefined) updateData.barcode = barcode;
+      if (quantity !== undefined) updateData.quantity = quantity;
+      if (expiryDate !== undefined) {
+        const newDate = new Date(expiryDate);
+        updateData.expiryDate = newDate;
+        // Auto-calculate isExpired based on new date
+        updateData.isExpired = newDate < new Date();
+      }
+
       const updatedProduct = await prisma.product.update({
         where: { id: String(productId), userId: session.user.id },
-        data: { name, barcode, expiryDate: new Date(expiryDate) },
+        data: updateData,
       });
       res.status(200).json(updatedProduct);
     } catch (error) {

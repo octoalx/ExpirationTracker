@@ -10,6 +10,7 @@ node_modules/
 out/
 build/
 dist/
+temp/
 
 # Production
 .env.production
@@ -24,6 +25,9 @@ yarn-error.log*
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+
+# Auto-backups
+backups/
 
 # IDE
 .vscode/

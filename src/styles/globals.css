@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "@spectrum-css/vars/dist/spectrum-global.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
@@ -239,15 +238,7 @@
   backface-visibility: hidden;
 }
 
-/* ─── Prevent FOUC with next-themes ──────────────────────────────────── */
+/* ─── Light theme only ──────────────────────────────────────────────── */
 html {
   color-scheme: light;
-}
-html.dark {
-  color-scheme: dark;
-}
-
-/* Hide content during SSR to prevent flash */
-[data-theme-loading] {
-  visibility: hidden;
 }

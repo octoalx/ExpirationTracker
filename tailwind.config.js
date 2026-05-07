@@ -11,6 +11,16 @@ module.exports = {
         sans: ['"Montserrat"', "ui-sans-serif", "system-ui", "sans-serif"],
         heading: ['"Montserrat"', "ui-sans-serif", "system-ui", "sans-serif"],
       },
+      keyframes: {
+        "fade-out": {
+          "0%":   { opacity: "1" },
+          "40%":  { opacity: "1" },
+          "100%": { opacity: "0" },
+        },
+      },
+      animation: {
+        "fade-out": "fade-out 0.8s ease-in-out forwards",
+      },
     },
   },
   plugins: [],

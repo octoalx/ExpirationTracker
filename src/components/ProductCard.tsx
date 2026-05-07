@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import React, { useState, type FormEvent } from "react";
 import { format, differenceInDays } from "date-fns";
 import { ru } from "date-fns/locale";
 import { 
@@ -30,7 +30,7 @@ interface ProductCardProps {
   onProductUpdated: (product: Product) => void;
 }
 
-export default function ProductCard({ 
+function ProductCard({ 
   product, 
   onProductDeleted, 
   onProductConsumed,
@@ -311,3 +311,14 @@ export default function ProductCard({
     </>
   );
 }
+
+export default React.memo(ProductCard, (prevProps, nextProps) => {
+  // Only re-render if product data changed
+  return (
+    prevProps.product.id === nextProps.product.id &&
+    prevProps.product.name === nextProps.product.name &&
+    prevProps.product.barcode === nextProps.product.barcode &&
+    prevProps.product.expiryDate === nextProps.product.expiryDate &&
+    prevProps.product.status === nextProps.product.status
+  );
+});

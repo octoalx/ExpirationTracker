@@ -12,9 +12,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
-import ThemeToggle from "@/components/ThemeToggle";
-const CustomCursor = dynamic(() => import("@/components/CustomCursor"), { ssr: false });
 import BackToTop from "@/components/BackToTop";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 const ScannerModal = dynamic(() => import("./ScannerModal"), { ssr: false });
 
@@ -107,6 +106,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-animated-gradient">
+      <AnimatedBackground />
       {/* ─── Desktop Sidebar ────────────────────────────────────────── */}
       <aside
         className={cn(
@@ -119,11 +119,10 @@ export default function Layout({ children }: LayoutProps) {
       >
         <div className="flex flex-col grow pt-6 overflow-y-auto">
           {/* Logo */}
-          <div className="flex items-center justify-between px-5 mb-8">
+          <div className="flex items-center justify-center px-5 mb-8">
             <h1 className="text-2xl font-extrabold tracking-tight bg-linear-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
               ExpiTrack
             </h1>
-            <ThemeToggle />
           </div>
 
           {/* Navigation */}
@@ -214,7 +213,7 @@ export default function Layout({ children }: LayoutProps) {
       <div className="md:pl-64 flex flex-col flex-1">
         <main className="flex-1">
           <div className="py-6 pb-24 md:pb-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+            <div className="w-full mx-auto px-4 sm:px-6 md:px-8">
               {children}
             </div>
           </div>
@@ -321,7 +320,6 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* ─── Global UI ────────────────────────────────────────────── */}
       <BackToTop />
-      <CustomCursor />
     </div>
   );
 }

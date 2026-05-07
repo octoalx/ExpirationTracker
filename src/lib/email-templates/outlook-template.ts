@@ -22,16 +22,6 @@ export function outlookSummaryEmailTemplate(data: SummaryEmailData): string {
 
   // Determine summary color based on urgency
   const summaryColor = hasExpired ? "#dc2626" : hasCritical ? "#ea580c" : hasWarning ? "#ca8a04" : "#059669";
-  const summaryBg = hasExpired ? "#fef2f2" : hasCritical ? "#fff7ed" : hasWarning ? "#fefce8" : "#f0fdf4";
-  const summaryBorder = hasExpired ? "#fecaca" : hasCritical ? "#fed7aa" : hasWarning ? "#fde047" : "#86efac";
-  const summaryIcon = hasExpired ? "🔴" : hasCritical ? "🟠" : hasWarning ? "🟡" : "🟢";
-  const summaryTitle = hasExpired
-    ? "⚠️ Обнаружены просроченные товары!"
-    : hasCritical
-    ? "🚨 Требуется срочное внимание"
-    : hasWarning
-    ? "⚡ Товары с истекающим сроком"
-    : "📋 Сводка по срокам годности";
 
   // Generate product rows for Outlook (table-based only)
   const productsHtml = products.map(product => {
@@ -92,25 +82,7 @@ export function outlookSummaryEmailTemplate(data: SummaryEmailData): string {
     `;
   }).join("");
 
-  // CTA Button as table (Outlook-compatible, no border-radius)
-  const ctaButton = appUrl ? `
-  <!-- CTA Button Section -->
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 32px 0;">
-    <tr>
-      <td align="center">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" bgcolor="#059669" style="background-color: #059669;">
-          <tr>
-            <td style="padding: 16px 32px; font-family: Arial, sans-serif; font-size: 16px; font-weight: 600; text-align: center;">
-              <a href="${escapeHtml(appUrl)}" target="_blank" style="color: #ffffff; text-decoration: none; display: inline-block;">
-                Перейти в приложение →
-              </a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  ` : '';
+  const ctaButton = '';
 
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="ru">
@@ -136,7 +108,7 @@ export function outlookSummaryEmailTemplate(data: SummaryEmailData): string {
       <td align="center" style="padding: 20px 0;">
         
         <!-- Main Container Table (max-width: 600px) -->
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="width: 100%; max-width: 600px; background-color: #ffffff; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="800" style="width: 100%; max-width: 800px; background-color: #ffffff; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
           
           <!--[if gte mso 9]>
           <tr>
@@ -173,37 +145,8 @@ export function outlookSummaryEmailTemplate(data: SummaryEmailData): string {
             <td style="padding: 32px 32px 24px 32px;">
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
-                  <td style="font-family: Arial, sans-serif; font-size: 20px; font-weight: 600; color: #0f172a;">
-                    Привет${userName ? ', ' + escapeHtml(userName) : ''}! 👋
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Summary Box -->
-          <tr>
-            <td style="padding: 0 32px 32px 32px;">
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" bgcolor="${summaryBg}" style="background-color: ${summaryBg}; border: 2px solid ${summaryBorder}; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 24px;">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                      <tr>
-                        <td style="font-family: Arial, sans-serif; font-size: 24px; padding-bottom: 12px;">
-                          ${summaryIcon}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="font-family: Arial, sans-serif; font-size: 16px; font-weight: 700; color: ${summaryColor}; padding-bottom: 8px;">
-                          ${summaryTitle}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="font-family: Arial, sans-serif; font-size: 14px; color: #64748b; line-height: 1.6;">
-                          У вас <strong style="color: ${summaryColor};">${products.length} ${getProductWordForm(products.length)}</strong>, требующих внимания.
-                        </td>
-                      </tr>
-                    </table>
+                  <td style="font-family: Arial, sans-serif; font-size: 18px; font-weight: 600; color: #0f172a;">
+                    Привет${userName ? ', ' + escapeHtml(userName) : ''}! У вас <strong style="color: ${summaryColor};">${products.length} ${getProductWordForm(products.length)}</strong> с истекающим сроком.
                   </td>
                 </tr>
               </table>
@@ -281,15 +224,6 @@ export function outlookSummaryEmailTemplate(data: SummaryEmailData): string {
                     Система автоматического контроля сроков годности
                   </td>
                 </tr>
-                <tr>
-                  <td align="center" style="font-family: Arial, sans-serif; font-size: 12px; color: #94a3b8;">
-                    <a href="${escapeHtml(appUrl || '#')}/settings" target="_blank" style="color: #059669; text-decoration: none; font-weight: 500;">Настройки уведомлений</a>
-                    <span style="margin: 0 8px; color: #cbd5e1;">|</span>
-                    <a href="${escapeHtml(appUrl || '#')}/dashboard" target="_blank" style="color: #059669; text-decoration: none; font-weight: 500;">Дашборд</a>
-                    <span style="margin: 0 8px; color: #cbd5e1;">|</span>
-                    <a href="mailto:support@expitrack.app" style="color: #059669; text-decoration: none; font-weight: 500;">Поддержка</a>
-                  </td>
-                </tr>
               </table>
             </td>
           </tr>
@@ -330,24 +264,7 @@ export function outlookExpirationEmailTemplate(data: {
     ? "Истекает завтра!"
     : `Осталось ${data.daysUntil} дн.`;
 
-  // CTA Button as table
-  const ctaButton = appUrl ? `
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 32px 0;">
-    <tr>
-      <td align="center">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" bgcolor="#059669" style="background-color: #059669;">
-          <tr>
-            <td style="padding: 16px 32px; font-family: Arial, sans-serif; font-size: 16px; font-weight: 600; text-align: center;">
-              <a href="${escapeHtml(appUrl)}" target="_blank" style="color: #ffffff; text-decoration: none; display: inline-block;">
-                Перейти в приложение →
-              </a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  ` : '';
+  const ctaButton = '';
 
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="ru">
@@ -371,7 +288,7 @@ export function outlookExpirationEmailTemplate(data: {
     <tr>
       <td align="center" style="padding: 20px 0;">
         
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="width: 100%; max-width: 600px; background-color: #ffffff; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="800" style="width: 100%; max-width: 800px; background-color: #ffffff; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
           
           <!-- Top Accent Bar -->
           <tr>
@@ -521,13 +438,6 @@ export function outlookExpirationEmailTemplate(data: {
                   <td align="center" style="font-family: Arial, sans-serif; font-size: 13px; color: #64748b; line-height: 1.6; padding-bottom: 16px;">
                     Уведомление отправлено: ${formatDateTime(new Date())}<br/>
                     Система автоматического контроля сроков годности
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center" style="font-family: Arial, sans-serif; font-size: 12px; color: #94a3b8;">
-                    <a href="${escapeHtml(appUrl || '#')}/settings" target="_blank" style="color: #059669; text-decoration: none; font-weight: 500;">Настройки уведомлений</a>
-                    <span style="margin: 0 8px; color: #cbd5e1;">|</span>
-                    <a href="mailto:support@expitrack.app" style="color: #059669; text-decoration: none; font-weight: 500;">Поддержка</a>
                   </td>
                 </tr>
               </table>

@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { addDays, addMonths, addWeeks, format } from "date-fns";
-import { Loader2, Barcode, Package, Calendar, Factory } from "lucide-react";
+import { Loader2, Barcode, Package, Calendar, Factory, Hash } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface AddProductFormProps {
@@ -17,6 +17,7 @@ export default function AddProductForm({
 }: AddProductFormProps) {
   const [barcode, setBarcode] = useState(initialBarcode);
   const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState<number | "">("");
   const [expiryDate, setExpiryDate] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [dateInputType, setDateInputType] = useState<DateInputType>("expiry");
@@ -49,6 +50,7 @@ export default function AddProductForm({
   const resetForm = () => {
     setBarcode("");
     setName("");
+    setQuantity("");
     setExpiryDate("");
     setManufacturingDate("");
     setShelfLife("");
@@ -59,7 +61,10 @@ export default function AddProductForm({
     setIsLoading(true);
 
     try {
-      const productData = { name, barcode, expiryDate };
+      const productData: { name: string; barcode: string; expiryDate: string; quantity?: number } = { name, barcode, expiryDate };
+      if (quantity !== "" && quantity > 0) {
+        productData.quantity = quantity;
+      }
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -94,9 +99,8 @@ export default function AddProductForm({
           value={barcode}
           onChange={(e) => setBarcode(e.target.value)}
           className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-          placeholder="Введите или отсканируйте штрих-код"
+          placeholder="Например: 4601234567890"
         />
-        <p className="text-xs text-slate-400 mt-1">Например: 4601234567890</p>
       </div>
 
       {/* Название */}
@@ -110,8 +114,27 @@ export default function AddProductForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-          placeholder="Например: Молоко «Вкусное» 3.2%"
+          placeholder="Например: Цемент М500"
           required
+        />
+      </div>
+
+      {/* Количество */}
+      <div>
+        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+          <Hash size={14} />
+          Количество <span className="text-slate-400 font-normal normal-case">(опционально)</span>
+        </label>
+        <input
+          type="number"
+          min="1"
+          value={quantity}
+          onChange={(e) => {
+            const val = e.target.value;
+            setQuantity(val === "" ? "" : parseInt(val, 10));
+          }}
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          placeholder="Например: 5"
         />
       </div>
 

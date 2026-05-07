@@ -1,3 +1,4 @@
+import { differenceInDays, startOfDay } from "date-fns";
 import { prisma } from "../lib/prisma";
 import { emailService } from "./emailService";
 import { getEmailTemplate } from "../lib/email-templates/index";
@@ -29,15 +30,69 @@ interface SendResult {
   error?: string;
 }
 
-export async function sendExpirationNotifications(userId?: string): Promise<SendResult[]> {
+async function sendEmailForProducts(
+  user: { id: string; name: string | null; email: string | null },
+  settings: {
+    notificationEmail: string | null;
+    smtpHost: string;
+    smtpPort: number | null;
+    smtpUser: string;
+    smtpPass: string;
+  },
+  products: ExpirationProduct[],
+): Promise<SendResult> {
+  const recipientEmail = settings.notificationEmail || user.email;
+  if (!recipientEmail) {
+    return { userId: user.id, email: "", success: false, productsCount: 0, error: "No recipient email" };
+  }
+
+  emailService.initialize({
+    host: settings.smtpHost,
+    port: settings.smtpPort ?? 587,
+    user: settings.smtpUser,
+    pass: settings.smtpPass,
+    from: settings.smtpUser,
+  });
+
+  const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "";
+  const { html } = getEmailTemplate(
+    "summary",
+    { userName: user.name || "", products, appUrl },
+    "auto",
+    recipientEmail
+  );
+
+  const result = await emailService.send(
+    recipientEmail,
+    `⏰ ${products.length} товаров требуют внимания`,
+    html,
+    user.id
+  );
+
+  if (result.success) {
+    console.log(`[Notifications] Sent to ${recipientEmail} for ${products.length} products`);
+  } else {
+    console.error(`[Notifications] Failed to send to ${recipientEmail}: ${result.error}`);
+  }
+
+  return {
+    userId: user.id,
+    email: recipientEmail,
+    success: result.success,
+    productsCount: products.length,
+    error: result.error,
+  };
+}
+
+/**
+ * Ежедневный отчёт в 10:00 — товары со статусом СРОЧНО (≤ urgentThreshold).
+ * Отправляется каждый день.
+ */
+export async function sendDailyUrgentNotifications(userId?: string): Promise<SendResult[]> {
   const results: SendResult[] = [];
 
   const users = await prisma.user.findMany({
-    where: userId ? { id: userId } : {
-      settings: {
-        emailNotifications: true,
-      },
-    },
+    where: userId ? { id: userId } : { settings: { emailNotifications: true } },
     include: {
       settings: {
         select: {
@@ -51,41 +106,29 @@ export async function sendExpirationNotifications(userId?: string): Promise<Send
           emailNotifications: true,
         },
       },
-      products: {
-        where: {
-          status: "ACTIVE",
-        },
-      },
+      products: { where: { status: "ACTIVE" } },
     },
   });
 
   for (const user of users) {
-    if (!user.settings?.emailNotifications) {
-      continue;
-    }
-
+    if (!user.settings?.emailNotifications) continue;
     if (!user.settings.smtpHost || !user.settings.smtpUser || !user.settings.smtpPass) {
-      console.warn(`[Notifications] SMTP not configured for user ${user.id}`);
+      console.warn(`[Notifications/Daily] SMTP not configured for user ${user.id}`);
       continue;
     }
 
     const urgentThreshold = user.settings.urgentThreshold ?? 3;
     const warningThreshold = user.settings.warningThreshold ?? 7;
+    const today = startOfDay(new Date());
 
-    const expiringProducts = user.products
+    const urgentProducts = user.products
       .filter((p) => {
         if (!p.expiryDate) return false;
-        const daysUntil = Math.ceil(
-          (new Date(p.expiryDate).getTime() - new Date().getTime()) /
-          (1000 * 3600 * 24)
-        );
-        return daysUntil <= warningThreshold;
+        const daysUntil = differenceInDays(startOfDay(new Date(p.expiryDate)), today);
+        return daysUntil <= urgentThreshold;
       })
       .map((p) => {
-        const daysUntil = Math.ceil(
-          (new Date(p.expiryDate!).getTime() - new Date().getTime()) /
-          (1000 * 3600 * 24)
-        );
+        const daysUntil = differenceInDays(startOfDay(new Date(p.expiryDate!)), today);
         return {
           name: p.name,
           barcode: p.barcode,
@@ -96,56 +139,90 @@ export async function sendExpirationNotifications(userId?: string): Promise<Send
       })
       .sort((a, b) => a.daysUntil - b.daysUntil);
 
-    if (expiringProducts.length === 0) {
-      continue;
-    }
+    if (urgentProducts.length === 0) continue;
 
-    const recipientEmail = user.settings.notificationEmail || user.email;
-    if (!recipientEmail) {
-      continue;
-    }
-
-    emailService.initialize({
-      host: user.settings.smtpHost,
-      port: user.settings.smtpPort ?? 587,
-      user: user.settings.smtpUser,
-      pass: user.settings.smtpPass,
-      from: user.settings.smtpUser,
-    });
-
-    const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "";
-    const { html } = getEmailTemplate(
-      "summary",
-      { userName: user.name || "", products: expiringProducts, appUrl },
-      "auto",
-      recipientEmail
+    const result = await sendEmailForProducts(
+      user,
+      user.settings as { notificationEmail: string | null; smtpHost: string; smtpPort: number | null; smtpUser: string; smtpPass: string },
+      urgentProducts
     );
-
-    const result = await emailService.send(
-      recipientEmail,
-      `⏰ ${expiringProducts.length} товаров требуют внимания`,
-      html,
-      user.id
-    );
-
-    results.push({
-      userId: user.id,
-      email: recipientEmail,
-      success: result.success,
-      productsCount: expiringProducts.length,
-      error: result.error,
-    });
-
-    if (result.success) {
-      console.log(
-        `[Notifications] Sent to ${recipientEmail} for ${expiringProducts.length} products`
-      );
-    } else {
-      console.error(
-        `[Notifications] Failed to send to ${recipientEmail}: ${result.error}`
-      );
-    }
+    results.push(result);
   }
 
   return results;
+}
+
+/**
+ * Уведомление "Внимание" — товары у которых сегодня ровно warningThreshold дней.
+ * Отправляется каждый день в указанное время. Если таких товаров нет — ничего не делает.
+ */
+export async function sendWarningNotifications(userId?: string): Promise<SendResult[]> {
+  const results: SendResult[] = [];
+
+  const users = await prisma.user.findMany({
+    where: userId ? { id: userId } : { settings: { emailNotifications: true } },
+    include: {
+      settings: {
+        select: {
+          notificationEmail: true,
+          smtpHost: true,
+          smtpPort: true,
+          smtpUser: true,
+          smtpPass: true,
+          urgentThreshold: true,
+          warningThreshold: true,
+          emailNotifications: true,
+        },
+      },
+      products: { where: { status: "ACTIVE" } },
+    },
+  });
+
+  for (const user of users) {
+    if (!user.settings?.emailNotifications) continue;
+    if (!user.settings.smtpHost || !user.settings.smtpUser || !user.settings.smtpPass) {
+      console.warn(`[Notifications/Warning] SMTP not configured for user ${user.id}`);
+      continue;
+    }
+
+    const warningThreshold = user.settings.warningThreshold ?? 7;
+    const today = startOfDay(new Date());
+
+    const warningProducts = user.products
+      .filter((p) => {
+        if (!p.expiryDate) return false;
+        const daysUntil = differenceInDays(startOfDay(new Date(p.expiryDate)), today);
+        return daysUntil === warningThreshold;
+      })
+      .map((p) => ({
+        name: p.name,
+        barcode: p.barcode,
+        expiryDate: p.expiryDate!.toISOString(),
+        daysUntil: warningThreshold,
+        urgency: "warning" as const,
+      }));
+
+    if (warningProducts.length === 0) continue;
+
+    const result = await sendEmailForProducts(
+      user,
+      user.settings as { notificationEmail: string | null; smtpHost: string; smtpPort: number | null; smtpUser: string; smtpPass: string },
+      warningProducts
+    );
+    results.push(result);
+  }
+
+  return results;
+}
+
+/**
+ * Обратная совместимость — используется при ручном запуске через API.
+ * Шлёт всё: и срочные, и предупреждения.
+ */
+export async function sendExpirationNotifications(userId?: string): Promise<SendResult[]> {
+  const [dailyResults, warningResults] = await Promise.all([
+    sendDailyUrgentNotifications(userId),
+    sendWarningNotifications(userId),
+  ]);
+  return [...dailyResults, ...warningResults];
 }

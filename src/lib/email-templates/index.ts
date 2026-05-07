@@ -247,7 +247,7 @@ export function renderTestEmail(userName?: string): string {
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f1f5f9;">
     <tr>
       <td align="center" style="padding: 20px 0;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="width: 100%; max-width: 600px; background-color: #ffffff; border-collapse: collapse;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="800" style="width: 100%; max-width: 800px; background-color: #ffffff; border-collapse: collapse;">
           <tr>
             <td bgcolor="#059669" height="6" style="font-size: 1px; line-height: 1px; background-color: #059669; height: 6px;">&nbsp;</td>
           </tr>
