@@ -6,14 +6,10 @@ import toast from "react-hot-toast";
 import {
   User,
   Bell,
-  Palette,
   AlertTriangle,
   Loader2,
   Send,
   Mail,
-  Sun,
-  Moon,
-  Monitor,
   Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -63,56 +59,7 @@ const tabs: Tab[] = [
   { id: "personal", label: "Личные данные", icon: User },
   { id: "integrations", label: "Интеграции", icon: Bell },
   { id: "statuses", label: "Статусы", icon: AlertTriangle },
-  { id: "appearance", label: "Оформление", icon: Palette },
 ];
-
-/* ── Theme option card ───────────────────────────────────────────────── */
-interface ThemeOptionProps {
-  label: string;
-  value: string;
-  icon: React.ElementType;
-  selected: boolean;
-  onSelect: () => void;
-}
-
-function ThemeOption({ label, value, icon: Icon, selected, onSelect }: ThemeOptionProps) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "relative flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all duration-200",
-        selected
-          ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
-          : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600",
-      )}
-    >
-      <div className={cn(
-        "rounded-lg p-2.5",
-        selected
-          ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
-          : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400",
-      )}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <span className={cn(
-        "text-xs font-semibold",
-        selected ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
-      )}>
-        {label}
-      </span>
-      {selected && (
-        <motion.div
-          layoutId="theme-check"
-          className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-emerald-500 flex items-center justify-center"
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        >
-          <span className="text-[8px] text-white font-bold">✓</span>
-        </motion.div>
-      )}
-    </button>
-  );
-}
 
 /* ── Settings page ───────────────────────────────────────────────────── */
 const SettingsPage = () => {
@@ -131,7 +78,6 @@ const SettingsPage = () => {
   const [settings, setSettings] = useState({
     telegramNotifications: true,
     emailNotifications: false,
-    theme: "light",
     urgentThreshold: 3,
     warningThreshold: 7,
     telegramToken: "",
@@ -429,39 +375,6 @@ const SettingsPage = () => {
                   />
                 </div>
               </div>
-            </div>
-          </div>
-        );
-
-      case "appearance":
-        return (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Оформление</h2>
-              <p className="text-sm text-muted-foreground">Выберите тему интерфейса</p>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <ThemeOption
-                label="Светлая"
-                value="light"
-                icon={Sun}
-                selected={settings.theme === "light"}
-                onSelect={() => setSettings({ ...settings, theme: "light" })}
-              />
-              <ThemeOption
-                label="Тёмная"
-                value="dark"
-                icon={Moon}
-                selected={settings.theme === "dark"}
-                onSelect={() => setSettings({ ...settings, theme: "dark" })}
-              />
-              <ThemeOption
-                label="Системная"
-                value="system"
-                icon={Monitor}
-                selected={settings.theme === "system"}
-                onSelect={() => setSettings({ ...settings, theme: "system" })}
-              />
             </div>
           </div>
         );
