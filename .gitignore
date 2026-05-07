@@ -26,6 +26,10 @@ yarn-error.log*
 prisma/*.db
 prisma/*.db-journal
 
+# Root DB files
+*.db
+*.db-journal
+
 # Auto-backups
 backups/
 
