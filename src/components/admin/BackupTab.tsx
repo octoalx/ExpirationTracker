@@ -52,6 +52,7 @@ export default function BackupTab() {
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [deletingBackup, setDeletingBackup] = useState<string | null>(null);
 
   // Backup settings
   const [backupTime, setBackupTime] = useState("03:00");
@@ -157,6 +158,28 @@ export default function BackupTab() {
       toast.error("Ошибка восстановления");
     } finally {
       setRestoring(null);
+    }
+  };
+
+  const handleDeleteBackup = async (filename: string) => {
+    if (!confirm(`Удалить бэкап "${filename}"?`)) {
+      return;
+    }
+    setDeletingBackup(filename);
+    try {
+      const res = await fetch(`/api/admin/auto-backups/${encodeURIComponent(filename)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        toast.success("Бэкап удален");
+        fetchAutoBackups();
+      } else {
+        toast.error("Ошибка удаления");
+      }
+    } catch {
+      toast.error("Ошибка удаления");
+    } finally {
+      setDeletingBackup(null);
     }
   };
 
@@ -364,6 +387,20 @@ export default function BackupTab() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <RotateCcw className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDeleteBackup(backup.name)}
+                    disabled={deletingBackup === backup.name}
+                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    title="Удалить"
+                  >
+                    {deletingBackup === backup.name ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
                     )}
                   </Button>
                 </div>

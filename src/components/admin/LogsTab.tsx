@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { 
-  FileText, AlertTriangle, AlertCircle, Info, 
-  ChevronLeft, ChevronRight, Loader2, Filter, Calendar 
+import {
+  FileText, AlertTriangle, AlertCircle, Info,
+  ChevronLeft, ChevronRight, Loader2, Filter, Calendar, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,8 @@ export default function LogsTab() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [levelFilter, setLevelFilter] = useState<string>("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clearingAll, setClearingAll] = useState(false);
   const limit = 25;
 
   const fetchLogs = async () => {
@@ -54,6 +56,42 @@ export default function LogsTab() {
     }
   };
 
+  const handleDeleteLog = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/logs?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Лог удален");
+        fetchLogs();
+      } else {
+        toast.error("Ошибка удаления");
+      }
+    } catch {
+      toast.error("Ошибка удаления");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!confirm("Удалить все логи?")) return;
+    setClearingAll(true);
+    try {
+      const res = await fetch(`/api/admin/logs?clearAll=true`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Все логи очищены");
+        setPage(1);
+        fetchLogs();
+      } else {
+        toast.error("Ошибка очистки");
+      }
+    } catch {
+      toast.error("Ошибка очистки");
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
   useEffect(() => {
     fetchLogs();
   }, [page, levelFilter]);
@@ -69,25 +107,37 @@ export default function LogsTab() {
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Filter className="h-4 w-4 text-slate-400" />
-        {["", "INFO", "WARN", "ERROR"].map((level) => (
-          <button
-            key={level || "all"}
-            onClick={() => {
-              setLevelFilter(level);
-              setPage(1);
-            }}
-            className={cn(
-              "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-              levelFilter === level
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
-            )}
-          >
-            {level || "Все"}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="h-4 w-4 text-slate-400" />
+          {["", "INFO", "WARN", "ERROR"].map((level) => (
+            <button
+              key={level || "all"}
+              onClick={() => {
+                setLevelFilter(level);
+                setPage(1);
+              }}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                levelFilter === level
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
+              )}
+            >
+              {level || "Все"}
+            </button>
+          ))}
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleClearAll}
+          disabled={clearingAll || logs.length === 0}
+          className="text-red-600 border-red-200 hover:bg-red-50"
+        >
+          {clearingAll ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+          Очистить все
+        </Button>
       </div>
 
       {/* Logs list */}
@@ -125,6 +175,16 @@ export default function LogsTab() {
                     </pre>
                   )}
                 </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDeleteLog(log.id)}
+                  disabled={deletingId === log.id}
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  title="Удалить"
+                >
+                  {deletingId === log.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                </Button>
               </div>
             </motion.div>
           );
