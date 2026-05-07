@@ -38,12 +38,10 @@ interface BackupData {
       smtpPort?: number | null;
       smtpUser?: string | null;
       smtpPass?: string | null;
-      notifyBeforeExpiration?: number;
       urgentThreshold?: number;
       warningThreshold?: number;
       urgentNotifyTime?: string;
       warningNotifyTime?: string;
-      theme?: string;
     }>;
   };
 }
@@ -200,7 +198,6 @@ export default async function handler(
               emailNotifications: settings.emailNotifications ?? existing.emailNotifications,
               urgentThreshold: settings.urgentThreshold ?? existing.urgentThreshold,
               warningThreshold: settings.warningThreshold ?? existing.warningThreshold,
-              theme: settings.theme ?? existing.theme,
             },
           });
           results.settings.updated++;
@@ -217,12 +214,10 @@ export default async function handler(
               smtpPort: settings.smtpPort,
               smtpUser: settings.smtpUser,
               smtpPass: settings.smtpPass,
-              notifyBeforeExpiration: settings.notifyBeforeExpiration ?? 3,
               urgentThreshold: settings.urgentThreshold ?? 3,
               warningThreshold: settings.warningThreshold ?? 7,
               urgentNotifyTime: settings.urgentNotifyTime ?? "10:00",
               warningNotifyTime: settings.warningNotifyTime ?? "10:00",
-              theme: settings.theme ?? "light",
             },
           });
           results.settings.created++;

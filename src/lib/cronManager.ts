@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { sendDailyUrgentNotifications, sendWarningNotifications } from "../services/notificationService";
 import { prisma } from "./prisma";
+import { createBackup } from "./backupService";
 
 const TIMEZONE = "Europe/Minsk";
 
@@ -50,12 +51,39 @@ async function runScheduledNotifications() {
   }
 }
 
+let lastBackupDate: string | null = null;
+
+async function runScheduledBackup() {
+  const nowTime = currentTimeMinsk();
+  const today = new Date().toISOString().split("T")[0];
+
+  // Already ran today
+  if (lastBackupDate === today) return;
+
+  const settings = await prisma.settings.findMany({
+    where: { backupEnabled: true },
+    select: { backupTime: true },
+  });
+
+  // Check if any user has backupTime matching now
+  for (const s of settings) {
+    if (s.backupTime === nowTime) {
+      console.log(`[Cron] Backup time matched (${nowTime})`);
+      createBackup();
+      lastBackupDate = today;
+      break;
+    }
+  }
+}
+
+
 // Каждую минуту проверяем время и обновляем просроченные
 const minuteTask = cron.schedule(
   "* * * * *",
   () => {
     updateExpiredProducts().catch((e) => console.error("[Cron] Error:", e));
     runScheduledNotifications().catch((e) => console.error("[Cron] Error:", e));
+    runScheduledBackup().catch((e) => console.error("[Cron] Backup error:", e));
   },
   { scheduled: false, timezone: TIMEZONE },
 );

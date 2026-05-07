@@ -26,6 +26,9 @@ yarn-error.log*
 prisma/*.db
 prisma/*.db-journal
 
+# Auto-backups
+backups/
+
 # IDE
 .vscode/
 .idea/

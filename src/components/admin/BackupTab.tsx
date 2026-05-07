@@ -1,12 +1,37 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
-import { 
-  Download, Upload, Database, AlertTriangle, 
-  FileJson, CheckCircle, Loader2, RefreshCw
+import {
+  Download, Upload, Database, AlertTriangle,
+  FileJson, CheckCircle, Loader2, History, Clock,
+  RotateCcw, Save, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
+
+interface AutoBackup {
+  name: string;
+  size: number;
+  createdAt: string;
+  path: string;
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function BackupTab() {
   const [exporting, setExporting] = useState(false);
@@ -22,12 +47,125 @@ export default function BackupTab() {
     };
   } | null>(null);
 
+  // Auto-backups state
+  const [autoBackups, setAutoBackups] = useState<AutoBackup[]>([]);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  // Backup settings
+  const [backupTime, setBackupTime] = useState("03:00");
+  const [backupEnabled, setBackupEnabled] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const fetchAutoBackups = async () => {
+    setLoadingBackups(true);
+    try {
+      const res = await fetch("/api/admin/auto-backups");
+      if (res.ok) {
+        const data = await res.json();
+        setAutoBackups(data.backups || []);
+      }
+    } catch {
+      toast.error("Ошибка загрузки бэкапов");
+    } finally {
+      setLoadingBackups(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAutoBackups();
+    fetchBackupSettings();
+  }, []);
+
+  const fetchBackupSettings = async () => {
+    try {
+      const res = await fetch("/api/settings");
+      if (res.ok) {
+        const data = await res.json();
+        setBackupTime(data.settings?.backupTime ?? "03:00");
+        setBackupEnabled(data.settings?.backupEnabled ?? true);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const saveBackupSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user: {},
+          settings: { backupTime, backupEnabled },
+        }),
+      });
+      if (res.ok) {
+        toast.success("Настройки сохранены");
+      } else {
+        toast.error("Ошибка сохранения");
+      }
+    } catch {
+      toast.error("Ошибка сохранения");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/admin/auto-backups", { method: "POST" });
+      if (res.ok) {
+        toast.success("Бэкап создан");
+        fetchAutoBackups();
+      } else {
+        toast.error("Ошибка создания бэкапа");
+      }
+    } catch {
+      toast.error("Ошибка создания бэкапа");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDownloadBackup = (filename: string) => {
+    window.open(`/api/admin/auto-backups/${encodeURIComponent(filename)}`, "_blank");
+  };
+
+  const handleRestoreBackup = async (filename: string) => {
+    if (!confirm(`Восстановить базу из бэкапа "${filename}"?\n\nТекущие данные будут заменены.`)) {
+      return;
+    }
+    setRestoring(filename);
+    try {
+      const res = await fetch(`/api/admin/auto-backups/${encodeURIComponent(filename)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "replace" }),
+      });
+      if (res.ok) {
+        toast.success("База восстановлена. Перезагрузка...");
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Ошибка восстановления");
+      }
+    } catch {
+      toast.error("Ошибка восстановления");
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   const handleExport = async () => {
     setExporting(true);
     try {
       const res = await fetch("/api/admin/backup");
       if (!res.ok) throw new Error("Export failed");
-      
+
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -37,7 +175,7 @@ export default function BackupTab() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toast.success("Бэкап скачан");
     } catch {
       toast.error("Ошибка экспорта");
@@ -107,6 +245,139 @@ export default function BackupTab() {
 
   return (
     <div className="space-y-6">
+      {/* Auto Backups Section */}
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-purple-100 dark:bg-purple-900/50 p-3">
+              <History className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">Автоматические бэкапы</h3>
+              <p className="text-sm text-slate-500">
+                {backupEnabled ? `Ежедневно в ${backupTime}, хранится 30 копий` : "Автобэкапы отключены"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Enable toggle */}
+            <button
+              onClick={() => setBackupEnabled(!backupEnabled)}
+              className={cn(
+                "relative h-6 w-11 rounded-full transition-colors",
+                backupEnabled ? "bg-purple-600" : "bg-slate-300 dark:bg-slate-600"
+              )}
+              title={backupEnabled ? "Отключить" : "Включить"}
+            >
+              <span
+                className={cn(
+                  "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
+                  backupEnabled ? "translate-x-5" : "translate-x-0"
+                )}
+              />
+            </button>
+            <Button
+              onClick={handleCreateBackup}
+              disabled={creating}
+              variant="outline"
+              className="border-purple-200 hover:bg-purple-50"
+            >
+            {creating ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Создать сейчас
+            </Button>
+          </div>
+        </div>
+
+        {/* Time settings */}
+        <div className="mb-4 flex items-center gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-slate-400" />
+            <span className="text-sm text-slate-600 dark:text-slate-400">Время бэкапа:</span>
+            <input
+              type="time"
+              value={backupTime}
+              onChange={(e) => setBackupTime(e.target.value)}
+              disabled={!backupEnabled}
+              className="rounded-lg border border-slate-300 dark:border-slate-600 px-2 py-1 text-sm bg-white dark:bg-slate-800 disabled:opacity-50"
+            />
+          </div>
+          <Button
+            size="sm"
+            onClick={saveBackupSettings}
+            disabled={savingSettings}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            {savingSettings ? (
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+            ) : null}
+            Сохранить
+          </Button>
+        </div>
+
+        {loadingBackups ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+          </div>
+        ) : autoBackups.length === 0 ? (
+          <div className="text-center py-8 text-slate-500">
+            <Clock className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+            <p className="text-sm">Автобэкапов пока нет</p>
+            <p className="text-xs mt-1">Первый бэкап создастся сегодня ночью</p>
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {autoBackups.map((backup) => (
+              <div
+                key={backup.name}
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Database className="h-4 w-4 text-slate-400" />
+                  <div>
+                    <p className="text-sm font-medium">{formatDate(backup.createdAt)}</p>
+                    <p className="text-xs text-slate-500">{formatSize(backup.size)}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDownloadBackup(backup.name)}
+                    className="h-8 w-8 p-0"
+                    title="Скачать"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleRestoreBackup(backup.name)}
+                    disabled={restoring === backup.name}
+                    className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                    title="Восстановить"
+                  >
+                    {restoring === backup.name ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
+          <Clock className="h-3 w-3" />
+          <span>Всего: {autoBackups.length} / 30 бэкапов</span>
+        </div>
+      </div>
+
       {/* Export */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-6">
         <div className="flex items-center gap-3 mb-4">

@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import { 
   Users, FileText, Database, Shield
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
-import UsersTab from "@/components/admin/UsersTab";
-import LogsTab from "@/components/admin/LogsTab";
-import BackupTab from "@/components/admin/BackupTab";
+
+const UsersTab = dynamic(() => import("@/components/admin/UsersTab"), { ssr: false });
+const LogsTab = dynamic(() => import("@/components/admin/LogsTab"), { ssr: false });
+const BackupTab = dynamic(() => import("@/components/admin/BackupTab"), { ssr: false });
 
 const tabs = [
   { id: "users", label: "Пользователи", icon: Users },
@@ -14,8 +17,21 @@ const tabs = [
   { id: "backup", label: "Бэкап", icon: Database },
 ];
 
+const VALID_TABS = tabs.map((t) => t.id);
+
 export default function AdminPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("users");
+
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (VALID_TABS.includes(hash)) setActiveTab(hash);
+  }, []);
+
+  const handleTabChange = (id: string) => {
+    setActiveTab(id);
+    router.replace({ hash: id }, undefined, { shallow: true });
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -36,7 +52,7 @@ export default function AdminPage() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.15 }}
         className="mb-6"
       >
         <div className="flex items-center gap-3">
@@ -60,7 +76,7 @@ export default function AdminPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={cn(
                   "relative flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-xl",
                   "transition-colors duration-200",
@@ -90,7 +106,7 @@ export default function AdminPage() {
         key={activeTab}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.12 }}
         className="glass-card p-6"
       >
         {renderContent()}
