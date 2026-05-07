@@ -24,7 +24,7 @@ model Product {
   id         String   @id @default(cuid())
   name       String
   barcode    String   // Убрал @unique, чтобы не блокировать добавление одинаковых товаров
-  expiryDate DateTime
+  expiryDate DateTime?
   status     String   @default("ACTIVE") // ACTIVE, ARCHIVED, DEFECT
   isExpired          Boolean   @default(false)   // Авто-флаг просрочки
   quantity           Int?                         // Опциональное количество

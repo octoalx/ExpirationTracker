@@ -6,6 +6,7 @@ import { getExpiryStatus, cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import AddProductForm from "../components/AddProductForm";
 import EditProductForm from "../components/EditProductForm";
+import ImportExcelModal from "../components/ImportExcelModal";
 import { ProductTableEnhanced } from "@/components/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ import {
   ShieldCheck,
   Archive,
   ListFilter,
+  FileSpreadsheet,
 } from "lucide-react";
 
 /* ── Typing animation hook ───────────────────────────────────────────── */
@@ -209,6 +211,7 @@ const Dashboard = () => {
     warningThreshold: number;
   } | null>(null);
   const [isAddModalOpen, setAddModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [scannedBarcode, setScannedBarcode] = useState("");
@@ -268,7 +271,8 @@ const Dashboard = () => {
     setScannedBarcode("");
   };
 
-  const deleteProduct = (productId: string) => {
+  const deleteProduct = async (productId: string) => {
+    await fetch(`/api/products/${productId}`, { method: "DELETE" });
     setProducts((prev) => prev.filter((p) => p.id !== productId));
   };
 
@@ -602,6 +606,14 @@ const Dashboard = () => {
             <PackageOpen className="size-12 opacity-40" />
             <h3 className="text-lg font-semibold">Товары не найдены</h3>
             <p className="text-sm">Добавьте первый товар, чтобы начать.</p>
+            <Button
+              size="sm"
+              onClick={() => setAddModalOpen(true)}
+              className="mt-2 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Plus className="h-4 w-4" />
+              Добавить товар
+            </Button>
           </motion.div>
         ) : (
           <motion.div
@@ -696,9 +708,33 @@ const Dashboard = () => {
           <DialogHeader>
             <DialogTitle>Добавить товар</DialogTitle>
           </DialogHeader>
+
+          <Button
+            variant="outline"
+            onClick={() => {
+              setAddModalOpen(false);
+              setIsImportOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 w-full h-[46px] border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+          >
+            <FileSpreadsheet className="size-5! text-emerald-600 shrink-0"/>
+            Импорт из Excel
+          </Button>
+
           <AddProductForm onProductAdded={addProduct} initialBarcode={scannedBarcode} />
         </DialogContent>
       </Dialog>
+
+      {/* Import Excel dialog */}
+      <ImportExcelModal
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        onImportComplete={() => {
+          fetch("/api/products")
+            .then((r) => r.json())
+            .then((data) => setProducts(data.products ?? []));
+        }}
+      />
 
       {/* Edit product dialog */}
       <Dialog open={isEditModalOpen} onOpenChange={setEditModalOpen}>

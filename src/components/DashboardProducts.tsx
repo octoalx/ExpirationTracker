@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import { getExpiryStatus } from "@/lib/utils";
@@ -19,10 +20,12 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import AddProductForm from "@/components/AddProductForm";
+import ImportExcelModal from "@/components/ImportExcelModal";
 import { ProductStats } from "@/components/ProductStats";
 import { ProductTableEnhanced } from "@/components/products/ProductTableEnhanced";
 
@@ -44,6 +47,8 @@ export function DashboardProducts() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState("");
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const [bulkIds, setBulkIds] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -158,10 +163,11 @@ export function DashboardProducts() {
     const active = products.filter((p) => p.status === "ACTIVE");
 
     const expired = active.filter(
-      (p) => getExpiryStatus(new Date(p.expiryDate), ut, wt) === "expired"
+      (p) => p.expiryDate && getExpiryStatus(new Date(p.expiryDate), ut, wt) === "expired"
     ).length;
 
     const expiring7 = active.filter((p) => {
+      if (!p.expiryDate) return false;
       const days = Math.ceil(
         (new Date(p.expiryDate).getTime() - today.getTime()) /
           (1000 * 60 * 60 * 24)
@@ -170,6 +176,7 @@ export function DashboardProducts() {
     }).length;
 
     const expiring30 = active.filter((p) => {
+      if (!p.expiryDate) return false;
       const days = Math.ceil(
         (new Date(p.expiryDate).getTime() - today.getTime()) /
           (1000 * 60 * 60 * 24)
@@ -395,7 +402,27 @@ export function DashboardProducts() {
             <DialogTitle>
               {editProduct ? "Редактировать товар" : "Добавить товар"}
             </DialogTitle>
+            <DialogDescription>
+              {editProduct
+                ? "Измените данные товара"
+                : "Заполните форму или импортируйте из Excel"}
+            </DialogDescription>
           </DialogHeader>
+
+          {!editProduct && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddOpen(false);
+                setIsImportOpen(true);
+              }}
+              className="gap-2 w-full mb-2"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Импорт из Excel
+            </Button>
+          )}
+
           <AddProductForm
             onProductAdded={addProduct}
             initialBarcode={scannedBarcode}
@@ -403,15 +430,27 @@ export function DashboardProducts() {
         </DialogContent>
       </Dialog>
 
+      {/* Import Excel dialog */}
+      <ImportExcelModal
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        onImportComplete={() => {
+          // Reload products after import
+          fetch("/api/products")
+            .then((r) => r.json())
+            .then((data) => setProducts(data.products ?? []));
+        }}
+      />
+
       {/* Bulk delete confirm */}
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Удалить {bulkIds.length} товаров?</DialogTitle>
+            <DialogDescription>
+              Это действие необратимо. Все выбранные товары будут удалены.
+            </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Это действие необратимо. Все выбранные товары будут удалены.
-          </p>
           <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"

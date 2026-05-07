@@ -36,7 +36,7 @@ export default async function handler(
         data: {
           name,
           barcode,
-          expiryDate: new Date(expiryDate),
+          expiryDate: expiryDate ? new Date(expiryDate) : null,
           quantity: quantity || null,
           userId: session.user.id,
         },
