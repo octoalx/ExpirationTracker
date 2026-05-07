@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { SystemLog } from "@prisma/client";
 import IssueTable from "@/components/admin/issues/IssueTable";
-import { Heading } from "@adobe/react-spectrum";
 
 export default function IssueLogPage() {
   const [logs, setLogs] = useState<SystemLog[]>([]);
@@ -13,11 +12,9 @@ export default function IssueLogPage() {
   }, []);
 
   return (
-    <div>
-      <Heading level={1}>Issue Log</Heading>
-      <div style={{ marginTop: "2rem" }}>
-        <IssueTable logs={logs} />
-      </div>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Issue Log</h1>
+      <IssueTable logs={logs} />
     </div>
   );
 }

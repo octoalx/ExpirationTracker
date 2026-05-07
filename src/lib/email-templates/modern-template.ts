@@ -378,6 +378,8 @@ export function summaryEmailTemplate(data: SummaryEmailData): string {
 
   // Determine summary color based on urgency
   const summaryColor = hasExpired ? "#dc2626" : hasCritical ? "#ea580c" : hasWarning ? "#ca8a04" : "#059669";
+  const summaryBg = hasExpired ? "#fef2f2" : hasCritical ? "#fff7ed" : hasWarning ? "#fefce8" : "#f0fdf4";
+  const summaryBorder = hasExpired ? "#fecaca" : hasCritical ? "#fed7aa" : hasWarning ? "#fde047" : "#bbf7d0";
 
   // Generate product rows
   const productsHtml = products.map(product => {
