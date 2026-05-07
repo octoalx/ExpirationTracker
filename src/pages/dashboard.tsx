@@ -488,7 +488,7 @@ const Dashboard = () => {
               placeholder="Поиск по названию..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm"
+              className="pl-9 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-emerald-200 dark:border-emerald-800 focus:border-emerald-500"
             />
           </div>
 
