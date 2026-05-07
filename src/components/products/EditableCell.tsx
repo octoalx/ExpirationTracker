@@ -22,8 +22,11 @@ export function EditableCell({
   const savedRef = useRef(false);
 
   useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
+    const t = setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 0);
+    return () => clearTimeout(t);
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -58,7 +61,7 @@ export function EditableCell({
       onKeyDown={handleKeyDown}
       onBlur={handleBlur}
       className={cn(
-        "h-8 px-2 py-1 text-sm",
+        "h-8 w-full min-w-0 px-2 py-1 text-sm",
         "border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500/20",
         "animate-in fade-in zoom-in-95 duration-150"
       )}

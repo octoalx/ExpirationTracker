@@ -30,6 +30,7 @@ import {
   ScanBarcode,
   ShieldCheck,
   Archive,
+  ListFilter,
 } from "lucide-react";
 
 /* ── Typing animation hook ───────────────────────────────────────────── */
@@ -494,6 +495,7 @@ const Dashboard = () => {
 
         {/* Chip filters - new status model */}
         <div className="flex flex-wrap items-center gap-2">
+          <ListFilter className="h-4 w-4 text-slate-400 shrink-0" />
           {statusChips.map((c) => (
             <Chip
               key={c.value}
@@ -674,6 +676,20 @@ const Dashboard = () => {
         onItemsPerPageChange={setItemsPerPage}
       />
 
+      {/* FAB below table */}
+      {filteredProducts.length > 0 && (
+        <div className="flex justify-end mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+          <button
+            onClick={() => setAddModalOpen(true)}
+            className="group relative bg-linear-to-r from-emerald-600 to-teal-500 text-white rounded-full p-4 shadow-xl shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-110"
+            aria-label="Добавить новый товар"
+          >
+            <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+            <span className="absolute inset-0 rounded-full animate-ping bg-emerald-400/50" />
+          </button>
+        </div>
+      )}
+
       {/* Add product dialog */}
       <Dialog open={isAddModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="sm:max-w-md">
@@ -712,21 +728,7 @@ const Dashboard = () => {
   );
 
   return (
-    <>
-      <div className="pb-36 md:pb-16">{content}</div>
-
-      {/* FAB — fixed floating button */}
-      <div className="fixed bottom-28 right-8 md:bottom-12 md:right-12 z-100">
-        <button
-          onClick={() => setAddModalOpen(true)}
-          className="group relative bg-linear-to-r from-emerald-600 to-teal-500 text-white rounded-full p-4 shadow-2xl shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:scale-110"
-          aria-label="Добавить новый товар"
-        >
-          <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
-          <span className="absolute inset-0 rounded-full animate-ping bg-emerald-400/50" />
-        </button>
-      </div>
-    </>
+    <div className="pb-8">{content}</div>
   );
 };
 

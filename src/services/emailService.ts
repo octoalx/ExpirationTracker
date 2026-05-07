@@ -108,7 +108,7 @@ class EmailService {
     subject: string;
     status: string;
   }) {
-    return prisma.emailLog.create({
+    const logEntry = await prisma.emailLog.create({
       data: {
         userId: fields.userId || null,
         to: fields.to,
@@ -116,6 +116,23 @@ class EmailService {
         status: fields.status,
       },
     });
+
+    // Keep only last 50 email logs
+    const totalCount = await prisma.emailLog.count();
+    if (totalCount > 50) {
+      const toDelete = await prisma.emailLog.findMany({
+        orderBy: { createdAt: "desc" },
+        skip: 50,
+        select: { id: true },
+      });
+      if (toDelete.length > 0) {
+        await prisma.emailLog.deleteMany({
+          where: { id: { in: toDelete.map((l) => l.id) } },
+        });
+      }
+    }
+
+    return logEntry;
   }
 
   private async updateEmailLog(

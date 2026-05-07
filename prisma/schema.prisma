@@ -48,7 +48,7 @@ model Settings {
   // Telegram интеграция
   telegramToken          String?
   telegramChatId         String?
-  telegramNotifications  Boolean @default(true)
+  telegramNotifications  Boolean @default(false)
 
   // Email/SMTP интеграция
   notificationEmail      String?

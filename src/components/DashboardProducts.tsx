@@ -307,7 +307,7 @@ export function DashboardProducts() {
         />
       </motion.div>
 
-      {/* 3 + 4 + 5. Table with toolbar + action bar */}
+      {/* 3 + 4 + 5. Table with toolbar + action bar + FAB */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -366,19 +366,21 @@ export function DashboardProducts() {
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
 
-      {/* FAB */}
-      <div className="fixed bottom-28 right-8 md:bottom-12 md:right-12 z-50">
-        <button
-          onClick={() => { setEditProduct(null); setIsAddOpen(true); }}
-          className="group relative bg-linear-to-r from-emerald-600 to-teal-500 text-white rounded-full p-4 shadow-2xl shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-all duration-300 hover:scale-110"
-          aria-label="Добавить товар"
-        >
-          <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
-          <span className="absolute inset-0 rounded-full animate-ping bg-emerald-400/50" />
-        </button>
-      </div>
+        {/* FAB below table */}
+        {products.length > 0 && (
+          <div className="flex justify-end mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <button
+              onClick={() => { setEditProduct(null); setIsAddOpen(true); }}
+              className="group relative bg-linear-to-r from-emerald-600 to-teal-500 text-white rounded-full p-4 shadow-xl shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-110"
+              aria-label="Добавить товар"
+            >
+              <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+              <span className="absolute inset-0 rounded-full animate-ping bg-emerald-400/50" />
+            </button>
+          </div>
+        )}
+      </motion.div>
 
       {/* Add / Edit dialog */}
       <Dialog

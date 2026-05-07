@@ -19,15 +19,30 @@ export default async function handler(
   }
 
   try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-      },
+    const { level, page = "1", limit = "50" } = req.query;
+    
+    const pageNum = Math.max(1, parseInt(page as string, 10));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10)));
+    const skip = (pageNum - 1) * limitNum;
+
+    const where = level ? { level: level as string } : {};
+
+    const [logs, total] = await Promise.all([
+      prisma.systemLog.findMany({
+        where,
+        orderBy: { timestamp: "desc" },
+        skip,
+        take: limitNum,
+      }),
+      prisma.systemLog.count({ where }),
+    ]);
+
+    res.status(200).json({
+      logs,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
     });
-    res.status(200).json(users);
   } catch (error) {
     apiErrorHandler(error, res);
   }

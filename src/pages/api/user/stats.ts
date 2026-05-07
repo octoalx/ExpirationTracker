@@ -3,7 +3,39 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
-import { differenceInDays, format, startOfDay, subDays } from "date-fns";
+import { differenceInDays, format, startOfDay, subDays, parseISO } from "date-fns";
+import { ru } from "date-fns/locale";
+
+// Category mapping based on product name keywords
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  "Цемент": ["цемент"],
+  "Песок": ["песок"],
+  "Щебень": ["щебень"],
+  "Бетон": ["бетон"],
+  "Кирпич": ["кирпич"],
+  "Блоки": ["блок", "блоки"],
+  "Арматура": ["арматура"],
+  "Крепеж": ["саморез", "гвоздь", "шуруп", "болт", "гайка", "шайба", "анкер", "дюбель", "крепеж"],
+  "Пиломатериалы": ["доска", "брус", "брусок", "вагонка", "фанера", "осб", "osb", "плинтус", "порог", "рейка"],
+  "ЛКМ": ["краска", "лак", "грунт", "эмаль", "колер", "шпатлевка", "шпаклевка", "гидроизоляция", "мастика", "герметик", "клей", "пена"],
+  "Кровля": ["рубероид", "шифер", "черепица", "профнастил", "сайдинг", "гидро", "паро", "пароизоляция"],
+  "Утеплитель": ["утеплитель", "минвата", "пеноплекс", "эковата", "вата", "изол"],
+  "Гипсокартон": ["гипсокартон", "гкл", "профиль", "маяк", "серпянка", "подвес"],
+  "Металлопрокат": ["уголок", "планка", "кронштейн", "держатель", "соединитель", "заглушка", "проволока", "сетка"],
+  "Трубы": ["труба", "фитинг", "колено", "муфта", "заглушка", "кран", "вентиль"],
+  "Электрика": ["кабель", "провод", "розетка", "выключатель", "автомат", "светильник", "лампа"],
+  "Инструмент": ["инструмент", "дрель", "перфоратор", "шуруповерт", "пила", "нож"],
+};
+
+function categorizeProduct(name: string): string {
+  const lowerName = name.toLowerCase();
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(kw => lowerName.includes(kw))) {
+      return category;
+    }
+  }
+  return "Другое";
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -27,8 +59,8 @@ export default async function handler(
       where: { userId },
     });
 
-    const urgentThreshold = settings?.urgentThreshold || 3;
-    const warningThreshold = settings?.warningThreshold || 7;
+    const urgentThreshold = settings?.urgentThreshold || 5;
+    const warningThreshold = settings?.warningThreshold || 30;
 
     // Get all user products
     const products = await prisma.product.findMany({
@@ -36,50 +68,111 @@ export default async function handler(
       orderBy: { createdAt: "desc" },
     });
 
+    // Get email logs for user
+    const emailLogs = await prisma.emailLog.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+
     const now = new Date();
 
-    // Calculate status distribution
+    // Basic counts by status
+    const statusCounts = {
+      ACTIVE: 0,
+      ARCHIVED: 0,
+      DEFECT: 0,
+    };
+
+    // Calculate status distribution by expiry
     let expired = 0;
     let urgent = 0;
     let warning = 0;
     let safe = 0;
 
-    const urgentProducts: typeof products = [];
+    const problemProducts: typeof products = [];
+    const productsWithoutQuantity: typeof products = [];
+    const categoryCounts: Record<string, number> = {};
+    let totalQuantity = 0;
+    let productsWithQuantity = 0;
+
+    // Track min/max expiry dates
+    let nearestExpiry: { product: typeof products[0] | null; daysLeft: number } = { product: null, daysLeft: Infinity };
+    let farthestExpiry: { product: typeof products[0] | null; daysLeft: number } = { product: null, daysLeft: -Infinity };
 
     products.forEach((product) => {
       const daysLeft = differenceInDays(product.expiryDate, now);
 
+      // Status counts
+      statusCounts[product.status as keyof typeof statusCounts]++;
+
+      // Expiry distribution
       if (daysLeft < 0) {
         expired++;
+        problemProducts.push(product);
       } else if (daysLeft <= urgentThreshold) {
         urgent++;
-        urgentProducts.push(product);
+        problemProducts.push(product);
       } else if (daysLeft <= warningThreshold) {
         warning++;
       } else {
         safe++;
       }
+
+      // Category grouping
+      const category = categorizeProduct(product.name);
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+
+      // Quantity metrics
+      if (product.quantity !== null) {
+        totalQuantity += product.quantity;
+        productsWithQuantity++;
+      } else {
+        productsWithoutQuantity.push(product);
+      }
+
+      // Track nearest/farthest expiry
+      if (daysLeft < nearestExpiry.daysLeft) {
+        nearestExpiry = { product, daysLeft };
+      }
+      if (daysLeft > farthestExpiry.daysLeft) {
+        farthestExpiry = { product, daysLeft };
+      }
     });
 
-    // Get products added by day (last 30 days)
-    const thirtyDaysAgo = subDays(now, 30);
-    const productsByDay: Record<string, number> = {};
+    // Top products by quantity
+    const productsWithQty = products.filter(p => p.quantity !== null);
+    const topByQuantity = [...productsWithQty]
+      .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
+      .slice(0, 5)
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        quantity: p.quantity,
+      }));
 
-    // Initialize all days with 0
+    // Top categories by quantity (sum of quantities)
+    const categoryByQuantity: Record<string, number> = {};
+    productsWithQty.forEach(p => {
+      const cat = categorizeProduct(p.name);
+      categoryByQuantity[cat] = (categoryByQuantity[cat] || 0) + (p.quantity || 0);
+    });
+    const topCategoriesByQuantity = Object.entries(categoryByQuantity)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, count]) => ({ name, count }));
+
+    // Products added by day (last 30 days)
+    const productsByDay: Record<string, number> = {};
     for (let i = 0; i <= 30; i++) {
       const date = format(subDays(now, i), "yyyy-MM-dd");
       productsByDay[date] = 0;
     }
-
-    // Count products per day
     products.forEach((product) => {
       const date = format(startOfDay(product.createdAt), "yyyy-MM-dd");
       if (productsByDay[date] !== undefined) {
         productsByDay[date]++;
       }
     });
-
-    // Convert to array format for charts
     const productsAddedByDay = Object.entries(productsByDay)
       .map(([date, count]) => ({
         date,
@@ -88,41 +181,119 @@ export default async function handler(
       }))
       .reverse();
 
-    // Get top 5 urgent products (sorted by expiry date)
-    const topUrgent = urgentProducts
-      .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
-      .slice(0, 5)
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        expiryDate: p.expiryDate.toISOString(),
-        daysLeft: differenceInDays(p.expiryDate, now),
-      }));
-
-    // Category distribution (placeholder - will work when categories are added)
-    const categories: Record<string, number> = {};
-    // For now, group by status as a fallback
-    if (Object.keys(categories).length === 0) {
-      categories["В норме"] = safe;
-      categories["Внимание"] = warning;
-      categories["Срочно"] = urgent;
-      categories["Просрочено"] = expired;
+    // Email notifications by day (last 14 days)
+    const emailByDay: Record<string, number> = {};
+    for (let i = 0; i < 14; i++) {
+      const date = format(subDays(now, i), "yyyy-MM-dd");
+      emailByDay[date] = 0;
     }
+    emailLogs.forEach((log) => {
+      const date = format(startOfDay(log.sentAt || log.createdAt), "yyyy-MM-dd");
+      if (emailByDay[date] !== undefined) {
+        emailByDay[date]++;
+      }
+    });
+    const emailByDayArray = Object.entries(emailByDay)
+      .map(([date, count]) => ({
+        date,
+        displayDate: format(new Date(date), "dd.MM"),
+        count,
+      }))
+      .reverse();
+
+    // Last email notification
+    const lastEmail = emailLogs.length > 0 ? {
+      date: emailLogs[0].sentAt?.toISOString() || emailLogs[0].createdAt.toISOString(),
+      subject: emailLogs[0].subject,
+      status: emailLogs[0].status,
+    } : null;
+
+    // Format problem products for table
+    const problemProductsTable = problemProducts
+      .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
+      .map(p => {
+        const daysLeft = differenceInDays(p.expiryDate, now);
+        return {
+          id: p.id,
+          name: p.name,
+          barcode: p.barcode,
+          quantity: p.quantity,
+          expiryDate: p.expiryDate.toISOString(),
+          daysLeft,
+          status: daysLeft < 0 ? "expired" as const : "urgent" as const,
+        };
+      });
 
     res.status(200).json({
+      // Basic KPIs
       totalProducts: products.length,
+      activeProducts: statusCounts.ACTIVE,
+      archivedProducts: statusCounts.ARCHIVED,
+      defectProducts: statusCounts.DEFECT,
+      uniqueCategories: Object.keys(categoryCounts).length,
+
+      // Expiry metrics
+      expiredCount: expired,
+      urgentCount: urgent,
+      warningCount: warning,
+      safeCount: safe,
+      nearestExpiry: nearestExpiry.product ? {
+        id: nearestExpiry.product.id,
+        name: nearestExpiry.product.name,
+        daysLeft: nearestExpiry.daysLeft,
+        expiryDate: nearestExpiry.product.expiryDate.toISOString(),
+      } : null,
+      farthestExpiry: farthestExpiry.product ? {
+        id: farthestExpiry.product.id,
+        name: farthestExpiry.product.name,
+        daysLeft: farthestExpiry.daysLeft,
+        expiryDate: farthestExpiry.product.expiryDate.toISOString(),
+      } : null,
+
+      // Quantity metrics
+      totalQuantity,
+      productsWithQuantity,
+      averageQuantity: productsWithQuantity > 0 ? Math.round(totalQuantity / productsWithQuantity) : 0,
+      topByQuantity,
+      productsWithoutQuantityCount: productsWithoutQuantity.length,
+      productsWithoutQuantity: productsWithoutQuantity.slice(0, 10).map(p => ({
+        id: p.id,
+        name: p.name,
+        barcode: p.barcode,
+      })),
+
+      // Category metrics
+      categoriesByCount: Object.entries(categoryCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([name, count]) => ({ name, count })),
+      topCategoriesByQuantity,
+
+      // Charts data
       statusDistribution: {
         expired,
         urgent,
         warning,
         safe,
       },
+      statusByType: {
+        active: statusCounts.ACTIVE,
+        archived: statusCounts.ARCHIVED,
+        defect: statusCounts.DEFECT,
+      },
       productsAddedByDay,
-      topUrgent,
-      categories: Object.entries(categories).map(([name, count]) => ({
-        name,
-        count,
-      })),
+      emailByDay: emailByDayArray,
+
+      // Email metrics
+      totalEmails: emailLogs.length,
+      lastEmail,
+
+      // Problem products
+      problemProducts: problemProductsTable,
+
+      // Thresholds
+      urgentThreshold,
+      warningThreshold,
     });
   } catch (error) {
     apiErrorHandler(error, res);

@@ -23,6 +23,8 @@ import {
   CalendarCheck,
   ChevronUp,
   ChevronDown,
+  ChevronsUpDown,
+  Check,
   GripVertical,
   ScanBarcode,
   Package,
@@ -37,8 +39,8 @@ import { EditableCell } from "./EditableCell";
 const COL_WIDTHS = {
   select:    32,   // чекбокс
   name:      0,    // 0 = авто (занимает всё свободное место)
-  quantity:  90,   // кол-во
-  barcode:   100,  // штрих-код (EAN-13 ~13 символов)
+  quantity:  30,   // кол-во
+  barcode:   160,  // штрих-код (EAN-13 ~13 символов)
   expiryDate: 200, // срок годности + дата
   status:    110,  // статус
   actions:   120,  // кнопки действий
@@ -142,6 +144,20 @@ export function ProductTableEnhanced({
     rowId: string;
     columnId: string;
   } | null>(null);
+  const [copyTooltip, setCopyTooltip] = useState<{ x: number; y: number } | null>(null);
+  const tooltipTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clickTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const copyToClipboard = useCallback((text: string, e: React.MouseEvent) => {
+    const x = e.clientX, y = e.clientY;
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => {
+      navigator.clipboard.writeText(text).catch(() => {});
+      if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
+      setCopyTooltip({ x, y });
+      tooltipTimer.current = setTimeout(() => setCopyTooltip(null), 800);
+    }, 300);
+  }, []);
 
   const handleCellEdit = useCallback(
     async (product: Product, columnId: string, value: string | number | null) => {
@@ -225,9 +241,9 @@ export function ProductTableEnhanced({
             }}
           >
             Название
-            {sortField === "name" && (
-              sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-            )}
+            {sortField === "name"
+              ? (sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />)
+              : <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />}
           </div>
         ),
         cell: ({ row, getValue }) => {
@@ -249,11 +265,12 @@ export function ProductTableEnhanced({
           return (
             <div
               className="font-medium text-slate-900 cursor-pointer hover:text-emerald-600 transition-colors"
+              onClick={(e) => copyToClipboard(value, e)}
               onDoubleClick={(e) => {
-                e.stopPropagation();
+                if (clickTimer.current) clearTimeout(clickTimer.current);
                 setEditingCell({ rowId: row.id, columnId: "name" });
               }}
-              title="Двойной клик для редактирования"
+              title="Клик — копировать, двойной клик — редактировать"
             >
               {value}
             </div>
@@ -275,9 +292,9 @@ export function ProductTableEnhanced({
             }}
           >
             Кол-во
-            {sortField === "quantity" && (
-              sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-            )}
+            {sortField === "quantity"
+              ? (sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />)
+              : <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />}
           </div>
         ),
         cell: ({ row, getValue }) => {
@@ -303,12 +320,13 @@ export function ProductTableEnhanced({
 
           return (
             <div
-              className="text-sm text-slate-600 cursor-pointer hover:text-emerald-600 transition-colors"
+              className="text-sm text-slate-700 cursor-pointer hover:text-emerald-600 transition-colors"
+              onClick={(e) => copyToClipboard(String(value ?? ""), e)}
               onDoubleClick={(e) => {
-                e.stopPropagation();
+                if (clickTimer.current) clearTimeout(clickTimer.current);
                 setEditingCell({ rowId: row.id, columnId: "quantity" });
               }}
-              title="Двойной клик для редактирования"
+              title="Клик — копировать, двойной клик — редактировать"
             >
               {value ?? "—"}
             </div>
@@ -330,9 +348,9 @@ export function ProductTableEnhanced({
             }}
           >
             Штрих-код
-            {sortField === "barcode" && (
-              sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-            )}
+            {sortField === "barcode"
+              ? (sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />)
+              : <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />}
           </div>
         ),
         cell: ({ row, getValue }) => {
@@ -343,23 +361,26 @@ export function ProductTableEnhanced({
 
           if (isEditing) {
             return (
-              <EditableCell
-                value={value}
-                type="text"
-                onSave={(val) => handleCellEdit(row.original, "barcode", val)}
-                onCancel={() => setEditingCell(null)}
-              />
+              <div style={{ width: COL_WIDTHS.barcode - 32 }}>
+                <EditableCell
+                  value={value}
+                  type="text"
+                  onSave={(val) => handleCellEdit(row.original, "barcode", val)}
+                  onCancel={() => setEditingCell(null)}
+                />
+              </div>
             );
           }
 
           return (
             <div
               className="flex items-center gap-1.5 text-sm text-slate-500 cursor-pointer hover:text-emerald-600 transition-colors"
+              onClick={(e) => copyToClipboard(value || "", e)}
               onDoubleClick={(e) => {
-                e.stopPropagation();
+                if (clickTimer.current) clearTimeout(clickTimer.current);
                 setEditingCell({ rowId: row.id, columnId: "barcode" });
               }}
-              title="Двойной клик для редактирования"
+              title="Клик — копировать, двойной клик — редактировать"
             >
               <ScanBarcode className="h-3.5 w-3.5" />
               <span className="font-mono">{value || "—"}</span>
@@ -382,9 +403,9 @@ export function ProductTableEnhanced({
             }}
           >
             Срок годности
-            {sortField === "expiryDate" && (
-              sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-            )}
+            {sortField === "expiryDate"
+              ? (sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />)
+              : <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />}
           </div>
         ),
         cell: ({ row, getValue }) => {
@@ -455,9 +476,9 @@ export function ProductTableEnhanced({
             }}
           >
             Статус
-            {sortField === "status" && (
-              sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-            )}
+            {sortField === "status"
+              ? (sortDesc ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />)
+              : <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />}
           </div>
         ),
         cell: ({ getValue }) => {
@@ -567,6 +588,7 @@ export function ProductTableEnhanced({
     [
       editingCell,
       handleCellEdit,
+      copyToClipboard,
       onProductDelete,
       onProductConsume,
       onProductEdit,
@@ -609,6 +631,14 @@ export function ProductTableEnhanced({
 
   return (
     <div className="space-y-4">
+      {copyTooltip && (
+        <div
+          className="fixed z-50 pointer-events-none px-3 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-700 text-xs font-medium flex items-center gap-1.5 shadow-lg animate-fade-out"
+          style={{ left: copyTooltip.x, top: copyTooltip.y - 36, transform: "translateX(-200%)" }}
+        >
+          <Check className="h-3.5 w-3.5" /> Скопировано
+        </div>
+      )}
       {actionBar}
 
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
