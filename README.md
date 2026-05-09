@@ -19,8 +19,13 @@ cd ExpirationTracker
 
 # 2. Configure
 cp .env.example .env
-# Edit .env — fill NEXTAUTH_SECRET (openssl rand -base64 32)
-#             set NEXTAUTH_URL to your server IP/domain
+
+# Generate NEXTAUTH_SECRET
+openssl rand -base64 32
+
+# Edit .env and fill:
+#   NEXTAUTH_SECRET=<generated-secret>
+#   NEXTAUTH_URL=http://localhost:8080 (or your server IP)
 
 # 3. Deploy
 chmod +x deploy.sh
