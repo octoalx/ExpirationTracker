@@ -1,0 +1,15 @@
+node_modules
+.next
+data/
+.env
+.git
+Dockerfile
+docker-compose.yml
+*.log
+.gitignore
+.windsurf/
+README.md
+DOCKER.md
+deploy.sh
+nginx/
+.env.example

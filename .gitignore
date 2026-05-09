@@ -33,6 +33,9 @@ prisma/*.db-journal
 # Auto-backups
 backups/
 
+# Docker SQLite volume
+data/
+
 # IDE
 .vscode/
 .idea/
