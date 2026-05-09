@@ -4,7 +4,7 @@
 
 - Docker 24+
 - Docker Compose v2 (`docker compose` not `docker-compose`)
-- Port 80 available on host
+- Port 8080 available on host
 
 ## First-time setup
 
@@ -29,7 +29,7 @@ chmod +x deploy.sh
 ## Verify
 
 ```bash
-curl http://localhost/
+curl http://localhost:8080/
 # Should return HTML of the app
 ```
 
@@ -88,10 +88,10 @@ docker compose start app
 docker compose logs app
 ```
 
-**Port 80 in use:**
+**Port 8080 in use:**
 ```bash
-sudo ss -tlnp | grep :80
-# Kill or stop the process using port 80
+sudo ss -tlnp | grep :8080
+# Kill or stop the process using port 8080
 ```
 
 **Migrations failed:**

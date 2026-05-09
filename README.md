@@ -8,7 +8,7 @@ Web app for tracking product expiration dates with notifications via email and T
 
 - Docker 24+
 - Docker Compose v2
-- Port 80 free on host
+- Port 8080 free on host
 
 ### Deploy
 
@@ -30,10 +30,10 @@ chmod +x deploy.sh
 ### Verify
 
 ```bash
-curl http://localhost/
+curl http://localhost:8080/
 ```
 
-App runs at `http://localhost` (nginx → port 80).
+App runs at `http://localhost:8080`.
 
 ## Environment Variables
 

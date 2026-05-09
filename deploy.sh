@@ -9,9 +9,9 @@ if [ ! -f ".env" ]; then
   exit 1
 fi
 
-# Check port 80 is free
-if ss -tlnp 2>/dev/null | grep -q ':80 ' || netstat -tlnp 2>/dev/null | grep -q ':80 '; then
-  echo "ERROR: Port 80 is already in use. Free it before deploying."
+# Check port 8080 is free
+if ss -tlnp 2>/dev/null | grep -q ':8080 ' || netstat -tlnp 2>/dev/null | grep -q ':8080 '; then
+  echo "ERROR: Port 8080 is already in use. Free it before deploying."
   exit 1
 fi
 
@@ -26,7 +26,7 @@ docker compose up -d
 
 echo "[4/4] Waiting for health check..."
 RETRIES=12
-until curl -sf http://localhost/ > /dev/null 2>&1; do
+until curl -sf http://localhost:8080/ > /dev/null 2>&1; do
   RETRIES=$((RETRIES - 1))
   if [ "$RETRIES" -eq 0 ]; then
     echo "ERROR: App did not become healthy in time. Showing logs:"
@@ -39,4 +39,4 @@ done
 
 echo ""
 echo "=== Deploy successful! ==="
-echo "App is available at: http://localhost"
+echo "App is available at: http://localhost:8080"
