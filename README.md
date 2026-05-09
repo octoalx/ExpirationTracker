@@ -8,7 +8,7 @@ Web app for tracking product expiration dates with notifications via email and T
 
 - Docker 24+
 - Docker Compose v2
-- Port 8080 free on host
+- Port 8881 free on host
 
 ### Deploy
 
@@ -25,7 +25,7 @@ openssl rand -base64 32
 
 # Edit .env and fill:
 #   NEXTAUTH_SECRET=<generated-secret>
-#   NEXTAUTH_URL=http://localhost:8080 (or your server IP)
+#   NEXTAUTH_URL=http://localhost:8881 (or your server IP)
 
 # 3. Deploy
 chmod +x deploy.sh
@@ -35,10 +35,10 @@ chmod +x deploy.sh
 ### Verify
 
 ```bash
-curl http://localhost:8080/
+curl http://localhost:8881/
 ```
 
-App runs at `http://localhost:8080`.
+App runs at `http://localhost:8881`.
 
 ## Environment Variables
 
