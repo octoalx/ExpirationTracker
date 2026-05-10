@@ -1,53 +1,67 @@
-# ─── Stage 1: deps ───────────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat
+# ─── СТАДИЯ 1: Установка зависимостей ───
+FROM node:22-alpine AS deps
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
-RUN npm ci --ignore-scripts
+# Устанавливаем всё, включая devDependencies для билда
+RUN npm ci --ignore-scripts --legacy-peer-deps
 
-# ─── Stage 2: builder ────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
-RUN apk add --no-cache libc6-compat
+# ─── СТАДИЯ 2: Сборка приложения ───
+FROM node:22-alpine AS builder
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+# Временный URL для генерации клиента Prisma
+ENV DATABASE_URL="file:./dev.db"
 
-RUN npx prisma generate
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+COPY prisma.config.ts ./prisma.config.ts
+
+RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
 
-# ─── Stage 3: runner ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
-RUN apk add --no-cache libc6-compat
+# ─── СТАДИЯ 3: Финальный образ (Runner) ───
+FROM node:22-alpine AS runner
+RUN apk add --no-cache libc6-compat curl python3 make g++
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+# Путь к базе данных внутри контейнера
+ENV DATABASE_URL="file:/app/data/dev.db"
 
+# Создаем пользователя для безопасности
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
-COPY --from=builder /app/node_modules/@prisma/adapter-better-sqlite3 ./node_modules/@prisma/adapter-better-sqlite3
-
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
+# Создаем папку для БД и даем права пользователю nextjs
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
-RUN chown -R nextjs:nodejs /app
+
+# Копируем только необходимое из билдера
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/prisma ./prisma
+
+# Копируем зависимости, чтобы npx prisma работал в рантайме
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+# Пересобираем better-sqlite3 для Alpine
+RUN npm rebuild better-sqlite3
+
+# Подготавливаем входной скрипт
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
+    chown nextjs:nodejs /usr/local/bin/docker-entrypoint.sh
 
 USER nextjs
 

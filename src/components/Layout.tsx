@@ -95,7 +95,7 @@ export default function Layout({ children }: LayoutProps) {
     name: "Выйти",
     href: "#",
     icon: LogOut,
-    action: () => signOut(),
+    action: () => signOut({ redirect: false }).then(() => router.push('/auth/signin')),
   });
 
   if (isAuthPage) {
