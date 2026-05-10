@@ -17,6 +17,53 @@ Web app for tracking product expiration dates with notifications via email and T
 
 ---
 
+## Local Domain Setup (Optional)
+
+For local development with custom domain like `https://expitracker.local`:
+
+### 1. Add Domain to hosts
+
+```bash
+sudo nano /etc/hosts
+# Add line:
+127.0.0.1 expitracker.local
+```
+
+### 2. Create SSL Certificate
+
+```bash
+mkdir -p nginx/ssl
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout nginx/ssl/expitracker.local.key \
+  -out nginx/ssl/expitracker.local.crt \
+  -subj "/CN=expitracker.local"
+```
+
+### 3. Update Environment
+
+```env
+# For custom domain
+NEXTAUTH_URL="https://expitracker.local"
+```
+
+### 4. Redeploy
+
+```bash
+docker compose down
+./deploy.sh
+```
+
+### 5. Access
+
+Open `https://expitracker.local` in browser. Accept self-signed certificate warning.
+
+**Notes:**
+- HTTP (port 8881) auto-redirects to HTTPS (port 443)
+- Health checks still work on `http://localhost:8881/health`
+- SSL certificates mounted from `./nginx/ssl/` directory
+
+---
+
 ## Prerequisites
 
 | Requirement | Version | Notes |
