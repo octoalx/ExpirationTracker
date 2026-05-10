@@ -14,65 +14,7 @@ Web app for tracking product expiration dates with notifications via email and T
 - [Backup & Restore](#backup--restore)
 - [Troubleshooting](#troubleshooting)
 - [Architecture](#architecture)
-
----
-
-## HTTPS Setup (Optional)
-
-Default deployment uses HTTP on port 8881. To enable HTTPS for custom domains:
-
-### 1. Create SSL Certificates
-
-```bash
-mkdir -p nginx/ssl
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout nginx/ssl/expitrack.local.key \
-  -out nginx/ssl/expitrack.local.crt \
-  -subj "/CN=expitrack.local"
-```
-
-### 2. Enable HTTPS Configuration
-
-```bash
-# Backup HTTP config
-cp nginx/nginx.conf nginx/nginx-http.conf.backup
-# Copy HTTPS config
-cp nginx/nginx-ssl.conf.example nginx/nginx.conf
-```
-
-### 3. Update docker-compose.yml
-
-Add to nginx service:
-```yaml
-ports:
-  - "8881:80"
-  - "443:443"  # Add HTTPS port
-volumes:
-  - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-  - ./nginx/ssl:/etc/nginx/ssl:ro  # Add SSL volume
-```
-
-### 4. Update Environment
-
-```env
-NEXTAUTH_URL="https://expitrack.local"
-```
-
-### 5. Configure DNS
-
-Point your domain (e.g., `expitrack.local`) to the server IP in your DNS or `/etc/hosts`.
-
-### 6. Redeploy
-
-```bash
-docker compose down
-./deploy.sh
-```
-
-**Notes:**
-- Self-signed certificates show browser warnings — acceptable for local networks
-- For production, use Let's Encrypt or proper CA certificates
-- HTTP (port 8881) will redirect to HTTPS when SSL config is active
+- [HTTPS Setup (Optional)](#https-setup-optional)
 
 ---
 
@@ -363,6 +305,65 @@ deploy:
 - Security headers via nginx (X-Frame-Options, XSS protection)
 - Static assets served with immutable cache headers
 - WebSocket support for HMR (dev only)
+
+---
+
+## HTTPS Setup (Optional)
+
+Default deployment uses HTTP on port 8881. To enable HTTPS for custom domains:
+
+### 1. Create SSL Certificates
+
+```bash
+mkdir -p nginx/ssl
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout nginx/ssl/expitrack.local.key \
+  -out nginx/ssl/expitrack.local.crt \
+  -subj "/CN=expitrack.local"
+```
+
+### 2. Enable HTTPS Configuration
+
+```bash
+# Backup HTTP config
+cp nginx/nginx.conf nginx/nginx-http.conf.backup
+# Copy HTTPS config
+cp nginx/nginx-ssl.conf.example nginx/nginx.conf
+```
+
+### 3. Update docker-compose.yml
+
+Add to nginx service:
+```yaml
+ports:
+  - "8881:80"
+  - "443:443"  # Add HTTPS port
+volumes:
+  - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+  - ./nginx/ssl:/etc/nginx/ssl:ro  # Add SSL volume
+```
+
+### 4. Update Environment
+
+```env
+NEXTAUTH_URL="https://expitrack.local"
+```
+
+### 5. Configure DNS
+
+Point your domain (e.g., `expitrack.local`) to the server IP in your DNS or `/etc/hosts`.
+
+### 6. Redeploy
+
+```bash
+docker compose down
+./deploy.sh
+```
+
+**Notes:**
+- Self-signed certificates show browser warnings — acceptable for local networks
+- For production, use Let's Encrypt or proper CA certificates
+- HTTP (port 8881) will redirect to HTTPS when SSL config is active
 
 ---
 
