@@ -49,6 +49,7 @@ Thumbs.db
 .cursor/
 skills-lock.json
 
-# Local planning
+# Local planning & docs
 plan.md
+docs/
 *.original.md
