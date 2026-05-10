@@ -36,6 +36,7 @@ interface Settings {
 
 type BulkStatus = "ACTIVE" | "CONSUMED" | "DISCARDED";
 
+/** Main dashboard view: product list, stats, bulk actions, add/edit/import dialogs. */
 export function DashboardProducts() {
   const { data: session } = useSession();
   const router = useRouter();
@@ -54,7 +55,7 @@ export function DashboardProducts() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  /* ── Load ────────────────────────────────────────────────────────── */
+  /* ── Initial data load ─────────────────────────────────────────────── */
   useEffect(() => {
     Promise.all([
       fetch("/api/products").then((r) => r.json()),
@@ -66,7 +67,7 @@ export function DashboardProducts() {
     });
   }, []);
 
-  /* ── Barcode from URL ────────────────────────────────────────────── */
+  /* ── Open add-form when barcode arrives via URL query ────────────── */
   useEffect(() => {
     const bc = router.query.barcode;
     if (bc && typeof bc === "string") {
@@ -154,7 +155,7 @@ export function DashboardProducts() {
     [bulkIds]
   );
 
-  /* ── Stats ───────────────────────────────────────────────────────── */
+  /* ── Computed stats ───────────────────────────────────────────────── */
   const stats = useMemo(() => {
     const ut = settings?.urgentThreshold ?? 3;
     const wt = settings?.warningThreshold ?? 7;
@@ -187,7 +188,7 @@ export function DashboardProducts() {
     return { total: products.length, expired, expiring7, expiring30 };
   }, [products, settings]);
 
-  /* ── Greeting ────────────────────────────────────────────────────── */
+  /* ── Time-of-day greeting ─────────────────────────────────────────── */
   const greeting = useMemo(() => {
     const h = new Date().getHours();
     const time =
@@ -201,7 +202,7 @@ export function DashboardProducts() {
     return `${time}, ${session?.user?.name ?? "Гость"}!`;
   }, [session]);
 
-  /* ── Action bar ──────────────────────────────────────────────────── */
+  /* ── Bulk action bar ─────────────────────────────────────────────── */
   const actionBar = bulkIds.length > 0 && (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -266,11 +267,11 @@ export function DashboardProducts() {
     </motion.div>
   );
 
-  /* ── Render ──────────────────────────────────────────────────────── */
+  /* ── Render ────────────────────────────────────────────────────────── */
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 p-4">
 
-      {/* 1. Header */}
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -300,7 +301,7 @@ export function DashboardProducts() {
         </Button>
       </motion.div>
 
-      {/* 2. Stats */}
+      {/* Stats cards */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -314,7 +315,7 @@ export function DashboardProducts() {
         />
       </motion.div>
 
-      {/* 3 + 4 + 5. Table with toolbar + action bar + FAB */}
+      {/* Product table + action bar + FAB */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -389,7 +390,7 @@ export function DashboardProducts() {
         )}
       </motion.div>
 
-      {/* Add / Edit dialog */}
+      {/* Add / Edit product dialog */}
       <Dialog
         open={isAddOpen}
         onOpenChange={(open) => {
@@ -430,19 +431,19 @@ export function DashboardProducts() {
         </DialogContent>
       </Dialog>
 
-      {/* Import Excel dialog */}
+      {/* Excel import dialog */}
       <ImportExcelModal
         open={isImportOpen}
         onOpenChange={setIsImportOpen}
         onImportComplete={() => {
-          // Reload products after import
+          // Refresh product list after import
           fetch("/api/products")
             .then((r) => r.json())
             .then((data) => setProducts(data.products ?? []));
         }}
       />
 
-      {/* Bulk delete confirm */}
+      {/* Bulk delete confirmation */}
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>

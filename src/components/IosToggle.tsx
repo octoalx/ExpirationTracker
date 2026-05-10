@@ -7,6 +7,7 @@ interface IosToggleProps {
   disabled?: boolean;
 }
 
+/** iOS-style animated toggle switch. */
 export default function IosToggle({ checked, onChange, disabled = false }: IosToggleProps) {
   return (
     <button

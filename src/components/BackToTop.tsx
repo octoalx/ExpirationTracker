@@ -4,6 +4,7 @@ import { ArrowUp } from "lucide-react";
 
 const THRESHOLD = 500;
 
+/** Floating button that scrolls to top, appears after scrolling past threshold. */
 export default function BackToTop() {
   const [show, setShow] = useState(false);
 

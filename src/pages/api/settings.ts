@@ -4,6 +4,7 @@ import { apiErrorHandler } from "../../lib/apiErrorHandler";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../lib/auth";
 
+/** GET: fetch user settings | POST: update user profile and settings. */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -23,7 +24,27 @@ export default async function handler(
         select: {
           name: true,
           email: true,
-          settings: true,
+          settings: {
+            select: {
+              id: true,
+              userId: true,
+              telegramToken: true,
+              telegramChatId: true,
+              telegramNotifications: true,
+              notificationEmail: true,
+              emailNotifications: true,
+              smtpHost: true,
+              smtpPort: true,
+              smtpUser: true,
+              // smtpPass intentionally excluded for security
+              urgentThreshold: true,
+              warningThreshold: true,
+              urgentNotifyTime: true,
+              warningNotifyTime: true,
+              backupTime: true,
+              backupEnabled: true,
+            },
+          },
         },
       });
 
@@ -52,10 +73,10 @@ export default async function handler(
     try {
       const { user: userData, settings: settingsData } = req.body;
 
-      // 1. Очищаем объект userData от лишних полей
+      // 1. Strip non-allowed fields from user data
       const { id: _i, ...cleanUserData } = userData;
 
-      // 2. Очищаем объект settingsData
+      // 2. Strip non-allowed fields from settings data
       const {
         notificationEmail,
         id: _si,
@@ -63,9 +84,9 @@ export default async function handler(
         ...cleanSettingsData
       } = settingsData;
 
-      // 3. Выполняем обновление
+      // 3. Persist changes
       await prisma.$transaction([
-        // Обновляем только разрешенные поля User (name, email)
+        // Update allowed User fields (name, email)
         prisma.user.update({
           where: { id: session.user.id },
           data: {
@@ -73,7 +94,7 @@ export default async function handler(
             email: cleanUserData.email,
           },
         }),
-        // Обновляем Settings
+        // Update Settings
         prisma.settings.update({
           where: { userId: session.user.id },
           data: { ...cleanSettingsData, notificationEmail },

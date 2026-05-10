@@ -5,6 +5,7 @@ import { prisma } from "../../../lib/prisma";
 import { emailService } from "../../../services/emailService";
 import { renderTestEmail } from "../../../lib/email-templates/index";
 
+/** POST: send a test email to verify the user's SMTP configuration. */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,

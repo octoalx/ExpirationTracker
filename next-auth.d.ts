@@ -1,3 +1,4 @@
+/** NextAuth.js module augmentation — extends Session, User, and JWT with the `role` field. */
 import NextAuth, { DefaultSession } from "next-auth";
 import { Role } from "@prisma/client";
 

@@ -18,6 +18,7 @@ function getToastType(t: { type: string }): ToastType {
   return "info";
 }
 
+/** Custom animated toast renderer with glassmorphism styling. */
 export default function Toaster() {
   const { toasts, handlers } = useToaster();
   const { startPause, endPause } = handlers;
@@ -71,7 +72,7 @@ export default function Toaster() {
   );
 }
 
-/* ── Helper functions for typed toasts ───────────────────────────────── */
+/** Typed toast helpers for success, error, info, and warning notifications. */
 export const notify = {
   success: (message: string) => toast.success(message, { duration: 3000 }),
   error: (message: string) => toast.error(message, { duration: 4000 }),

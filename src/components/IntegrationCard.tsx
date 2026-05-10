@@ -14,6 +14,7 @@ interface IntegrationCardProps {
   children: React.ReactNode;
 }
 
+/** Expandable card with toggle for enabling/disabling an integration. */
 export default function IntegrationCard({
   title,
   description,
@@ -29,7 +30,7 @@ export default function IntegrationCard({
     <div className="relative rounded-2xl p-px overflow-hidden">
       <div className={cn("absolute inset-0 rounded-2xl bg-linear-to-br opacity-50", gradient)} />
       <div className="relative rounded-2xl bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl">
-        {/* Header */}
+        {/* Card header */}
         <div className="flex items-center gap-4 p-4">
           <div className={cn("flex items-center justify-center w-11 h-11 rounded-xl bg-linear-to-br shrink-0", gradient)}>
             {icon}
@@ -56,7 +57,7 @@ export default function IntegrationCard({
           </button>
         </div>
 
-        {/* Expandable content */}
+        {/* Collapsible details */}
         <AnimatePresence initial={false}>
           {expanded && (
             <motion.div

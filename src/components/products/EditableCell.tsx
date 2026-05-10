@@ -11,6 +11,7 @@ interface EditableCellProps {
   onCancel: () => void;
 }
 
+/** Inline editable cell with Enter/Escape/blur handling. */
 export function EditableCell({
   value,
   type = "text",
@@ -44,7 +45,7 @@ export function EditableCell({
   };
 
   const handleBlur = () => {
-    // Small delay to allow click events to process
+    // Delay to let pending click events settle before auto-saving
     setTimeout(() => {
       if (!savedRef.current) {
         onSave(editValue);

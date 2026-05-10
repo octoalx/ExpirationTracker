@@ -28,6 +28,7 @@ const levelColors = {
   INFO: "text-blue-600 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400",
 };
 
+/** Admin tab displaying paginated system logs with level filtering. */
 export default function LogsTab() {
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);

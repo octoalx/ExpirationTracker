@@ -1,5 +1,6 @@
 import { Html, Head, Main, NextScript } from "next/document";
 
+/** Custom document with Montserrat font preloading and ru locale. */
 export default function Document() {
   return (
     <Html lang="ru">

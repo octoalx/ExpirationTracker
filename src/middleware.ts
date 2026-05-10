@@ -1,6 +1,7 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
+/** NextAuth middleware: protect routes and restrict /admin to ADMIN role. */
 export default withAuth(
   function middleware(req) {
     if (
@@ -17,6 +18,7 @@ export default withAuth(
   },
 );
 
+/** Route matcher for protected pages. */
 export const config = {
   matcher: ["/", "/dashboard/:path*", "/settings/:path*", "/admin/:path*"],
 };

@@ -13,6 +13,7 @@ interface IssueTableProps {
   logs: SystemLog[];
 }
 
+/** Simple table rendering system log entries with level badges. */
 export default function IssueTable({ logs }: IssueTableProps) {
   const getLevelColor = (level: string) => {
     switch (level.toLowerCase()) {

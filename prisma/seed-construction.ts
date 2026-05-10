@@ -28,20 +28,23 @@ const constructionProducts = [
   "Крепежный уголок", "Соединительная планка", "Держатель трубы", "Кронштейн крепежный", "Заглушки"
 ];
 
+/** Generate a 10-digit EAN-like barcode from the product index. */
 function generateBarcode(index: number): string {
   return `460${String(index + 1).padStart(7, "0")}`;
 }
 
+/** Return a random date between -30 and +335 days from now. */
 function randomDate(): Date {
   const now = new Date();
-  const days = Math.floor(Math.random() * 365) - 30; // от -30 до +335 дней
+  const days = Math.floor(Math.random() * 365) - 30;
   const date = new Date(now);
   date.setDate(date.getDate() + days);
   return date;
 }
 
+/** Seed 100 construction products for the first user in the database. */
 async function seed() {
-  // Найти первого пользователя
+  // Find the first user
   const user = await prisma.user.findFirst();
   if (!user) {
     console.error("No user found. Create a user first.");
@@ -60,7 +63,7 @@ async function seed() {
     userId: user.id,
   }));
 
-  // Удалить существующие товары пользователя перед seed
+  // Remove existing products for this user before seeding
   await prisma.product.deleteMany({
     where: { userId: user.id }
   });

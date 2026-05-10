@@ -19,6 +19,7 @@ const tabs = [
 
 const VALID_TABS = tabs.map((t) => t.id);
 
+/** Admin panel with tabs for users, logs, and backup management. */
 export default function AdminPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("users");

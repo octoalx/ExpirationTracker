@@ -6,6 +6,7 @@ interface ParallaxCardProps {
   className?: string;
 }
 
+/** Card wrapper that applies a subtle 3D tilt effect on mouse hover. */
 export default function ParallaxCard({ children, className }: ParallaxCardProps) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);

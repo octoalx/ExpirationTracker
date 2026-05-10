@@ -12,6 +12,7 @@ interface EditProductFormProps {
   onCancel: () => void;
 }
 
+/** Inline form for editing an existing product's barcode, name, quantity, and expiry date. */
 export default function EditProductForm({
   product,
   onProductUpdated,
@@ -67,7 +68,7 @@ export default function EditProductForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Штрих-код */}
+      {/* Barcode */}
       <div>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Barcode size={14} />
@@ -82,7 +83,7 @@ export default function EditProductForm({
         />
       </div>
 
-      {/* Название */}
+      {/* Product name */}
       <div>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Package size={14} />
@@ -98,7 +99,7 @@ export default function EditProductForm({
         />
       </div>
 
-      {/* Количество */}
+      {/* Quantity */}
       <div>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Hash size={14} />
@@ -117,7 +118,7 @@ export default function EditProductForm({
         />
       </div>
 
-      {/* Срок годности */}
+      {/* Expiry date */}
       <div>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Calendar size={14} />
@@ -132,10 +133,10 @@ export default function EditProductForm({
         />
       </div>
 
-      {/* Разделитель */}
+      {/* Separator */}
       <div className="border-t border-slate-100 my-4" />
 
-      {/* Кнопки */}
+      {/* Action buttons */}
       <div className="flex gap-3">
         <button
           type="button"

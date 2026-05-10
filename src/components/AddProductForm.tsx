@@ -11,6 +11,7 @@ interface AddProductFormProps {
 type DateInputType = "expiry" | "manufacture";
 type ShelfLifeUnit = "days" | "weeks" | "months";
 
+/** Form for adding a new product with barcode, name, quantity, and expiry date. */
 export default function AddProductForm({
   onProductAdded,
   initialBarcode = "",
@@ -25,7 +26,7 @@ export default function AddProductForm({
   const [shelfLife, setShelfLife] = useState("");
   const [shelfLifeUnit, setShelfLifeUnit] = useState<ShelfLifeUnit>("months");
 
-  // Автоматический расчёт срока годности
+  // Auto-calculate expiry date from manufacturing date + shelf life
   useEffect(() => {
     if (
       dateInputType === "manufacture" &&
@@ -88,7 +89,7 @@ export default function AddProductForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Штрих-код */}
+      {/* Barcode */}
       <div>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Barcode size={14} />
@@ -103,7 +104,7 @@ export default function AddProductForm({
         />
       </div>
 
-      {/* Название */}
+      {/* Product name */}
       <div>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Package size={14} />
@@ -119,7 +120,7 @@ export default function AddProductForm({
         />
       </div>
 
-      {/* Количество */}
+      {/* Quantity */}
       <div>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Hash size={14} />
@@ -138,10 +139,10 @@ export default function AddProductForm({
         />
       </div>
 
-      {/* Разделитель */}
+      {/* Separator */}
       <div className="border-t border-slate-100 my-4" />
 
-      {/* Способ указания даты */}
+      {/* Date input method */}
       <div>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
           <Calendar size={14} />
@@ -171,7 +172,7 @@ export default function AddProductForm({
         </div>
       </div>
 
-      {/* Поля в зависимости от выбора */}
+      {/* Date fields based on selection */}
       {dateInputType === "expiry" ? (
         <div>
           <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
@@ -255,10 +256,10 @@ export default function AddProductForm({
         </div>
       )}
 
-      {/* Разделитель */}
+      {/* Separator */}
       <div className="border-t border-slate-100 my-4" />
 
-      {/* Кнопка отправки */}
+      {/* Submit button */}
       <button
         type="submit"
         disabled={isLoading}

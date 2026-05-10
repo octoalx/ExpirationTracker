@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { SystemLog } from "@prisma/client";
 import IssueTable from "@/components/admin/issues/IssueTable";
 
+/** Admin page displaying system issue logs. */
 export default function IssueLogPage() {
   const [logs, setLogs] = useState<SystemLog[]>([]);
 

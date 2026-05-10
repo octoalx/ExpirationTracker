@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { sendDailyUrgentNotifications, sendWarningNotifications } from "../src/services/notificationService";
 
+/** Manually trigger urgent and warning notification dispatches. */
 async function main() {
   console.log("[Cron] Running daily notifications at 10:00 Minsk...");
 

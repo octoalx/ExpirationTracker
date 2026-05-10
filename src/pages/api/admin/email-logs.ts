@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 
+/** GET: paginated email logs | POST: retry a failed email (admin only). */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -44,7 +45,7 @@ export default async function handler(
       apiErrorHandler(error, res);
     }
   } else if (req.method === "POST") {
-    // Retry failed email - update status to QUEUED
+    // Retry a failed email by resetting its status to QUEUED
     try {
       const { id } = req.body;
       if (!id) {

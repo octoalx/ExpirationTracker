@@ -2,6 +2,10 @@ import { NextApiResponse } from "next";
 
 import { ZodError } from "zod";
 
+/**
+ * Centralized API error handler.
+ * Maps `ZodError` → 400, `Error` with `statusCode` → that code, otherwise → 500.
+ */
 export function apiErrorHandler(err: unknown, res: NextApiResponse) {
   console.error(err);
 

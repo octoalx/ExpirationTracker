@@ -47,6 +47,7 @@ interface BackupData {
   };
 }
 
+/** POST: import a JSON backup with merge or replace mode (admin only). */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -74,7 +75,7 @@ export default async function handler(
       settings: { created: 0, updated: 0, skipped: 0 },
     };
 
-    // If replace mode, delete all existing data first
+    // In replace mode, wipe all existing data first
     if (mode === "replace") {
       await prisma.$transaction([
         prisma.emailLog.deleteMany(),
@@ -85,7 +86,7 @@ export default async function handler(
       ]);
     }
 
-    // Restore users
+    // Restore users from backup
     if (data.data.users && data.data.users.length > 0) {
       for (const user of data.data.users) {
         if (!user.email) {
@@ -122,14 +123,12 @@ export default async function handler(
       }
     }
 
-    // Restore products
+    // Restore products from backup
     if (data.data.products && data.data.products.length > 0) {
       for (const product of data.data.products) {
-        // Check if user exists
         const userExists = await prisma.user.findUnique({
           where: { id: product.userId },
         });
-
         if (!userExists) {
           results.products.skipped++;
           continue;
@@ -174,14 +173,12 @@ export default async function handler(
       }
     }
 
-    // Restore settings
+    // Restore settings from backup
     if (data.data.settings && data.data.settings.length > 0) {
       for (const settings of data.data.settings) {
-        // Check if user exists
         const userExists = await prisma.user.findUnique({
           where: { id: settings.userId },
         });
-
         if (!userExists) {
           results.settings.skipped++;
           continue;

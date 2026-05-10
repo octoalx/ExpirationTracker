@@ -6,7 +6,7 @@ import { apiErrorHandler } from "@/lib/apiErrorHandler";
 import { differenceInDays, format, startOfDay, subDays, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
-// Category mapping based on product name keywords
+/** Category mapping based on product name keywords (Russian). */
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   "Цемент": ["цемент"],
   "Песок": ["песок"],
@@ -27,6 +27,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   "Инструмент": ["инструмент", "дрель", "перфоратор", "шуруповерт", "пила", "нож"],
 };
 
+/** Classifies a product into a category by matching keywords in its name. */
 function categorizeProduct(name: string): string {
   const lowerName = name.toLowerCase();
   for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
@@ -37,6 +38,7 @@ function categorizeProduct(name: string): string {
   return "Другое";
 }
 
+/** GET: comprehensive analytics for the current user's products and notifications. */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -54,7 +56,7 @@ export default async function handler(
   try {
     const userId = session.user.id;
 
-    // Get user settings
+    // Load user settings for threshold values
     const settings = await prisma.settings.findUnique({
       where: { userId },
     });
@@ -62,13 +64,13 @@ export default async function handler(
     const urgentThreshold = settings?.urgentThreshold || 5;
     const warningThreshold = settings?.warningThreshold || 30;
 
-    // Get all user products
+    // Load all products owned by the user
     const products = await prisma.product.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
     });
 
-    // Get email logs for user
+    // Load email logs for notification metrics
     const emailLogs = await prisma.emailLog.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -76,14 +78,14 @@ export default async function handler(
 
     const now = new Date();
 
-    // Basic counts by status
+    // Aggregate counts by product status
     const statusCounts = {
       ACTIVE: 0,
       ARCHIVED: 0,
       DEFECT: 0,
     };
 
-    // Calculate status distribution by expiry
+    // Classify products by expiry urgency
     let expired = 0;
     let urgent = 0;
     let warning = 0;
@@ -95,17 +97,17 @@ export default async function handler(
     let totalQuantity = 0;
     let productsWithQuantity = 0;
 
-    // Track min/max expiry dates
+    // Track nearest and farthest expiry dates
     let nearestExpiry: { product: typeof products[0] | null; daysLeft: number } = { product: null, daysLeft: Infinity };
     let farthestExpiry: { product: typeof products[0] | null; daysLeft: number } = { product: null, daysLeft: -Infinity };
 
     products.forEach((product) => {
       const daysLeft = differenceInDays(product.expiryDate, now);
 
-      // Status counts
+      // Increment status counter
       statusCounts[product.status as keyof typeof statusCounts]++;
 
-      // Expiry distribution
+      // Classify by expiry urgency
       if (daysLeft < 0) {
         expired++;
         problemProducts.push(product);
@@ -118,11 +120,11 @@ export default async function handler(
         safe++;
       }
 
-      // Category grouping
+      // Group by category
       const category = categorizeProduct(product.name);
       categoryCounts[category] = (categoryCounts[category] || 0) + 1;
 
-      // Quantity metrics
+      // Accumulate quantity metrics
       if (product.quantity !== null) {
         totalQuantity += product.quantity;
         productsWithQuantity++;
@@ -130,7 +132,7 @@ export default async function handler(
         productsWithoutQuantity.push(product);
       }
 
-      // Track nearest/farthest expiry
+      // Update nearest/farthest expiry trackers
       if (daysLeft < nearestExpiry.daysLeft) {
         nearestExpiry = { product, daysLeft };
       }
@@ -139,7 +141,7 @@ export default async function handler(
       }
     });
 
-    // Top products by quantity
+    // Top 5 products by quantity
     const productsWithQty = products.filter(p => p.quantity !== null);
     const topByQuantity = [...productsWithQty]
       .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
@@ -150,7 +152,7 @@ export default async function handler(
         quantity: p.quantity,
       }));
 
-    // Top categories by quantity (sum of quantities)
+    // Top 10 categories ranked by total quantity
     const categoryByQuantity: Record<string, number> = {};
     productsWithQty.forEach(p => {
       const cat = categorizeProduct(p.name);
@@ -161,7 +163,7 @@ export default async function handler(
       .slice(0, 10)
       .map(([name, count]) => ({ name, count }));
 
-    // Products added by day (last 30 days)
+    // Products added per day (last 30 days)
     const productsByDay: Record<string, number> = {};
     for (let i = 0; i <= 30; i++) {
       const date = format(subDays(now, i), "yyyy-MM-dd");
@@ -181,7 +183,7 @@ export default async function handler(
       }))
       .reverse();
 
-    // Email notifications by day (last 14 days)
+    // Email notifications per day (last 14 days)
     const emailByDay: Record<string, number> = {};
     for (let i = 0; i < 14; i++) {
       const date = format(subDays(now, i), "yyyy-MM-dd");
@@ -201,14 +203,14 @@ export default async function handler(
       }))
       .reverse();
 
-    // Last email notification
+    // Most recent email notification
     const lastEmail = emailLogs.length > 0 ? {
       date: emailLogs[0].sentAt?.toISOString() || emailLogs[0].createdAt.toISOString(),
       subject: emailLogs[0].subject,
       status: emailLogs[0].status,
     } : null;
 
-    // Format problem products for table
+    // Problem products (expired + urgent) for the detail table
     const problemProductsTable = problemProducts
       .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
       .map(p => {
@@ -225,14 +227,14 @@ export default async function handler(
       });
 
     res.status(200).json({
-      // Basic KPIs
+      // KPI totals
       totalProducts: products.length,
       activeProducts: statusCounts.ACTIVE,
       archivedProducts: statusCounts.ARCHIVED,
       defectProducts: statusCounts.DEFECT,
       uniqueCategories: Object.keys(categoryCounts).length,
 
-      // Expiry metrics
+      // Expiry classification
       expiredCount: expired,
       urgentCount: urgent,
       warningCount: warning,
@@ -250,7 +252,7 @@ export default async function handler(
         expiryDate: farthestExpiry.product.expiryDate.toISOString(),
       } : null,
 
-      // Quantity metrics
+      // Quantity statistics
       totalQuantity,
       productsWithQuantity,
       averageQuantity: productsWithQuantity > 0 ? Math.round(totalQuantity / productsWithQuantity) : 0,
@@ -262,14 +264,14 @@ export default async function handler(
         barcode: p.barcode,
       })),
 
-      // Category metrics
+      // Category breakdown
       categoriesByCount: Object.entries(categoryCounts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([name, count]) => ({ name, count })),
       topCategoriesByQuantity,
 
-      // Charts data
+      // Chart datasets
       statusDistribution: {
         expired,
         urgent,
@@ -284,14 +286,14 @@ export default async function handler(
       productsAddedByDay,
       emailByDay: emailByDayArray,
 
-      // Email metrics
+      // Notification metrics
       totalEmails: emailLogs.length,
       lastEmail,
 
-      // Problem products
+      // Attention-needed products
       problemProducts: problemProductsTable,
 
-      // Thresholds
+      // Active thresholds
       urgentThreshold,
       warningThreshold,
     });

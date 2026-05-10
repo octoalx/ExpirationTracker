@@ -35,7 +35,8 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 
-/* ── Typing animation hook ───────────────────────────────────────────── */
+/* ── Typing animation hook ── */
+/** Hook that displays text character-by-character at a given speed. */
 function useTypingText(text: string, speed = 60) {
   const [displayed, setDisplayed] = useState("");
   useEffect(() => {
@@ -51,7 +52,8 @@ function useTypingText(text: string, speed = 60) {
   return displayed;
 }
 
-/* ── Debounce hook ──────────────────────────────────────────────────── */
+/* ── Debounce hook ── */
+/** Returns a debounced copy of the value, updating after `delay` ms of inactivity. */
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
@@ -63,7 +65,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-/* ── Chip filter component ───────────────────────────────────────────── */
+/* ── Chip filter ── */
 interface ChipProps {
   label: string;
   active: boolean;
@@ -94,7 +96,7 @@ function Chip({ label, active, onClick }: ChipProps) {
   );
 }
 
-/* ── Stat card ───────────────────────────────────────────────────────── */
+/* ── Stat card ── */
 interface StatCardProps {
   title: string;
   value: number;
@@ -128,7 +130,7 @@ function StatCard({ title, value, icon: Icon, color, borderGradient }: StatCardP
   );
 }
 
-/* ── Pagination ──────────────────────────────────────────────────────── */
+/* ── Pagination ── */
 const DEFAULT_ITEMS_PER_PAGE = 25;
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -201,7 +203,8 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
   );
 }
 
-/* ── Dashboard ───────────────────────────────────────────────────────── */
+/* ── Dashboard ── */
+/** Main dashboard page: product table, search, filters, stats, dialogs. */
 const Dashboard = () => {
   const { data: session } = useSession();
   const router = useRouter();
@@ -216,7 +219,7 @@ const Dashboard = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [scannedBarcode, setScannedBarcode] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL, ACTIVE, CONSUMED, DISCARDED
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [sortField, setSortField] = useState<"name" | "barcode" | "expiryDate" | "quantity" | "status" | "createdAt">("createdAt");
@@ -226,7 +229,7 @@ const Dashboard = () => {
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  /* Greeting */
+  /* ── Greeting ── */
   const getTimeOfDay = () => {
     const h = new Date().getHours();
     if (h < 6) return "Доброй ночи";
@@ -248,13 +251,13 @@ const Dashboard = () => {
       .then((data) => setSettings(data));
   }, []);
 
-  // Open add-product dialog when navigated with ?barcode=...
+  // Open add-product dialog when navigated with ?barcode=… query param
   useEffect(() => {
     const bc = router.query.barcode;
     if (bc && typeof bc === "string") {
       setScannedBarcode(bc);
       setAddModalOpen(true);
-      // Clean the URL without re-render
+      // Remove barcode query param without triggering a re-render
       router.replace("/dashboard", undefined, { shallow: true });
     }
   }, [router.query.barcode, router]);
@@ -267,7 +270,7 @@ const Dashboard = () => {
 
   const addProduct = (product: Product) => {
     setProducts((prev) => [...prev, product]);
-    setAddModalOpen(false); // Close modal after adding
+    setAddModalOpen(false);
     setScannedBarcode("");
   };
 
@@ -294,7 +297,7 @@ const Dashboard = () => {
     setSortDesc(true);
   };
 
-  /* ── Bulk actions ───────────────────────────────────────────────────── */
+  /* ── Bulk actions ── */
   const handleBulkDelete = useCallback(async () => {
     setBulkBusy(true);
     await Promise.all(
@@ -332,7 +335,7 @@ const Dashboard = () => {
 
   const filteredProducts = products
     .filter((p) => {
-      // Search filter (debounced)
+      // Text search (debounced)
       const searchLower = debouncedSearchTerm.toLowerCase();
       const nameMatch = p.name.toLowerCase().includes(searchLower);
       const barcodeMatch = p.barcode?.toLowerCase().includes(searchLower);
@@ -341,7 +344,7 @@ const Dashboard = () => {
         return false;
       }
 
-      // Status filter - new model: ALL, ACTIVE, EXPIRED, ARCHIVED, DEFECT
+      // Status filter
       if (statusFilter !== "ALL") {
         if (statusFilter === "EXPIRED") {
           if (p.status !== "ACTIVE" || new Date(p.expiryDate) >= new Date()) return false;
@@ -388,7 +391,7 @@ const Dashboard = () => {
       return 0;
     });
 
-  // Reset page when filters or sort change
+  // Reset to first page when filters or sort change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, sortField]);
@@ -399,7 +402,7 @@ const Dashboard = () => {
     currentPage * itemsPerPage,
   );
 
-  /* Quick stats data */
+  /* ── Quick stats ── */
   const stats = useMemo(() => {
     const total = products.length;
     const expiringSoon = products.filter((p) => {
@@ -421,7 +424,7 @@ const Dashboard = () => {
     return { total, expiringSoon, expired };
   }, [products, settings]);
 
-  /* Status chip options - new model: Активный → Просрочен → Архив → Брак */
+  /* ── Status chip options ── */
   const statusChips = [
     { label: "Все", value: "ALL" },
     { label: "Активные", value: "ACTIVE" },
@@ -432,7 +435,7 @@ const Dashboard = () => {
 
   const content = (
     <div className="mx-auto flex w-full flex-col gap-6 p-2">
-      {/* ── Hero greeting ──────────────────────────────────────────── */}
+      {/* Hero greeting */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -452,7 +455,7 @@ const Dashboard = () => {
         </p>
       </motion.div>
 
-      {/* ── Stats cards ────────────────────────────────────────────── */}
+      {/* Stats cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           title="Всего товаров"
@@ -477,7 +480,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* ── Toolbar: search + filters + view toggle ────────────────── */}
+      {/* Toolbar: search + filters */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
@@ -497,7 +500,7 @@ const Dashboard = () => {
           </Button>
         </div>
 
-        {/* Chip filters - new status model */}
+        {/* Status filter chips */}
         <div className="flex flex-wrap items-center gap-2">
           <ListFilter className="h-4 w-4 text-slate-400 shrink-0" />
           {statusChips.map((c) => (
@@ -511,7 +514,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ── Bulk Action Bar ────────────────────────────────────────── */}
+      {/* Bulk action bar */}
       <AnimatePresence>
         {selectedIds.length > 0 && (
           <motion.div
@@ -593,7 +596,7 @@ const Dashboard = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Content ────────────────────────────────────────────────── */}
+      {/* Content */}
       <AnimatePresence mode="wait">
         {filteredProducts.length === 0 ? (
           <motion.div
@@ -679,7 +682,7 @@ const Dashboard = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Pagination ─────────────────────────────────────────────── */}
+      {/* Pagination */}
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
@@ -688,7 +691,7 @@ const Dashboard = () => {
         onItemsPerPageChange={setItemsPerPage}
       />
 
-      {/* FAB below table */}
+      {/* Floating add button */}
       {filteredProducts.length > 0 && (
         <div className="flex justify-end mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
           <button
@@ -725,7 +728,7 @@ const Dashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Import Excel dialog */}
+      {/* Excel import dialog */}
       <ImportExcelModal
         open={isImportOpen}
         onOpenChange={setIsImportOpen}
@@ -746,7 +749,7 @@ const Dashboard = () => {
             <EditProductForm
               product={editingProduct}
               onProductUpdated={(updated) => {
-                // Type assertion to handle API response string status
+                // Cast API response to match Prisma Product type
                 const product = updated as Product;
                 updateProduct(product);
                 setEditModalOpen(false);

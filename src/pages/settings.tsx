@@ -14,7 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import IntegrationCard from "@/components/IntegrationCard";
 
-/* ── Reusable focus-glow input ───────────────────────────────────────── */
+/* ── Glow input ── */
 interface GlowInputProps {
   label: string;
   value: string | number;
@@ -47,7 +47,7 @@ function GlowInput({ label, value, onChange, type = "text", placeholder }: GlowI
   );
 }
 
-/* ── Tab definition ──────────────────────────────────────────────────── */
+/* ── Tabs ── */
 interface Tab {
   id: string;
   label: string;
@@ -60,7 +60,8 @@ const tabs: Tab[] = [
   { id: "statuses", label: "Статусы", icon: AlertTriangle },
 ];
 
-/* ── Settings page ───────────────────────────────────────────────────── */
+/* ── Settings page ── */
+/** User settings page with personal info, integrations, and status thresholds. */
 const SettingsPage = () => {
   const { data: session, update: updateSession } = useSession();
   const [activeTab, setActiveTab] = useState("personal");
@@ -156,7 +157,7 @@ const SettingsPage = () => {
     }
   };
 
-  /* Tab content */
+  /* ── Tab content ── */
   const renderContent = () => {
     switch (activeTab) {
       case "personal":
@@ -362,7 +363,7 @@ const SettingsPage = () => {
         <p className="mt-1 text-sm text-muted-foreground">Управление аккаунтом и настройками</p>
       </motion.div>
 
-      {/* ── Animated tabs ─────────────────────────────────────────── */}
+      {/* Animated tabs */}
       <div className="relative mb-8">
         <div className="flex gap-1 overflow-x-auto pb-px scrollbar-none">
           {tabs.map((tab) => {
@@ -396,7 +397,7 @@ const SettingsPage = () => {
         <div className="h-px bg-slate-200 dark:bg-slate-700" />
       </div>
 
-      {/* ── Tab content ───────────────────────────────────────────── */}
+      {/* Tab content */}
       <div className="glass-card p-6">
         <AnimatePresence mode="wait">
           <motion.div

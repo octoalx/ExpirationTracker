@@ -7,6 +7,7 @@ import path from "path";
 import { resolvePrismaDbPath } from "@/lib/prisma";
 import { prisma } from "@/lib/prisma";
 
+/** GET: download backup | POST: restore from backup | DELETE: remove backup (admin only). */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
 
@@ -19,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ message: "Invalid filename" });
   }
 
-  // Security: validate filename exists in backup list
+  // Validate filename exists in the backup list (prevents path traversal)
   const backups = listBackups();
   const backup = backups.find((b) => b.name === filename);
   if (!backup) {
@@ -27,7 +28,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "GET") {
-    // Download backup file
     const filePath = getBackupFilePath(filename);
     if (!filePath) {
       return res.status(404).json({ message: "File not found" });
@@ -44,7 +44,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "POST") {
-    // Restore from backup
     const { mode = "replace" } = req.body as { mode?: "merge" | "replace" };
 
     const backupPath = getBackupFilePath(filename);
@@ -53,18 +52,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      // Get current DB path
       const dbPath = resolvePrismaDbPath();
 
-      // Create emergency backup of current state before restore
+      // Create emergency backup before overwriting the database
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
       const emergencyBackup = path.join(path.dirname(dbPath), `emergency-pre-restore-${timestamp}.db`);
       fs.copyFileSync(dbPath, emergencyBackup);
 
-      // Replace DB with backup
       fs.copyFileSync(backupPath, dbPath);
 
-      // Log restore action
       await prisma.systemLog.create({
         data: {
           level: "INFO",
@@ -93,7 +89,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "DELETE") {
-    // Delete backup file
     const backupPath = getBackupFilePath(filename);
     if (!backupPath) {
       return res.status(404).json({ message: "Backup file not found" });

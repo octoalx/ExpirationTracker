@@ -8,6 +8,7 @@ import {
   getProductWordForm,
 } from "./types";
 
+/** Modern HTML email template for a single product expiration notification. */
 export function expirationEmailTemplate(data: ExpirationEmailData, appUrl?: string): string {
   const status = statusConfig[data.urgency];
   const daysText = data.daysUntil < 0
@@ -368,6 +369,7 @@ export function expirationEmailTemplate(data: ExpirationEmailData, appUrl?: stri
 </html>`;
 }
 
+/** Modern HTML email template for a multi-product expiration summary. */
 export function summaryEmailTemplate(data: SummaryEmailData): string {
   const { userName, products, appUrl } = data;
 

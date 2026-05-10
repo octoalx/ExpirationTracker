@@ -21,6 +21,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
 }
 
+/** Generic data table backed by TanStack Table (issues). */
 export function DataTable<TData, TValue>({
   columns,
   data,

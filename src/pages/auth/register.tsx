@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import ParallaxCard from "@/components/ParallaxCard";
 
-/* ── Floating input (local) ──────────────────────────────────────────── */
+/* ── Floating input ── */
 interface FloatingInputProps {
   id: string;
   label: string;
@@ -68,7 +68,7 @@ function FloatingInput({ id, label, value, onChange, type = "text", icon }: Floa
   );
 }
 
-/* ── Shake animation variants ────────────────────────────────────────── */
+/* ── Shake animation ── */
 const shakeVariants = {
   shake: {
     x: [0, -12, 12, -8, 8, -4, 4, 0],
@@ -77,7 +77,8 @@ const shakeVariants = {
   idle: { x: 0 },
 };
 
-/* ── Register page ───────────────────────────────────────────────────── */
+/* ── Register page ── */
+/** New user registration page with name, email, and password form. */
 export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

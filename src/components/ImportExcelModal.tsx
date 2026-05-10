@@ -25,6 +25,7 @@ interface PreviewData {
 
 type ImportState = "idle" | "previewing" | "uploading" | "success" | "error";
 
+/** Modal dialog for importing products from an Excel file (inventory or catalog format). */
 export default function ImportExcelModal({
   open,
   onOpenChange,
@@ -70,7 +71,7 @@ export default function ImportExcelModal({
     setErrorMessage("");
 
     try {
-      // Парсим файл на клиенте для превью
+      // Parse file on the client for preview
       const XLSX = await import("xlsx");
       const buffer = await selectedFile.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
@@ -82,12 +83,12 @@ export default function ImportExcelModal({
         return;
       }
 
-      // Определяем тип по структуре
+      // Detect file type by structure
       let fileType: string;
       let isInventory = false;
       let products: Array<{ barcode: string; name: string; quantity: number | null }> = [];
 
-      // Проверяем на "Инвентаризационная опись" в первых 5 строках
+      // Check for "Inventory" marker in the first 5 rows
       for (let r = 0; r < 5; r++) {
         const cell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
         if (cell && typeof cell.v === "string" && cell.v.includes("Инвентаризационная опись")) {
@@ -95,7 +96,7 @@ export default function ImportExcelModal({
           break;
         }
       }
-      // Также проверяем наличие строки-заголовка "Артикул" + "Наименование"
+      // Also check for header row with "Артикул" + "Наименование"
       if (!isInventory) {
         for (let r = 15; r < 22; r++) {
           const artCell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
@@ -113,7 +114,7 @@ export default function ImportExcelModal({
       if (isInventory) {
         fileType = "Инвентаризация";
         const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-        // Ищем строку-заголовок с "Артикул"
+        // Locate header row containing "Артикул"
         let headerRow = 17;
         for (let r = 10; r < 25; r++) {
           const cell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
@@ -139,7 +140,7 @@ export default function ImportExcelModal({
       } else {
         fileType = "Каталог товаров";
         const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-        // Ищем колонки по заголовкам
+        // Map columns by header text
         let barcodeCol = 3, nameCol = 5, qtyCol = 8;
         for (let c = range.s.c; c <= Math.min(range.e.c, 40); c++) {
           const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];

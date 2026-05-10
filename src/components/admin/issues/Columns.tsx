@@ -3,6 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { SystemLog } from "@prisma/client";
 
+/** Column definitions for the system log data table. */
 export const columns: ColumnDef<SystemLog>[] = [
   {
     accessorKey: "timestamp",

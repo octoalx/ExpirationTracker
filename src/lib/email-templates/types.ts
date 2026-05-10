@@ -1,3 +1,4 @@
+/** Single product entry used in summary email tables. */
 export interface ExpirationProduct {
   name: string;
   barcode: string;
@@ -6,6 +7,7 @@ export interface ExpirationProduct {
   urgency: "expired" | "critical" | "warning" | "soon" | "safe";
 }
 
+/** Data for a single-product expiration notification email. */
 export interface ExpirationEmailData {
   productName: string;
   barcode: string;
@@ -14,13 +16,14 @@ export interface ExpirationEmailData {
   urgency: "expired" | "critical" | "warning" | "soon" | "safe";
 }
 
+/** Data for a multi-product summary notification email. */
 export interface SummaryEmailData {
   userName?: string;
   products: ExpirationProduct[];
   appUrl?: string;
 }
 
-// Status configuration with 5 levels
+/** Status configuration with 5 urgency levels (colors, icons, labels). */
 export const statusConfig = {
   expired: {
     color: "#dc2626",
@@ -64,7 +67,7 @@ export const statusConfig = {
   },
 };
 
-// Helper functions
+/** Escape HTML special characters to prevent XSS in email templates. */
 export function escapeHtml(text: string): string {
   const map: Record<string, string> = {
     "&": "&amp;",
@@ -76,6 +79,7 @@ export function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (m) => map[m]);
 }
 
+/** Format an ISO date string to Russian short date (e.g. "5 мая 2025"). */
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString("ru-RU", {
@@ -85,6 +89,7 @@ export function formatDate(dateString: string): string {
   });
 }
 
+/** Format a Date to Russian long date-time (e.g. "5 мая 2025, 10:30"). */
 export function formatDateTime(date: Date): string {
   return date.toLocaleString("ru-RU", {
     day: "numeric",
@@ -95,6 +100,7 @@ export function formatDateTime(date: Date): string {
   });
 }
 
+/** Return the correct Russian plural form for "товар" based on count. */
 export function getProductWordForm(count: number): string {
   const lastDigit = count % 10;
   const lastTwoDigits = count % 100;

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 
+/** GET: paginated system logs | DELETE: remove single log or clear all (admin only). */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,

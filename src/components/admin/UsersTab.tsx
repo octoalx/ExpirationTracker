@@ -19,6 +19,7 @@ interface UserWithStats {
   };
 }
 
+/** Admin tab for managing users: search, role changes, deletion, password reset. */
 export default function UsersTab() {
   const [users, setUsers] = useState<UserWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +28,7 @@ export default function UsersTab() {
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
 
-  // Password reset modal state
+  // Password reset dialog state
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithStats | null>(null);
   const [newPassword, setNewPassword] = useState("");

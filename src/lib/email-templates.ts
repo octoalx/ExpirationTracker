@@ -32,6 +32,13 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (m) => map[m]);
 }
 
+/**
+ * Renders an HTML email summarizing products that need attention (expired, urgent, warning).
+ *
+ * @param products - Products with urgency metadata.
+ * @param userName - Recipient's display name.
+ * @returns Full HTML document string for the email body.
+ */
 export function renderExpirationSummary(products: ProductWithUrgency[], userName: string): string {
   const expiredCount = products.filter((p) => p.urgency === "EXPIRED").length;
   const urgentCount = products.filter((p) => p.urgency === "URGENT").length;
@@ -103,6 +110,12 @@ export function renderExpirationSummary(products: ProductWithUrgency[], userName
 </body></html>`;
 }
 
+/**
+ * Renders a simple HTML test email to verify SMTP configuration.
+ *
+ * @param userName - Recipient's display name.
+ * @returns Full HTML document string for the test email.
+ */
 export function renderTestEmail(userName: string): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Тестовое письмо</title></head>
 <body style="margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb;">

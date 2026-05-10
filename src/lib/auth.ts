@@ -4,6 +4,7 @@ import { Role } from "@prisma/client";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
+/** NextAuth configuration — credentials provider with bcrypt password verification. */
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({

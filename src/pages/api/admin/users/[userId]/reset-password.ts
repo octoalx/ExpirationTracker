@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 import bcrypt from "bcryptjs";
 
+/** POST: reset a user's password (admin only). */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,

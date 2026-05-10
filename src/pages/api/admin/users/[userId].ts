@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 
+/** DELETE: remove a user | PUT: change a user's role (admin only). */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,

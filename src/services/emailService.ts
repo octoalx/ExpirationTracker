@@ -16,10 +16,15 @@ interface SendResult {
   error?: string;
 }
 
+/**
+ * Singleton email service backed by Nodemailer.
+ * Must be initialized with SMTP credentials before sending.
+ */
 class EmailService {
   private transporter: Transporter | null = null;
   private config: SMTPConfig | null = null;
 
+  /** Configures the SMTP transport with the given credentials. */
   initialize(config: SMTPConfig): void {
     this.config = config;
     this.transporter = nodemailer.createTransport({
@@ -33,10 +38,19 @@ class EmailService {
     });
   }
 
+  /** Returns `true` if the transporter has been configured. */
   isInitialized(): boolean {
     return this.transporter !== null;
   }
 
+  /**
+   * Sends an HTML email and logs the result to the database.
+   *
+   * @param to - Recipient email address.
+   * @param subject - Email subject line.
+   * @param html - Email body as HTML.
+   * @param userId - Optional user ID for log association.
+   */
   async send(
     to: string,
     subject: string,
@@ -81,6 +95,7 @@ class EmailService {
     }
   }
 
+  /** Sends a pre-built test email to verify SMTP connectivity. */
   async sendTestEmail(to: string, userId?: string): Promise<SendResult> {
     const html = `
       <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
@@ -102,6 +117,7 @@ class EmailService {
     return this.send(to, "📧 Тестовое письмо от ExpiTrack", html, userId);
   }
 
+  /** Creates an email log entry and prunes old entries beyond 50. */
   private async logEmail(fields: {
     userId?: string;
     to: string;
@@ -117,7 +133,7 @@ class EmailService {
       },
     });
 
-    // Keep only last 50 email logs
+    // Prune old logs — keep only the 50 most recent
     const totalCount = await prisma.emailLog.count();
     if (totalCount > 50) {
       const toDelete = await prisma.emailLog.findMany({
@@ -135,6 +151,7 @@ class EmailService {
     return logEntry;
   }
 
+  /** Updates an existing email log entry with delivery status. */
   private async updateEmailLog(
     id: string,
     fields: {

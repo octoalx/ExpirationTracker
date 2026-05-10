@@ -4,6 +4,7 @@ import { apiErrorHandler } from "../../../lib/apiErrorHandler";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 
+/** GET: list products (optionally filtered by status) | POST: create a new product. */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,

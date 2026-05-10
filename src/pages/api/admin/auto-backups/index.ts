@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { listBackups, createBackup } from "@/lib/backupService";
 import { prisma } from "@/lib/prisma";
 
+/** GET: list auto-backups | POST: manually trigger a new backup (admin only). */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
 
@@ -12,13 +13,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "GET") {
-    // List auto-backups
     const backups = listBackups();
     return res.status(200).json({ backups });
   }
 
   if (req.method === "POST") {
-    // Manual trigger backup
     const filename = createBackup();
     if (filename) {
       await prisma.systemLog.create({

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { sendExpirationNotifications } from "../../../services/notificationService";
 
+/** POST: manually trigger expiration notifications for the current user. */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,

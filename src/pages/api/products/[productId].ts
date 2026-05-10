@@ -4,6 +4,7 @@ import { apiErrorHandler } from "@/lib/apiErrorHandler";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
+/** DELETE: remove product | PUT: update status | PATCH: partial field update. */
 export default async (req: NextApiRequest, res: NextApiResponse) => {
   const session = await getServerSession(req, res, authOptions);
   if (!session || !session.user) {
@@ -36,7 +37,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     try {
       const { name, barcode, expiryDate, quantity } = req.body;
 
-      // Build update data only with provided fields
+      // Build partial update payload from provided fields
       const updateData: { name?: string; barcode?: string; expiryDate?: Date; isExpired?: boolean; quantity?: number | null } = {};
       if (name !== undefined) updateData.name = name;
       if (barcode !== undefined) updateData.barcode = barcode;
@@ -44,7 +45,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
       if (expiryDate !== undefined) {
         const newDate = new Date(expiryDate);
         updateData.expiryDate = newDate;
-        // Auto-calculate isExpired based on new date
+        // Recalculate isExpired flag based on the new expiry date
         updateData.isExpired = newDate < new Date();
       }
 

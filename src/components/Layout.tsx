@@ -21,14 +21,14 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-/* ── Client-side year to avoid hydration mismatch ──────────────────────── */
+/** Renders current year on the client to avoid hydration mismatch. */
 function ClientYear() {
   const [year, setYear] = useState<number | null>(null);
   useEffect(() => setYear(new Date().getFullYear()), []);
   return <>{year ?? "2024"}</>;
 }
 
-/* ── Ripple helper ───────────────────────────────────────────────────── */
+/** Hook that spawns animated ripple circles on click. */
 function useRipple() {
   const [ripples, setRipples] = useState<{ x: number; y: number; id: number }[]>([]);
   const nextId = useRef(0);
@@ -55,7 +55,7 @@ function useRipple() {
   return { spawn, Ripples };
 }
 
-/* ── Layout ──────────────────────────────────────────────────────────── */
+/** App shell with desktop sidebar, mobile bottom nav, scanner, and background. */
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -107,7 +107,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-animated-gradient">
       <AnimatedBackground />
-      {/* ─── Desktop Sidebar ────────────────────────────────────────── */}
+      {/* Desktop sidebar */}
       <aside
         className={cn(
           "hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30",
@@ -209,7 +209,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* ─── Main content ───────────────────────────────────────────── */}
+      {/* Main content */}
       <div className="md:pl-64 flex flex-col flex-1">
         <main className="flex-1">
           <div className="py-6 pb-24 md:pb-6">
@@ -220,7 +220,7 @@ export default function Layout({ children }: LayoutProps) {
         </main>
       </div>
 
-      {/* ─── Mobile Bottom Navigation ───────────────────────────────── */}
+      {/* Mobile bottom navigation */}
       <nav
         className={cn(
           "md:hidden fixed inset-x-0 bottom-0 z-30",
@@ -311,14 +311,14 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </nav>
 
-      {/* ─── Scanner Modal ──────────────────────────────────────────── */}
+      {/* Scanner modal */}
       <ScannerModal
         open={isScannerOpen}
         onClose={() => setScannerOpen(false)}
         onScanSuccess={handleScanSuccess}
       />
 
-      {/* ─── Global UI ────────────────────────────────────────────── */}
+      {/* Global utilities */}
       <BackToTop />
     </div>
   );

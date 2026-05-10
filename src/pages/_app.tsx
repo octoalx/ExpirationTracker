@@ -12,6 +12,7 @@ const pageVariants = {
   exit: { opacity: 0, y: -8 },
 };
 
+/** Root application wrapper with session provider, layout, page transitions, and toaster. */
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
 

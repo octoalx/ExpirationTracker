@@ -14,6 +14,7 @@ interface ImportResponse {
   errors: string[];
 }
 
+/** POST: bulk-import products from a parsed Excel file. */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ImportResponse | { error: string }>,

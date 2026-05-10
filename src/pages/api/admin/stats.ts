@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 
+/** GET: admin dashboard KPIs (total users, active/expired products, issues). */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,

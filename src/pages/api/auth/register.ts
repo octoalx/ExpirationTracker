@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 
+/** POST: register a new user with name, email, and password. */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,

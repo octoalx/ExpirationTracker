@@ -13,6 +13,7 @@ type Tab = "camera" | "image";
 
 const SCANNER_ELEMENT_ID = "scanner-viewport";
 
+/** Fullscreen modal for scanning barcodes via camera or image upload. */
 const ScannerModal: React.FC<ScannerModalProps> = ({
   open,
   onClose,
@@ -70,7 +71,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({
     [onScanSuccess, stopCamera],
   );
 
-  // Init scanner & enumerate cameras
+  // Initialize scanner and enumerate available cameras
   useEffect(() => {
     if (!open) return;
     hasScannedRef.current = false;

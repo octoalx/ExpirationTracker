@@ -35,17 +35,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { EditableCell } from "./EditableCell";
 
-// ─── Ширина колонок ───────────────────────────────────────────────────────────
+/* ── Column widths ── */
 const COL_WIDTHS = {
-  select:    32,   // чекбокс
-  name:      0,    // 0 = авто (занимает всё свободное место)
-  quantity:  30,   // кол-во
-  barcode:   160,  // штрих-код (EAN-13 ~13 символов)
-  expiryDate: 200, // срок годности + дата
-  status:    110,  // статус
-  actions:   120,  // кнопки действий
+  select:    32,   // checkbox
+  name:      0,    // 0 = auto (fills remaining space)
+  quantity:  30,   // qty
+  barcode:   160,  // barcode (EAN-13 ~13 chars)
+  expiryDate: 200, // expiry date + badge
+  status:    110,  // status badge
+  actions:   120,  // action buttons
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface ProductTableEnhancedProps {
   products: Product[];
@@ -68,6 +67,7 @@ interface ProductTableEnhancedProps {
 
 type ExpiryStatus = "expired" | "urgent" | "warning" | "safe";
 
+/** Returns icon, colors, and label for a given expiry status. */
 const getStatusConfig = (status: ExpiryStatus, daysLeft: number) => {
   switch (status) {
     case "expired":
@@ -109,6 +109,7 @@ const getStatusConfig = (status: ExpiryStatus, daysLeft: number) => {
   }
 };
 
+/** Enhanced product table with inline editing, sorting, and bulk selection. */
 export function ProductTableEnhanced({
   products,
   urgentThreshold = 3,
@@ -127,8 +128,6 @@ export function ProductTableEnhanced({
   sortDesc,
   onSortChange,
 }: ProductTableEnhancedProps) {
-  // Sorting is handled by parent component (dashboard)
-
   // Convert selectedIds array to rowSelection object for TanStack Table
   const rowSelection = useMemo(() => {
     const selection: RowSelectionState = {};
@@ -510,7 +509,7 @@ export function ProductTableEnhanced({
           const product = row.original;
           return (
             <div className="flex items-center gap-0.5">
-              {/* Edit - always visible */}
+              {/* Edit */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -521,7 +520,7 @@ export function ProductTableEnhanced({
                 <Pencil className="h-4 w-4" />
               </Button>
 
-              {/* To Active - highlighted when product is ACTIVE */}
+              {/* Move to Active */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -537,7 +536,7 @@ export function ProductTableEnhanced({
                 <CheckCircle2 className="h-4 w-4" />
               </Button>
 
-              {/* To Archive - highlighted when product is ARCHIVED */}
+              {/* Move to Archive */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -553,7 +552,7 @@ export function ProductTableEnhanced({
                 <Archive className="h-4 w-4" />
               </Button>
 
-              {/* To Defect - highlighted when product is DEFECT */}
+              {/* Move to Defect */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -569,7 +568,7 @@ export function ProductTableEnhanced({
                 <AlertTriangle className="h-4 w-4" />
               </Button>
 
-              {/* Delete - always visible */}
+              {/* Delete */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -601,13 +600,12 @@ export function ProductTableEnhanced({
     ]
   );
 
-  // Handle row selection changes from TanStack Table
+  /** Syncs TanStack Table row selection back to parent via `onSelectionChange`. */
   const handleRowSelectionChange = useCallback(
     (updater: (old: RowSelectionState) => RowSelectionState) => {
-      // Get the new selection state
       const newSelection = updater(rowSelection);
 
-      // Convert to selectedIds array
+      // Map numeric indices back to product IDs
       const newSelectedIds = Object.keys(newSelection)
         .filter((key) => newSelection[key])
         .map((index) => products[parseInt(index)]?.id)

@@ -1,5 +1,6 @@
 import { Toaster } from "react-hot-toast";
 
+/** Global toast notification provider with emerald-themed styling. */
 export default function ToastProvider() {
   return (
     <Toaster

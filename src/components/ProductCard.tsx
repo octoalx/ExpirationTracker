@@ -30,6 +30,7 @@ interface ProductCardProps {
   onProductUpdated: (product: Product) => void;
 }
 
+/** Card displaying a single product with status, expiry info, and action buttons. */
 function ProductCard({ 
   product, 
   onProductDeleted, 
@@ -147,10 +148,10 @@ function ProductCard({
         "hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50",
         "overflow-hidden"
       )}>
-        {/* Цветная полоска сверху */}
+        {/* Top color stripe indicating urgency */}
         <div className={cn("h-1.5 w-full", config.stripeColor)} />
 
-        {/* Кнопка редактирования */}
+        {/* Edit button */}
         <button
           onClick={openEdit}
           aria-label="Редактировать товар"
@@ -167,7 +168,7 @@ function ProductCard({
         </button>
 
         <div className="p-4 flex flex-col h-full justify-between">
-          {/* Статус и дата в одной строке */}
+          {/* Status and date row */}
           <div className="flex items-center justify-between gap-2 pr-8">
             <div className="flex items-center gap-1.5 min-w-0">
               <StatusIcon className={cn("w-4 h-4 shrink-0", config.iconColor)} />
@@ -181,12 +182,12 @@ function ProductCard({
             </div>
           </div>
 
-          {/* Название товара */}
+          {/* Product name */}
           <h3 className="mt-3 font-bold text-slate-800 text-base leading-tight line-clamp-2 min-h-10">
             {product.name}
           </h3>
 
-          {/* Штрих-код */}
+          {/* Barcode */}
           <div className="mt-2 flex items-start gap-1.5">
             <Barcode className="w-3.5 h-3.5 text-slate-300" />
             <span className="text-xs text-slate-400 font-mono tracking-wider truncate">
@@ -194,7 +195,7 @@ function ProductCard({
             </span>
           </div>
 
-          {/* Кнопки действий */}
+          {/* Action buttons */}
           <div className="flex gap-2 mt-2 w-full justify-center">
             <button
               onClick={() => onProductConsumed(product)}
@@ -228,7 +229,7 @@ function ProductCard({
         </div>
       </div>
 
-      {/* Модальное окно редактирования */}
+      {/* Edit product dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -236,7 +237,7 @@ function ProductCard({
           </DialogHeader>
 
           <form onSubmit={handleEditSubmit} className="space-y-5 mt-1">
-            {/* Название */}
+            {/* Product name */}
             <div>
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                 <Package size={14} />
@@ -252,7 +253,7 @@ function ProductCard({
               />
             </div>
 
-            {/* Штрих-код */}
+            {/* Barcode */}
             <div>
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                 <Barcode size={14} />
@@ -267,7 +268,7 @@ function ProductCard({
               />
             </div>
 
-            {/* Дата окончания */}
+            {/* Expiry date */}
             <div>
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                 <Calendar size={14} />

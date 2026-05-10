@@ -15,12 +15,13 @@ export interface ParseResult {
 }
 
 /**
- * Определяет тип Excel-файла по содержимому первой ячейки / заголовков.
- * - "inventory" (Инвентаризация): A1 содержит "Инвентаризационная опись"
- * - "catalog" (Каталог товаров): строка 1 содержит заголовки "Штрих-код" или "Наименование товара"
+ * Detects the Excel file type by inspecting cell contents and headers.
+ *
+ * - `"inventory"` — cell A1..A5 contains "Инвентаризационная опись"
+ * - `"catalog"` — row 1 has headers "Штрих-код" or "Наименование товара"
  */
 function detectFileType(ws: XLSX.WorkSheet): ExcelFileType | null {
-  // Тип "Инвентаризация": ячейка A1 или A2 содержит "Инвентаризационная опись"
+  // Inventory type: first rows contain "Инвентаризационная опись"
   for (let r = 0; r < 5; r++) {
     const cell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
     if (cell && typeof cell.v === "string" && cell.v.includes("Инвентаризационная опись")) {
@@ -28,7 +29,7 @@ function detectFileType(ws: XLSX.WorkSheet): ExcelFileType | null {
     }
   }
 
-  // Также проверяем наличие строки-заголовка с "Артикул" + "Наименование" (типично для инвентаризации)
+  // Also check for header row with "Артикул" + "Наименование" (typical for inventory)
   for (let r = 15; r < 22; r++) {
     const artCell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
     const nameCell = ws[XLSX.utils.encode_cell({ r, c: 2 })];
@@ -40,7 +41,7 @@ function detectFileType(ws: XLSX.WorkSheet): ExcelFileType | null {
     }
   }
 
-  // Тип "Каталог": строка 1 содержит заголовки "Штрих-код" или "Наименование товара"
+  // Catalog type: row 1 has "Штрих-код" or "Наименование товара"
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
   for (let c = range.s.c; c <= Math.min(range.e.c, 40); c++) {
     const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
@@ -55,16 +56,16 @@ function detectFileType(ws: XLSX.WorkSheet): ExcelFileType | null {
 }
 
 /**
- * Парсит файл типа "Инвентаризация" (book1.xlsx):
- * - Ищем строку-заголовок с "Артикул"/"Наименование", данные начинаются со следующей строки
- * - B = штрихкод (Артикул), C = наименование, D = количество
+ * Parses an "Inventory" type Excel file.
+ * Locates the header row containing "Артикул"/"Наименование"; data starts on the next row.
+ * Columns: B = barcode, C = product name, D = quantity.
  */
 function parseInventory(ws: XLSX.WorkSheet): { products: ParsedProduct[]; errors: string[] } {
   const products: ParsedProduct[] = [];
   const errors: string[] = [];
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
 
-  // Находим строку-заголовок (содержит "Артикул" в колонке B)
+  // Find header row (contains "Артикул" in column B)
   let headerRow = 17; // default: row 18 (0-indexed)
   for (let r = 10; r < 25; r++) {
     const cell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
@@ -76,14 +77,14 @@ function parseInventory(ws: XLSX.WorkSheet): { products: ParsedProduct[]; errors
   const DATA_START_ROW = headerRow + 1;
 
   for (let r = DATA_START_ROW; r <= range.e.r; r++) {
-    const barcodeCell = ws[XLSX.utils.encode_cell({ r, c: 1 })]; // B
-    const nameCell = ws[XLSX.utils.encode_cell({ r, c: 2 })];    // C
-    const qtyCell = ws[XLSX.utils.encode_cell({ r, c: 3 })];     // D
+    const barcodeCell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
+    const nameCell = ws[XLSX.utils.encode_cell({ r, c: 2 })];
+    const qtyCell = ws[XLSX.utils.encode_cell({ r, c: 3 })];
 
     const barcode = barcodeCell ? String(barcodeCell.v).trim() : "";
     const name = nameCell ? String(nameCell.v).trim() : "";
 
-    // Пропускаем пустые строки и строки "Всего"
+    // Skip empty rows and "Всего" (totals) rows
     if (!barcode || !name) continue;
     if (name.toLowerCase().startsWith("всего")) continue;
 
@@ -102,21 +103,21 @@ function parseInventory(ws: XLSX.WorkSheet): { products: ParsedProduct[]; errors
 }
 
 /**
- * Парсит файл типа "Каталог товаров" (CS25.xls):
- * - Строка 1 = заголовки, данные со строки 2
- * - D = штрихкод осн., F = наименование товара, I = доступно (количество)
+ * Parses a "Product Catalog" type Excel file.
+ * Row 1 = headers, data starts at row 2.
+ * Default columns: D = barcode, F = product name, I = available quantity.
  */
 function parseCatalog(ws: XLSX.WorkSheet): { products: ParsedProduct[]; errors: string[] } {
   const products: ParsedProduct[] = [];
   const errors: string[] = [];
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
 
-  // Определяем индексы колонок по заголовкам (на случай если порядок изменится)
+  // Default column indices (overridden by header detection below)
   let barcodeCol = 3;  // D (0-indexed)
   let nameCol = 5;     // F (0-indexed)
   let qtyCol = 8;      // I (0-indexed)
 
-  // Попытка найти колонки по заголовкам
+  // Detect columns by header text
   for (let c = range.s.c; c <= Math.min(range.e.c, 40); c++) {
     const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
     if (cell && typeof cell.v === "string") {
@@ -152,7 +153,10 @@ function parseCatalog(ws: XLSX.WorkSheet): { products: ParsedProduct[]; errors: 
 }
 
 /**
- * Главная функция: принимает Buffer Excel-файла, определяет тип, парсит данные.
+ * Main entry point: accepts an Excel file buffer, detects file type, and parses product data.
+ *
+ * @param buffer - Raw Excel file buffer.
+ * @returns Parsed products, detected file type, and any parsing errors.
  */
 export function parseExcelFile(buffer: Buffer): ParseResult {
   const workbook = XLSX.read(buffer, { type: "buffer" });

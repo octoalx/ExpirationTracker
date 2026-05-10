@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User } from "@prisma/client";
 
+/** Sends PUT request to change a user's role. */
 const handleRoleChange = async (userId: string, role: string) => {
   await fetch(`/api/admin/users/${userId}`, {
     method: "PUT",
@@ -21,16 +22,18 @@ const handleRoleChange = async (userId: string, role: string) => {
     },
     body: JSON.stringify({ role }),
   });
-  // Here you would typically refetch the data or update the state
+  // TODO: refetch or update state after role change
 };
 
+/** Sends DELETE request to remove a user. */
 const handleDelete = async (userId: string) => {
   await fetch(`/api/admin/users/${userId}`, {
     method: "DELETE",
   });
-  // Here you would typically refetch the data or update the state
+  // TODO: refetch or update state after deletion
 };
 
+/** Column definitions for the admin users data table. */
 export const columns: ColumnDef<User>[] = [
   {
     accessorKey: "id",

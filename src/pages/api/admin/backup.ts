@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 
+/** GET: export full database backup as a JSON download (admin only). */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,

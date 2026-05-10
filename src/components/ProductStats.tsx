@@ -2,6 +2,7 @@ import React from "react";
 import { Package, AlertOctagon, Clock, CalendarClock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+/** Props for the product statistics summary cards. */
 export interface ProductStatsProps {
   total?: number;
   expired?: number;
@@ -9,6 +10,7 @@ export interface ProductStatsProps {
   expiring30?: number;
 }
 
+/** Renders four summary stat cards: total, expired, expiring in 7d, expiring in 30d. */
 export function ProductStats({
   total = 0,
   expired = 0,

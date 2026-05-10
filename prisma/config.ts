@@ -1,5 +1,4 @@
-// NOTE: Main Prisma config is at project root: prisma.config.ts
-// This file is kept for backwards compatibility but is not used by Prisma CLI.
+/** @deprecated Main Prisma config lives at project root `prisma.config.ts`. Kept for backwards compatibility. */
 export default {
   schema: "./schema.prisma",
 };

@@ -9,6 +9,7 @@ interface Particle {
   alpha: number;
 }
 
+/** Full-screen particle canvas used as a decorative background layer. */
 export default function AnimatedBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -59,7 +60,7 @@ export default function AnimatedBackground() {
         ctx.fill();
       }
 
-      // Draw connections
+      // Draw connections between nearby particles
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;

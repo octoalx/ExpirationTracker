@@ -16,12 +16,14 @@ interface AutoBackup {
   path: string;
 }
 
+/** Formats byte count into a human-readable size string. */
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Formats an ISO timestamp using the ru-RU locale. */
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleString("ru-RU", {
@@ -33,6 +35,7 @@ function formatDate(iso: string): string {
   });
 }
 
+/** Admin tab for database export/import and automatic backup management. */
 export default function BackupTab() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -47,14 +50,14 @@ export default function BackupTab() {
     };
   } | null>(null);
 
-  // Auto-backups state
+  // Auto-backup list state
   const [autoBackups, setAutoBackups] = useState<AutoBackup[]>([]);
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [deletingBackup, setDeletingBackup] = useState<string | null>(null);
 
-  // Backup settings
+  // Backup schedule settings
   const [backupTime, setBackupTime] = useState("03:00");
   const [backupEnabled, setBackupEnabled] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);

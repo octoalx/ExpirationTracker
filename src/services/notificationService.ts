@@ -6,6 +6,7 @@ import type { ExpirationProduct } from "../lib/email-templates/index";
 
 type UrgencyLevel = "EXPIRED" | "URGENT" | "WARNING" | "SAFE";
 
+/** Maps days-until-expiry to an urgency level based on user thresholds. */
 function getUrgencyLevel(daysUntil: number, urgentThreshold: number, warningThreshold: number): UrgencyLevel {
   if (daysUntil < 0) return "EXPIRED";
   if (daysUntil <= urgentThreshold) return "URGENT";
@@ -13,6 +14,7 @@ function getUrgencyLevel(daysUntil: number, urgentThreshold: number, warningThre
   return "SAFE";
 }
 
+/** Converts internal `UrgencyLevel` to the email template's urgency enum. */
 function mapUrgency(level: UrgencyLevel): ExpirationProduct["urgency"] {
   switch (level) {
     case "EXPIRED": return "expired";
@@ -30,6 +32,7 @@ interface SendResult {
   error?: string;
 }
 
+/** Initializes SMTP for the given user and sends an expiration summary email. */
 async function sendEmailForProducts(
   user: { id: string; name: string | null; email: string | null },
   settings: {
@@ -85,8 +88,8 @@ async function sendEmailForProducts(
 }
 
 /**
- * Ежедневный отчёт в 10:00 — товары со статусом СРОЧНО (≤ urgentThreshold).
- * Отправляется каждый день.
+ * Daily urgent report — products at or below the urgent threshold.
+ * Sends every day for each user with email notifications enabled.
  */
 export async function sendDailyUrgentNotifications(userId?: string): Promise<SendResult[]> {
   const results: SendResult[] = [];
@@ -153,8 +156,8 @@ export async function sendDailyUrgentNotifications(userId?: string): Promise<Sen
 }
 
 /**
- * Уведомление "Внимание" — товары у которых сегодня ровно warningThreshold дней.
- * Отправляется каждый день в указанное время. Если таких товаров нет — ничего не делает.
+ * Warning notification — products that are exactly `warningThreshold` days from expiry.
+ * Fires daily; no-op if no matching products exist.
  */
 export async function sendWarningNotifications(userId?: string): Promise<SendResult[]> {
   const results: SendResult[] = [];
@@ -216,8 +219,8 @@ export async function sendWarningNotifications(userId?: string): Promise<SendRes
 }
 
 /**
- * Обратная совместимость — используется при ручном запуске через API.
- * Шлёт всё: и срочные, и предупреждения.
+ * Backward-compatible entry point — used by manual API triggers.
+ * Sends both urgent and warning notifications.
  */
 export async function sendExpirationNotifications(userId?: string): Promise<SendResult[]> {
   const [dailyResults, warningResults] = await Promise.all([

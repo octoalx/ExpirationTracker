@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import path from "path";
 
+/** Resolves the absolute path to the SQLite database file from `DATABASE_URL`. */
 export function resolvePrismaDbPath(): string {
   const dbUrl = process.env.DATABASE_URL ?? "file:./dev.db";
   const dbPath = dbUrl.replace(/^file:/, "");
@@ -9,6 +10,7 @@ export function resolvePrismaDbPath(): string {
   return path.join(process.cwd(), dbPath);
 }
 
+/** Creates a PrismaClient instance backed by the better-sqlite3 adapter. */
 function createPrismaClient() {
   const absolutePath = resolvePrismaDbPath();
   const adapter = new PrismaBetterSqlite3({ url: absolutePath });
