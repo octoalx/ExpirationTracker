@@ -21,6 +21,10 @@ fi
 echo "[1/4] Stopping existing containers..."
 docker compose down --remove-orphans || true
 
+echo "      Ensuring data directory exists with correct permissions..."
+mkdir -p ./data
+sudo chown -R 1001:1001 ./data 2>/dev/null || chown -R 1001:1001 ./data 2>/dev/null || chmod 777 ./data
+
 echo "[2/4] Building image (no cache)..."
 docker compose build --no-cache
 

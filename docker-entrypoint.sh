@@ -12,6 +12,12 @@ if [ ! -d "/app/data" ]; then
   mkdir -p /app/data
 fi
 
+# Verify writable
+if [ ! -w "/app/data" ]; then
+  echo "ERROR: /app/data is not writable by user $(whoami) (uid=$(id -u)). Fix: sudo chown -R 1001:1001 ./data on host."
+  exit 1
+fi
+
 echo "Running Prisma migrations..."
 # Выполняем миграции перед стартом
 npx prisma migrate deploy --schema=/app/prisma/schema.prisma
