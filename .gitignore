@@ -1,5 +1,3 @@
-# Создать/обновить .gitignore
-cat > .gitignore << 'EOF'
 # Dependencies
 node_modules/
 .pnp/
@@ -91,10 +89,12 @@ coverage/
 # Prisma migrations (только если не нужно в git)
 # prisma/migrations/
 
-# Windsurf
+# AI IDE configs
+.clinerules
+.windsurfrules
+.roo/
 .windsurf/
-.windsurfrules/
 .cursor/
+
+# IDE lock files
 skills-lock.json
-EOF.next/server/pages/auth/
-.next/static/chunks/pages/auth/

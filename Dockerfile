@@ -1,17 +1,20 @@
 # ─── СТАДИЯ 1: Установка зависимостей ───
 FROM node:22-alpine AS deps
-RUN apk add --no-cache libc6-compat python3 make g++
+RUN --mount=type=cache,target=/etc/apk/cache \
+    apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
 # Устанавливаем всё, включая devDependencies для билда
-RUN npm ci --ignore-scripts --legacy-peer-deps
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts --legacy-peer-deps
 
 # ─── СТАДИЯ 2: Сборка приложения ───
 FROM node:22-alpine AS builder
-RUN apk add --no-cache libc6-compat python3 make g++
+RUN --mount=type=cache,target=/etc/apk/cache \
+    apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -26,9 +29,12 @@ COPY prisma.config.ts ./prisma.config.ts
 RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
 
+# Пересобираем better-sqlite3 для Alpine (нативные модули)
+RUN npm rebuild better-sqlite3
+
 # ─── СТАДИЯ 3: Финальный образ (Runner) ───
 FROM node:22-alpine AS runner
-RUN apk add --no-cache libc6-compat curl python3 make g++
+RUN apk add --no-cache libc6-compat curl
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -57,9 +63,6 @@ COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 # Копируем скрипт создания admin
 COPY --from=builder /app/scripts ./scripts
-
-# Пересобираем better-sqlite3 для Alpine
-RUN npm rebuild better-sqlite3
 
 # Подготавливаем входной скрипт
 COPY docker-entrypoint.sh /usr/local/bin/

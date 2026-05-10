@@ -13,3 +13,10 @@ DOCKER.md
 deploy.sh
 nginx/
 .env.example
+docs/
+prisma/migrations/
+*.md
+.clinerules
+.windsurfrules
+tsconfig.json
+.roo/
