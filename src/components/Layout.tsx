@@ -1,7 +1,6 @@
-import { useState, useCallback, useRef, useEffect, type MouseEvent, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import {
   Home,
-  ScanBarcode,
   Settings,
   LogOut,
   Shield,
@@ -10,12 +9,9 @@ import {
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import BackToTop from "@/components/BackToTop";
 import AnimatedBackground from "@/components/AnimatedBackground";
-
-const ScannerModal = dynamic(() => import("./ScannerModal"), { ssr: false });
 
 interface LayoutProps {
   children: ReactNode;
@@ -28,62 +24,15 @@ function ClientYear() {
   return <>{year ?? "2024"}</>;
 }
 
-/** Hook that spawns animated ripple circles on click. */
-function useRipple() {
-  const [ripples, setRipples] = useState<{ x: number; y: number; id: number }[]>([]);
-  const nextId = useRef(0);
-
-  const spawn = (e: MouseEvent<HTMLElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const id = nextId.current++;
-    setRipples((prev) => [...prev, { x: e.clientX - rect.left, y: e.clientY - rect.top, id }]);
-    setTimeout(() => setRipples((prev) => prev.filter((r) => r.id !== id)), 600);
-  };
-
-  const Ripples = () => (
-    <>
-      {ripples.map((r) => (
-        <span
-          key={r.id}
-          className="pointer-events-none absolute rounded-full bg-emerald-400/30 animate-[ping_0.6s_ease-out_forwards]"
-          style={{ left: r.x - 10, top: r.y - 10, width: 20, height: 20 }}
-        />
-      ))}
-    </>
-  );
-
-  return { spawn, Ripples };
-}
-
-/** App shell with desktop sidebar, mobile bottom nav, scanner, and background. */
+/** App shell with desktop sidebar, mobile bottom nav, and background. */
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const isAuthPage = router.pathname.startsWith("/auth");
-  const [isScannerOpen, setScannerOpen] = useState(false);
-  const scanRipple = useRipple();
-  const mobileRipple = useRipple();
 
-  const handleScanSuccess = useCallback(
-    (decodedText: string) => {
-      setScannerOpen(false);
-      router.push({
-        pathname: "/dashboard",
-        query: { barcode: decodedText },
-      });
-    },
-    [router],
-  );
-
-  const navigation = [
+  const navigation: { name: string; href: string; icon: typeof Home; action?: () => void }[] = [
     { name: "Главная", href: "/dashboard", icon: Home },
     { name: "Статистика", href: "/stats", icon: BarChart3 },
-    {
-      name: "Сканировать",
-      href: "#",
-      icon: ScanBarcode,
-      action: () => setScannerOpen(true),
-    },
     { name: "Настройки", href: "/settings", icon: Settings },
   ];
 
@@ -129,30 +78,6 @@ export default function Layout({ children }: LayoutProps) {
           <nav className="flex-1 px-3 pb-4 space-y-1">
             {navigation.map((item) => {
               const active = !item.action && isActive(item.href);
-              const isScan = item.name === "Сканировать";
-
-              if (isScan) {
-                return (
-                  <button
-                    key={item.name}
-                    onClick={(e) => {
-                      scanRipple.spawn(e);
-                      item.action?.();
-                    }}
-                    className={cn(
-                      "relative overflow-hidden w-full group flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl",
-                      "bg-linear-to-r from-emerald-600 to-teal-500 text-white",
-                      "hover:shadow-lg hover:shadow-emerald-500/25",
-                      "active:scale-[0.98] transition-all duration-200",
-                      isScannerOpen && "animate-pulse",
-                    )}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    {item.name}
-                    <scanRipple.Ripples />
-                  </button>
-                );
-              }
 
               if (item.action) {
                 return (
@@ -235,48 +160,20 @@ export default function Layout({ children }: LayoutProps) {
             .filter((item) => item.name !== "Выйти")
             .map((item) => {
               const active = !item.action && isActive(item.href);
-              const isScan = item.name === "Сканировать";
-
-              if (isScan) {
-                return (
-                  <button
-                    key={item.name}
-                    onClick={(e) => {
-                      mobileRipple.spawn(e);
-                      item.action?.();
-                    }}
-                    className={cn(
-                      "relative overflow-hidden flex flex-col items-center justify-center",
-                      "-mt-5 w-14 h-14 rounded-2xl",
-                      "bg-linear-to-br from-emerald-600 to-teal-500 text-white",
-                      "shadow-lg shadow-emerald-500/30",
-                      "active:scale-95 transition-all duration-200",
-                      isScannerOpen && "animate-pulse",
-                    )}
-                  >
-                    <item.icon className="h-6 w-6" />
-                    <mobileRipple.Ripples />
-                  </button>
-                );
-              }
 
               if (item.action) {
                 return (
                   <button
                     key={item.name}
-                    onClick={(e) => {
-                      mobileRipple.spawn(e);
-                      item.action?.();
-                    }}
+                    onClick={item.action}
                     className={cn(
-                      "relative overflow-hidden flex flex-col items-center justify-center w-16 py-1 rounded-xl cursor-pointer",
+                      "flex flex-col items-center justify-center w-16 py-1 rounded-xl cursor-pointer",
                       "text-slate-400 dark:text-slate-500",
                       "active:scale-95 transition-all duration-200",
                     )}
                   >
                     <item.icon className="h-5 w-5" />
                     <span className="text-[10px] mt-0.5">{item.name}</span>
-                    <mobileRipple.Ripples />
                   </button>
                 );
               }
@@ -310,13 +207,6 @@ export default function Layout({ children }: LayoutProps) {
             })}
         </div>
       </nav>
-
-      {/* Scanner modal */}
-      <ScannerModal
-        open={isScannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onScanSuccess={handleScanSuccess}
-      />
 
       {/* Global utilities */}
       <BackToTop />

@@ -28,7 +28,6 @@ import {
   Trash2,
   CheckCircle2,
   Loader2,
-  ScanBarcode,
   ShieldCheck,
   Archive,
   ListFilter,
@@ -217,7 +216,6 @@ const Dashboard = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [scannedBarcode, setScannedBarcode] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -228,6 +226,17 @@ const Dashboard = () => {
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
+  /* ── Data fetching ── */
+  useEffect(() => {
+    fetch(`/api/products`)
+      .then((res) => res.json())
+      .then((data) => setProducts(data.products || []));
+
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => setSettings(data));
+  }, []);
 
   /* ── Greeting ── */
   const getTimeOfDay = () => {
@@ -241,27 +250,6 @@ const Dashboard = () => {
   const greeting = `${getTimeOfDay()}, ${session?.user?.name || "Гость"}!`;
   const typedGreeting = useTypingText(greeting);
 
-  useEffect(() => {
-    fetch(`/api/products`)
-      .then((res) => res.json())
-      .then((data) => setProducts(data.products || []));
-
-    fetch("/api/settings")
-      .then((res) => res.json())
-      .then((data) => setSettings(data));
-  }, []);
-
-  // Open add-product dialog when navigated with ?barcode=… query param
-  useEffect(() => {
-    const bc = router.query.barcode;
-    if (bc && typeof bc === "string") {
-      setScannedBarcode(bc);
-      setAddModalOpen(true);
-      // Remove barcode query param without triggering a re-render
-      router.replace("/dashboard", undefined, { shallow: true });
-    }
-  }, [router.query.barcode, router]);
-
   const updateProduct = (updatedProduct: Product) => {
     setProducts((prev) =>
       prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)),
@@ -271,7 +259,6 @@ const Dashboard = () => {
   const addProduct = (product: Product) => {
     setProducts((prev) => [...prev, product]);
     setAddModalOpen(false);
-    setScannedBarcode("");
   };
 
   const deleteProduct = async (productId: string) => {
@@ -498,6 +485,15 @@ const Dashboard = () => {
           <Button variant="outline" size="sm" onClick={resetFilters}>
             Сбросить
           </Button>
+
+          <Button
+            size="sm"
+            onClick={() => setAddModalOpen(true)}
+            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <Plus className="h-4 w-4" />
+            Добавить товар
+          </Button>
         </div>
 
         {/* Status filter chips */}
@@ -691,20 +687,6 @@ const Dashboard = () => {
         onItemsPerPageChange={setItemsPerPage}
       />
 
-      {/* Floating add button */}
-      {filteredProducts.length > 0 && (
-        <div className="flex justify-end mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-          <button
-            onClick={() => setAddModalOpen(true)}
-            className="group relative bg-linear-to-r from-emerald-600 to-teal-500 text-white rounded-full p-4 shadow-xl shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-110"
-            aria-label="Добавить новый товар"
-          >
-            <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
-            <span className="absolute inset-0 rounded-full animate-ping bg-emerald-400/50" />
-          </button>
-        </div>
-      )}
-
       {/* Add product dialog */}
       <Dialog open={isAddModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="sm:max-w-md">
@@ -724,7 +706,7 @@ const Dashboard = () => {
             Импорт из Excel
           </Button>
 
-          <AddProductForm onProductAdded={addProduct} initialBarcode={scannedBarcode} />
+          <AddProductForm onProductAdded={addProduct} />
         </DialogContent>
       </Dialog>
 

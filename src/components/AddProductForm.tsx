@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 
 interface AddProductFormProps {
   onProductAdded: (product: Record<string, unknown>) => void;
-  initialBarcode?: string;
 }
 
 type DateInputType = "expiry" | "manufacture";
@@ -14,9 +13,8 @@ type ShelfLifeUnit = "days" | "weeks" | "months";
 /** Form for adding a new product with barcode, name, quantity, and expiry date. */
 export default function AddProductForm({
   onProductAdded,
-  initialBarcode = "",
 }: AddProductFormProps) {
-  const [barcode, setBarcode] = useState(initialBarcode);
+  const [barcode, setBarcode] = useState("");
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState<number | "">("");
   const [expiryDate, setExpiryDate] = useState("");
@@ -43,10 +41,6 @@ export default function AddProductForm({
       setExpiryDate(format(endDate, "yyyy-MM-dd"));
     }
   }, [dateInputType, manufacturingDate, shelfLife, shelfLifeUnit]);
-
-  useEffect(() => {
-    if (initialBarcode) setBarcode(initialBarcode);
-  }, [initialBarcode]);
 
   const resetForm = () => {
     setBarcode("");
