@@ -55,6 +55,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
+# Копируем скрипт создания admin
+COPY --from=builder /app/scripts ./scripts
+
 # Пересобираем better-sqlite3 для Alpine
 RUN npm rebuild better-sqlite3
 
