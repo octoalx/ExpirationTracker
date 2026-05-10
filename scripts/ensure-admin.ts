@@ -23,9 +23,9 @@ async function ensureAdmin() {
     return;
   }
 
-  // Generate a random password for the default admin account
-  const randomPass = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
-  const hashedPassword = await bcrypt.hash(randomPass, 10);
+  // Default admin password for local network deployment
+  const adminPassword = "admin";
+  const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
   const admin = await prisma.user.create({
     data: {
@@ -35,8 +35,7 @@ async function ensureAdmin() {
     },
   });
 
-  console.log(`Created default admin user: admin@localhost / ${randomPass} (role: ${admin.role})`);
-  console.log("IMPORTANT: Change this password immediately after first login!");
+  console.log(`Created default admin user: admin@localhost / ${adminPassword} (role: ${admin.role})`);
 }
 
 ensureAdmin()
