@@ -97,31 +97,26 @@ Access app: `http://localhost:8881`
 
 ### Optional: Email Notifications (SMTP)
 
-```env
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT="587"
-SMTP_USER="your-email@gmail.com"
-SMTP_PASS="your-app-password"
-```
+SMTP credentials are configured **per user** in the app via **Settings → Notifications**, not via environment variables. Each user stores their own SMTP settings in the database.
 
 For Gmail: use [App Password](https://support.google.com/accounts/answer/185833), not your login password.
 
 ### Optional: Telegram Notifications
 
-```env
-TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrSTUvwxyz"
-TELEGRAM_CHAT_ID="12345678"
-```
+Telegram bot token and chat ID are configured **per user** in the app via **Settings → Notifications**, not via environment variables.
 
-To get `TELEGRAM_CHAT_ID`: message [@userinfobot](https://t.me/userinfobot).
+To get your `Chat ID`: message [@userinfobot](https://t.me/userinfobot).
 
 ### Notification Thresholds
 
-```env
-NOTIFY_BEFORE_EXPIRATION="3"    # Days before expiry to notify
-URGENT_THRESHOLD="5"            # Red alert threshold (days)
-WARNING_THRESHOLD="30"          # Yellow warning threshold (days)
-```
+Thresholds are configured **per user** in the app via **Settings → Notifications**:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Urgent threshold | 3 days | Red alert — critical expiry |
+| Warning threshold | 7 days | Yellow warning |
+| Urgent notify time | 10:00 | Daily report send time |
+| Warning notify time | 10:00 | One-time warning send time |
 
 ---
 
@@ -159,10 +154,11 @@ git pull origin main
 
 ### What `deploy.sh` Does
 
-1. Pulls latest source code
-2. Rebuilds Docker images (`docker compose build`)
-3. Runs database migrations (`prisma migrate deploy`)
-4. Restarts services with zero-downtime
+1. Pulls latest source code (`git pull origin main`)
+2. Stops existing containers (`docker compose down`)
+3. Rebuilds Docker image (`docker compose build --no-cache`)
+4. Starts containers (`docker compose up -d`)
+5. On container start, `docker-entrypoint.sh` automatically runs `prisma migrate deploy` and creates the default admin user before Next.js starts
 
 ---
 
