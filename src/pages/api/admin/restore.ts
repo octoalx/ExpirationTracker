@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth";
+import { Role } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
@@ -101,7 +102,7 @@ export default async function handler(
             where: { id: existing.id },
             data: {
               name: user.name ?? existing.name,
-              role: user.role ?? existing.role,
+              role: (user.role as Role) ?? existing.role,
             },
           });
           results.users.updated++;
@@ -111,7 +112,7 @@ export default async function handler(
               id: user.id,
               name: user.name,
               email: user.email,
-              role: user.role ?? "USER",
+              role: (user.role as Role) ?? Role.USER,
             },
           });
           results.users.created++;

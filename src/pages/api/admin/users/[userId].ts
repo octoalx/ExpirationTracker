@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth";
+import { Role } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
@@ -34,7 +35,7 @@ export default async function handler(
     }
   } else if (req.method === "PUT") {
     const { role } = req.body;
-    if (!["USER", "ADMIN"].includes(role)) {
+    if (!Object.values(Role).includes(role)) {
       return res.status(400).json({ message: "Invalid role specified" });
     }
     try {

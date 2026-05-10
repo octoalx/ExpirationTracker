@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import path from "path";
 import bcrypt from "bcryptjs";
@@ -27,7 +27,7 @@ async function ensureAdmin() {
     data: {
       email: "admin@localhost",
       password: hashedPassword,
-      role: "ADMIN",
+      role: Role.ADMIN,
     },
   });
 

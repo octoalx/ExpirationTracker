@@ -5,7 +5,7 @@ export default withAuth(
   function middleware(req) {
     if (
       req.nextUrl.pathname.startsWith("/admin") &&
-      req.nextauth.token?.role?.trim() !== "ADMIN"
+      req.nextauth.token?.role !== "ADMIN"
     ) {
       return NextResponse.redirect(new URL("/", req.url));
     }
