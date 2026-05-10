@@ -1,3 +1,10 @@
+# HTTPS configuration example
+# To enable HTTPS:
+# 1. Copy this file to nginx.conf: cp nginx-ssl.conf.example nginx.conf
+# 2. Create SSL certificates in nginx/ssl/ directory
+# 3. Update docker-compose.yml to add port 443 and SSL volume
+# 4. Redeploy
+
 user  nginx;
 worker_processes  auto;
 
@@ -27,14 +34,35 @@ http {
         server app:3000;
     }
 
+    # HTTP server — redirect to HTTPS
     server {
         listen 80;
         server_name _;
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    # HTTPS server
+    server {
+        listen 443 ssl http2;
+        server_name _;
+
+        # SSL certificates (mount via docker-compose volume)
+        ssl_certificate /etc/nginx/ssl/expitrack.local.crt;
+        ssl_certificate_key /etc/nginx/ssl/expitrack.local.key;
+
+        # SSL configuration
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers on;
 
         # Security headers
         add_header X-Frame-Options "SAMEORIGIN" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header X-XSS-Protection "1; mode=block" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
         # Static assets — cache 365 days
         location /_next/static/ {

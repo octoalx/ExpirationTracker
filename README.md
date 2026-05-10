@@ -17,19 +17,11 @@ Web app for tracking product expiration dates with notifications via email and T
 
 ---
 
-## Local Domain Setup (Optional)
+## HTTPS Setup (Optional)
 
-For local development with custom domain like `https://expitrack.local`:
+Default deployment uses HTTP on port 8881. To enable HTTPS for custom domains:
 
-### 1. Add Domain to hosts
-
-```bash
-sudo nano /etc/hosts
-# Add line:
-127.0.0.1 expitrack.local
-```
-
-### 2. Create SSL Certificate
+### 1. Create SSL Certificates
 
 ```bash
 mkdir -p nginx/ssl
@@ -39,28 +31,48 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -subj "/CN=expitrack.local"
 ```
 
-### 3. Update Environment
+### 2. Enable HTTPS Configuration
+
+```bash
+# Backup HTTP config
+cp nginx/nginx.conf nginx/nginx-http.conf.backup
+# Copy HTTPS config
+cp nginx/nginx-ssl.conf.example nginx/nginx.conf
+```
+
+### 3. Update docker-compose.yml
+
+Add to nginx service:
+```yaml
+ports:
+  - "8881:80"
+  - "443:443"  # Add HTTPS port
+volumes:
+  - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+  - ./nginx/ssl:/etc/nginx/ssl:ro  # Add SSL volume
+```
+
+### 4. Update Environment
 
 ```env
-# For custom domain
 NEXTAUTH_URL="https://expitrack.local"
 ```
 
-### 4. Redeploy
+### 5. Configure DNS
+
+Point your domain (e.g., `expitrack.local`) to the server IP in your DNS or `/etc/hosts`.
+
+### 6. Redeploy
 
 ```bash
 docker compose down
 ./deploy.sh
 ```
 
-### 5. Access
-
-Open `https://expitrack.local` in browser. Accept self-signed certificate warning.
-
 **Notes:**
-- HTTP (port 8881) auto-redirects to HTTPS (port 443)
-- Health checks still work on `http://localhost:8881/health`
-- SSL certificates mounted from `./nginx/ssl/` directory
+- Self-signed certificates show browser warnings — acceptable for local networks
+- For production, use Let's Encrypt or proper CA certificates
+- HTTP (port 8881) will redirect to HTTPS when SSL config is active
 
 ---
 
