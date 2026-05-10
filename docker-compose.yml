@@ -8,6 +8,7 @@ services:
       DATABASE_URL: file:/app/data/dev.db
     volumes:
       - ./data:/app/data
+      - ./backups:/app/backups
     restart: unless-stopped
     deploy:
       resources:
