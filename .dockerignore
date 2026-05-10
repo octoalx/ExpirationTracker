@@ -18,5 +18,4 @@ prisma/migrations/
 *.md
 .clinerules
 .windsurfrules
-tsconfig.json
 .roo/
