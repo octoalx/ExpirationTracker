@@ -25,7 +25,7 @@ async function updateExpiredProducts() {
       where: { status: "ACTIVE", expiryDate: { lt: now }, isExpired: false },
       data: { isExpired: true },
     });
-    if (result.count > 0) console.log(`[Cron] Updated ${result.count} expired products`);
+    if (result.count > 0) logger.info(`Updated ${result.count} expired products`, { context: "Cron" });
   } catch (err) {
     logger.error("[Cron] Error updating expired products", { error: String(err) });
   }
@@ -42,13 +42,13 @@ async function runScheduledNotifications() {
 
   for (const s of users) {
     if (s.urgentNotifyTime === nowTime) {
-      console.log(`[Cron] Urgent notify time matched (${nowTime}) for user ${s.userId}`);
+      logger.info(`Urgent notify time matched (${nowTime})`, { context: "Cron", userId: s.userId });
       sendDailyUrgentNotifications(s.userId).catch((e) =>
         logger.error("[Cron] Error sending urgent notifications", { userId: s.userId, error: String(e) })
       );
     }
     if (s.warningNotifyTime === nowTime) {
-      console.log(`[Cron] Warning notify time matched (${nowTime}) for user ${s.userId}`);
+      logger.info(`Warning notify time matched (${nowTime})`, { context: "Cron", userId: s.userId });
       sendWarningNotifications(s.userId).catch((e) =>
         logger.error("[Cron] Error sending warning notifications", { userId: s.userId, error: String(e) })
       );
@@ -81,11 +81,11 @@ async function pruneOldLogs() {
       await prisma.systemLog.deleteMany({
         where: { id: { in: oldest.map((r) => r.id) } },
       });
-      console.log(`[Cron] Pruned ${oldest.length} excess log rows (cap: ${LOG_MAX_ROWS})`);
+      logger.info(`Pruned ${oldest.length} excess log rows (cap: ${LOG_MAX_ROWS})`, { context: "Cron" });
     }
 
     if (deleted.count > 0) {
-      console.log(`[Cron] Pruned ${deleted.count} log entries older than ${LOG_RETENTION_DAYS} days`);
+      logger.info(`Pruned ${deleted.count} log entries older than ${LOG_RETENTION_DAYS} days`, { context: "Cron" });
     }
   } catch (err) {
     logger.error("[Cron] Error pruning old logs", { error: String(err) });
@@ -120,7 +120,7 @@ async function runScheduledBackup() {
 
   for (const s of settings) {
     if (s.backupTime === nowTime) {
-      console.log(`[Cron] Backup time matched (${nowTime})`);
+      logger.info(`Backup time matched (${nowTime})`, { context: "Cron" });
       const backupName = createBackup();
       if (backupName) {
         logger.info("[Cron] Scheduled backup created", { file: backupName });

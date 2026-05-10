@@ -21,9 +21,10 @@ interface GlowInputProps {
   onChange: (v: string) => void;
   type?: string;
   placeholder?: string;
+  inputClassName?: string;
 }
 
-function GlowInput({ label, value, onChange, type = "text", placeholder }: GlowInputProps) {
+function GlowInput({ label, value, onChange, type = "text", placeholder, inputClassName }: GlowInputProps) {
   return (
     <div>
       <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
@@ -41,6 +42,7 @@ function GlowInput({ label, value, onChange, type = "text", placeholder }: GlowI
           "focus:scale-[1.01] focus:border-emerald-400 focus:bg-white dark:focus:bg-slate-800",
           "focus:ring-2 focus:ring-emerald-300/40 focus:shadow-[0_0_16px_rgba(16,185,129,0.12)]",
           "placeholder:text-slate-400",
+          inputClassName,
         )}
       />
     </div>
@@ -249,6 +251,8 @@ const SettingsPage = () => {
                 value={settings.smtpPass || ""}
                 onChange={(v) => setSettings({ ...settings, smtpPass: v })}
                 type="password"
+                placeholder={(settings as Record<string, unknown>).hasSmtpPass ? "••••••••••••••••" : ""}
+                inputClassName="placeholder:text-lg placeholder:tracking-widest"
               />
               <GlowInput
                 label="Email для уведомлений"

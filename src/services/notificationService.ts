@@ -1,5 +1,6 @@
 import { differenceInDays, startOfDay } from "date-fns";
 import { prisma } from "../lib/prisma";
+import { logger } from "../lib/logger";
 import { emailService } from "./emailService";
 import { getEmailTemplate } from "../lib/email-templates/index";
 import type { ExpirationProduct } from "../lib/email-templates/index";
@@ -116,7 +117,7 @@ export async function sendDailyUrgentNotifications(userId?: string): Promise<Sen
   for (const user of users) {
     if (!user.settings?.emailNotifications) continue;
     if (!user.settings.smtpHost || !user.settings.smtpUser || !user.settings.smtpPass) {
-      console.warn(`[Notifications/Daily] SMTP not configured for user ${user.id}`);
+      logger.warn("SMTP not configured", { context: "Notifications/Daily", userId: user.id });
       continue;
     }
 
@@ -184,7 +185,7 @@ export async function sendWarningNotifications(userId?: string): Promise<SendRes
   for (const user of users) {
     if (!user.settings?.emailNotifications) continue;
     if (!user.settings.smtpHost || !user.settings.smtpUser || !user.settings.smtpPass) {
-      console.warn(`[Notifications/Warning] SMTP not configured for user ${user.id}`);
+      logger.warn("SMTP not configured", { context: "Notifications/Warning", userId: user.id });
       continue;
     }
 

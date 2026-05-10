@@ -37,7 +37,7 @@ export default async function handler(
               smtpHost: true,
               smtpPort: true,
               smtpUser: true,
-              // smtpPass intentionally excluded for security
+              smtpPass: true, // fetched only to derive hasSmtpPass flag
               urgentThreshold: true,
               warningThreshold: true,
               urgentNotifyTime: true,
@@ -60,12 +60,15 @@ export default async function handler(
         });
       }
 
+      // Never send the actual password to the client
+      const { smtpPass, ...safeSettings } = settings;
+
       res.status(200).json({
         user: {
           name: userWithSettings.name,
           email: userWithSettings.email,
         },
-        settings,
+        settings: { ...safeSettings, hasSmtpPass: !!smtpPass },
       });
     } catch (error) {
       apiErrorHandler(error, res);
@@ -82,8 +85,15 @@ export default async function handler(
         notificationEmail,
         id: _si,
         userId: _ui,
+        hasSmtpPass: _hp,
+        smtpPass,
         ...cleanSettingsData
       } = settingsData;
+
+      // Only update smtpPass if user actually provided a new value
+      if (smtpPass) {
+        cleanSettingsData.smtpPass = smtpPass;
+      }
 
       // 3. Persist changes
       await prisma.$transaction([

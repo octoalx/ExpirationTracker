@@ -6,11 +6,18 @@ const nextConfig = {
     optimizePackageImports: ["lucide-react"],
     instrumentationHook: true,
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.extensionAlias = {
       ...config.resolve.extensionAlias,
       ".js": [".js", ".mjs", ".ts", ".tsx"],
     };
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        stream: false,
+        fs: false,
+      };
+    }
     return config;
   },
 };

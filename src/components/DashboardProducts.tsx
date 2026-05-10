@@ -13,9 +13,11 @@ import {
   XCircle,
   Loader2,
   FileSpreadsheet,
+  Printer,
 } from "lucide-react";
 
 import { getExpiryStatus } from "@/lib/utils";
+import { exportProductsToExcel } from "@/lib/excel-export";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -155,6 +157,12 @@ export function DashboardProducts() {
     [bulkIds]
   );
 
+  const handleBulkPrint = useCallback(() => {
+    const selected = products.filter((p) => bulkIds.includes(p.id));
+    if (selected.length === 0) return;
+    exportProductsToExcel(selected, session?.user?.name ?? undefined);
+  }, [products, bulkIds, session]);
+
   /* ── Computed stats ───────────────────────────────────────────────── */
   const stats = useMemo(() => {
     const ut = settings?.urgentThreshold ?? 3;
@@ -242,6 +250,16 @@ export function DashboardProducts() {
           <XCircle className="h-3.5 w-3.5" />
         )}
         Выброшены
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleBulkPrint}
+        className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+      >
+        <Printer className="h-3.5 w-3.5" />
+        Печать
       </Button>
 
       <Button

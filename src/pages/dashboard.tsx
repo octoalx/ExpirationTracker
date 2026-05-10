@@ -3,6 +3,7 @@ import { Product } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { getExpiryStatus, cn } from "../lib/utils";
+import { exportProductsToExcel } from "../lib/excel-export";
 import { motion, AnimatePresence } from "framer-motion";
 import AddProductForm from "../components/AddProductForm";
 import EditProductForm from "../components/EditProductForm";
@@ -32,6 +33,7 @@ import {
   Archive,
   ListFilter,
   FileSpreadsheet,
+  Printer,
 } from "lucide-react";
 
 /* ── Typing animation hook ── */
@@ -383,6 +385,12 @@ const Dashboard = () => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, sortField]);
 
+  const handleBulkPrint = useCallback(() => {
+    const selected = filteredProducts.filter((p) => selectedIds.includes(p.id));
+    if (selected.length === 0) return;
+    exportProductsToExcel(selected, session?.user?.name ?? undefined);
+  }, [filteredProducts, selectedIds, session]);
+
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
   const paginatedProducts = filteredProducts.slice(
     (currentPage - 1) * itemsPerPage,
@@ -566,6 +574,16 @@ const Dashboard = () => {
                 <AlertTriangle className="h-3.5 w-3.5" />
               )}
               В Брак
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkPrint}
+              className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Печать
             </Button>
 
             <Button
