@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
+import { logger } from "@/lib/logger";
 
 /** GET: paginated email logs | POST: retry a failed email (admin only). */
 export default async function handler(
@@ -62,12 +63,8 @@ export default async function handler(
         },
       });
 
-      await prisma.systemLog.create({
-        data: {
-          level: "INFO",
-          message: `Admin ${session.user.email} retried email to ${emailLog?.to}`,
-          meta: JSON.stringify({ adminId: session.user.id, emailLogId: id, to: emailLog?.to }),
-        },
+      logger.info(`Admin ${session.user.email} retried email to ${emailLog?.to}`, {
+        adminId: session.user.id, emailLogId: id, to: emailLog?.to,
       });
 
       res.status(200).json(updated);

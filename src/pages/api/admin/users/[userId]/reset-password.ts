@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 import bcrypt from "bcryptjs";
+import { logger } from "@/lib/logger";
 
 /** POST: reset a user's password (admin only). */
 export default async function handler(
@@ -36,12 +37,8 @@ export default async function handler(
       data: { password: hashedPassword },
     });
 
-    await prisma.systemLog.create({
-      data: {
-        level: "INFO",
-        message: `Admin ${session.user.email} reset password for ${user?.email || userId}`,
-        meta: JSON.stringify({ adminId: session.user.id, userId, userEmail: user?.email }),
-      },
+    logger.info(`Admin ${session.user.email} reset password for ${user?.email || userId}`, {
+      adminId: session.user.id, userId, userEmail: user?.email,
     });
 
     res.status(200).json({ success: true, message: "Password reset successfully" });

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { resolvePrismaDbPath } from "./prisma";
+import { logger } from "./logger";
 
 /** Directory where database backups are stored. */
 const BACKUP_DIR = path.join(process.cwd(), "backups");
@@ -46,7 +47,7 @@ export function createBackup(): string | null {
     console.log(`[Backup] Created: ${backupName}`);
     return backupName;
   } catch (err) {
-    console.error("[Backup] Error creating backup:", err);
+    logger.error("[Backup] Error creating backup", { error: String(err) });
     return null;
   }
 }
@@ -72,7 +73,7 @@ export function cleanupOldBackups(): void {
       }
     }
   } catch (err) {
-    console.error("[Backup] Error cleaning up old backups:", err);
+    logger.error("[Backup] Error cleaning up old backups", { error: String(err) });
   }
 }
 

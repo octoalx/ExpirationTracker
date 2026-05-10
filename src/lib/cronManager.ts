@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { sendDailyUrgentNotifications, sendWarningNotifications } from "../services/notificationService";
 import { prisma } from "./prisma";
 import { createBackup } from "./backupService";
+import { logger } from "./logger";
 
 /** Timezone used for all scheduled tasks. */
 const TIMEZONE = "Europe/Minsk";
@@ -26,7 +27,7 @@ async function updateExpiredProducts() {
     });
     if (result.count > 0) console.log(`[Cron] Updated ${result.count} expired products`);
   } catch (err) {
-    console.error("[Cron] Error updating expired products:", err);
+    logger.error("[Cron] Error updating expired products", { error: String(err) });
   }
 }
 
@@ -43,16 +44,63 @@ async function runScheduledNotifications() {
     if (s.urgentNotifyTime === nowTime) {
       console.log(`[Cron] Urgent notify time matched (${nowTime}) for user ${s.userId}`);
       sendDailyUrgentNotifications(s.userId).catch((e) =>
-        console.error("[Cron] Error sending urgent notifications:", e)
+        logger.error("[Cron] Error sending urgent notifications", { userId: s.userId, error: String(e) })
       );
     }
     if (s.warningNotifyTime === nowTime) {
       console.log(`[Cron] Warning notify time matched (${nowTime}) for user ${s.userId}`);
       sendWarningNotifications(s.userId).catch((e) =>
-        console.error("[Cron] Error sending warning notifications:", e)
+        logger.error("[Cron] Error sending warning notifications", { userId: s.userId, error: String(e) })
       );
     }
   }
+}
+
+/** Max age of SystemLog entries to retain (days). */
+const LOG_RETENTION_DAYS = 30;
+/** Max total SystemLog rows to retain. */
+const LOG_MAX_ROWS = 5000;
+
+/** Deletes SystemLog entries older than LOG_RETENTION_DAYS and trims to LOG_MAX_ROWS. */
+async function pruneOldLogs() {
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - LOG_RETENTION_DAYS);
+
+    const deleted = await prisma.systemLog.deleteMany({
+      where: { timestamp: { lt: cutoff } },
+    });
+
+    const total = await prisma.systemLog.count();
+    if (total > LOG_MAX_ROWS) {
+      const oldest = await prisma.systemLog.findMany({
+        orderBy: { timestamp: "asc" },
+        take: total - LOG_MAX_ROWS,
+        select: { id: true },
+      });
+      await prisma.systemLog.deleteMany({
+        where: { id: { in: oldest.map((r) => r.id) } },
+      });
+      console.log(`[Cron] Pruned ${oldest.length} excess log rows (cap: ${LOG_MAX_ROWS})`);
+    }
+
+    if (deleted.count > 0) {
+      console.log(`[Cron] Pruned ${deleted.count} log entries older than ${LOG_RETENTION_DAYS} days`);
+    }
+  } catch (err) {
+    logger.error("[Cron] Error pruning old logs", { error: String(err) });
+  }
+}
+
+/** Tracks the last date log pruning was executed. */
+let lastPruneDate: string | null = null;
+
+/** Runs daily log pruning once per day. */
+async function runScheduledLogPrune() {
+  const today = new Date().toISOString().split("T")[0];
+  if (lastPruneDate === today) return;
+  lastPruneDate = today;
+  await pruneOldLogs();
 }
 
 /** Tracks the last date a backup was executed to prevent duplicates within a day. */
@@ -73,7 +121,12 @@ async function runScheduledBackup() {
   for (const s of settings) {
     if (s.backupTime === nowTime) {
       console.log(`[Cron] Backup time matched (${nowTime})`);
-      createBackup();
+      const backupName = createBackup();
+      if (backupName) {
+        logger.info("[Cron] Scheduled backup created", { file: backupName });
+      } else {
+        logger.error("[Cron] Scheduled backup failed");
+      }
       lastBackupDate = today;
       break;
     }
@@ -85,9 +138,10 @@ async function runScheduledBackup() {
 const minuteTask = cron.schedule(
   "* * * * *",
   () => {
-    updateExpiredProducts().catch((e) => console.error("[Cron] Error:", e));
-    runScheduledNotifications().catch((e) => console.error("[Cron] Error:", e));
-    runScheduledBackup().catch((e) => console.error("[Cron] Backup error:", e));
+    updateExpiredProducts().catch((e) => logger.error("[Cron] Error", { error: String(e) }));
+    runScheduledNotifications().catch((e) => logger.error("[Cron] Error", { error: String(e) }));
+    runScheduledBackup().catch((e) => logger.error("[Cron] Backup error", { error: String(e) }));
+    runScheduledLogPrune().catch((e) => logger.error("[Cron] Log prune error", { error: String(e) }));
   },
   { scheduled: false, timezone: TIMEZONE },
 );

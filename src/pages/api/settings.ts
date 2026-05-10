@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma";
 import { apiErrorHandler } from "../../lib/apiErrorHandler";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../lib/auth";
+import { logger } from "../../lib/logger";
 
 /** GET: fetch user settings | POST: update user profile and settings. */
 export default async function handler(
@@ -101,6 +102,7 @@ export default async function handler(
         }),
       ]);
 
+      logger.info("User updated settings", { userId });
       res.status(200).json({ success: true });
     } catch (error) {
       apiErrorHandler(error, res);

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
+import { logger } from "@/lib/logger";
 
 /** GET: export full database backup as a JSON download (admin only). */
 export default async function handler(
@@ -20,13 +21,7 @@ export default async function handler(
   }
 
   try {
-    await prisma.systemLog.create({
-      data: {
-        level: "INFO",
-        message: `Admin ${session.user.email} exported database backup`,
-        meta: JSON.stringify({ adminId: session.user.id }),
-      },
-    });
+    logger.info(`Admin ${session.user.email} exported database backup`, { adminId: session.user.id });
 
     const [users, products, settings, systemLogs, emailLogs] = await Promise.all([
       prisma.user.findMany({

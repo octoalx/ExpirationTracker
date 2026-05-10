@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { Role } from "@prisma/client";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
+import { logger } from "./logger";
 
 /** NextAuth configuration — credentials provider with bcrypt password verification. */
 export const authOptions: NextAuthOptions = {
@@ -24,6 +25,7 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!user || !user.password) {
+            logger.warn("Login failed: user not found", { email: credentials.email });
             return null;
           }
 
@@ -35,10 +37,11 @@ export const authOptions: NextAuthOptions = {
           if (isValid) {
             return user;
           } else {
+            logger.warn("Login failed: wrong password", { email: credentials.email });
             return null;
           }
         } catch (error) {
-          console.error("Error in authorize function:", error);
+          logger.error("Login error", { email: credentials.email, error: String(error) });
           return null;
         }
       },

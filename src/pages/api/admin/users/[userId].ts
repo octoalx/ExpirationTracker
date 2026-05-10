@@ -4,6 +4,7 @@ import { Role } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
+import { logger } from "@/lib/logger";
 
 /** DELETE: remove a user | PUT: change a user's role (admin only). */
 export default async function handler(
@@ -23,12 +24,8 @@ export default async function handler(
       await prisma.user.delete({
         where: { id: userId as string },
       });
-      await prisma.systemLog.create({
-        data: {
-          level: "INFO",
-          message: `Admin ${session.user.email} deleted user ${user?.email || userId}`,
-          meta: JSON.stringify({ adminId: session.user.id, userId, userEmail: user?.email }),
-        },
+      logger.info(`Admin ${session.user.email} deleted user ${user?.email || userId}`, {
+        adminId: session.user.id, userId, userEmail: user?.email,
       });
       res.status(204).end();
     } catch (error) {
@@ -44,12 +41,8 @@ export default async function handler(
         where: { id: userId as string },
         data: { role },
       });
-      await prisma.systemLog.create({
-        data: {
-          level: "INFO",
-          message: `Admin ${session.user.email} changed role of ${updatedUser.email} to ${role}`,
-          meta: JSON.stringify({ adminId: session.user.id, userId, newRole: role, userEmail: updatedUser.email }),
-        },
+      logger.info(`Admin ${session.user.email} changed role of ${updatedUser.email} to ${role}`, {
+        adminId: session.user.id, userId, newRole: role, userEmail: updatedUser.email,
       });
       res.status(200).json(updatedUser);
     } catch (error) {
