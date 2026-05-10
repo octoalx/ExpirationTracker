@@ -3,6 +3,9 @@ set -e
 
 echo "=== ExpirationTracker Deploy ==="
 
+echo "[0/4] Pulling latest code..."
+git pull origin main
+
 # Check .env exists
 if [ ! -f ".env" ]; then
   echo "ERROR: .env file not found. Copy .env.example to .env and fill in values."
