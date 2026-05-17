@@ -24,12 +24,15 @@ RUN npm rebuild better-sqlite3
 
 # Stage 3: Production deps only
 FROM node:22-alpine AS production-deps
+RUN --mount=type=cache,target=/etc/apk/cache \
+    apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --ignore-scripts --legacy-peer-deps --omit=dev
 RUN npx prisma generate --schema=./prisma/schema.prisma --generator=client
+RUN npm rebuild better-sqlite3
 
 # Stage 4: Runner with minimal deps
 FROM node:22-alpine AS runner
