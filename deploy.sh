@@ -25,8 +25,8 @@ echo "      Ensuring data/backups directories exist with correct permissions..."
 mkdir -p ./data ./backups
 sudo chown -R 1001:1001 ./data ./backups 2>/dev/null || chown -R 1001:1001 ./data ./backups 2>/dev/null || chmod 777 ./data ./backups
 
-echo "[2/4] Building image (no cache)..."
-docker compose build --no-cache
+echo "[2/4] Building image..."
+docker compose build
 
 echo "[3/4] Starting containers..."
 docker compose up -d
