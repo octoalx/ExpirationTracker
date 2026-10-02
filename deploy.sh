@@ -12,14 +12,14 @@ if [ ! -f ".env" ]; then
   exit 1
 fi
 
-# Check port 8881 is free
-if ss -tlnp 2>/dev/null | grep -q ':8881 ' || netstat -tlnp 2>/dev/null | grep -q ':8881 '; then
-  echo "ERROR: Port 8881 is already in use. Free it before deploying."
-  exit 1
-fi
-
 echo "[1/4] Stopping existing containers..."
 docker compose down --remove-orphans || true
+
+# Check port 8881 is free
+if ss -tlnp 2>/dev/null | grep -q ':8881 ' || netstat -tlnp 2>/dev/null | grep -q ':8881 '; then
+  echo "ERROR: Port 8881 is already in use by another service. Free it before deploying."
+  exit 1
+fi
 
 echo "      Ensuring data/backups directories exist with correct permissions..."
 mkdir -p ./data ./backups

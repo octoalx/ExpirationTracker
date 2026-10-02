@@ -2,6 +2,13 @@
 
 Web app for tracking product expiration dates with notifications via email and Telegram. Built with Next.js 14, TypeScript, Tailwind CSS, Prisma ORM + SQLite.
 
+## Development with AI
+
+Start with [AGENTS.md](AGENTS.md), the shared engineering contract, and the
+[development workflow](docs/engineering/README.md). Run `npm run verify` for local
+tooling checks. Missing application prerequisites are reported explicitly; see
+the [current baseline limitations](docs/engineering/development.md).
+
 ---
 
 ## Table of Contents

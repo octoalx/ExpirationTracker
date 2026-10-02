@@ -49,9 +49,12 @@ skills-lock.json
 
 # Local planning & docs
 plan.md
-docs/
+# Shared engineering documentation is versioned.
 *.original.md
 PROJECT_INFO.md
 STYLE_GUIDE.md
 DOCKER.md
 SECURITY_AUDIT.md
+
+# Local verification evidence
+.verification/

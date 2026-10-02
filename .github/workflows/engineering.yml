@@ -1,0 +1,22 @@
+name: Engineering tooling
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  tooling:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check instruction budget and documentation
+        run: npm run check:context
+      - name: Test verification tooling
+        run: npm run test:harness
