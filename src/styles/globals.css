@@ -323,8 +323,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .inventory-row { border-radius: 12px; transition: background-color 150ms ease; }
 .inventory-row:hover { background: #f1f5f9; }
 .inventory-row:focus-visible { outline: 2px solid #1554b5; outline-offset: -2px; }
-.record-actions button { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: .5rem .75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff; }
-.record-actions svg { width: 16px; height: 16px; }
 .record-actions { animation: reveal-record 180ms ease-out; }
 .scan-result { animation: reveal-record 180ms ease-out; }
 @keyframes reveal-record { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }

@@ -13,7 +13,8 @@ test("desktop and mobile inventory render saved urgency thresholds consistently"
   const render = (urgentThreshold: number, warningThreshold: number) => renderToStaticMarkup(createElement(ProductTableEnhanced,
     { products: [product], urgentThreshold, warningThreshold, referenceDate }));
   const safe = render(3, 7);
-  assert.ok(safe.includes("В норме"));
+  assert.ok(!safe.includes("В норме"), "Mobile safe status no longer shows the old label");
+  assert.ok(safe.includes("20 дн."), "Safe status shows remaining days");
   assert.ok(!safe.includes("Внимание · 20 дн."));
   const warning = render(3, 30);
   assert.ok(warning.includes("Внимание · 20 дн."), "Desktop displays warning and days");

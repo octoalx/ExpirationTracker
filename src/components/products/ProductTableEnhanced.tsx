@@ -54,6 +54,8 @@ interface ProductTableEnhancedProps {
   referenceDate?: Date;
   onProductEdit?: (product: Product) => void;
   onProductDelete?: (product: Product) => void;
+  /** Called after a deferred mobile delete has been committed to the server. */
+  onProductRemoved?: (productId: string) => void;
   onProductConsume?: (product: Product) => void;
   onProductMoveToActive?: (product: Product) => void;
   onProductArchive?: (product: Product) => void;
@@ -119,6 +121,7 @@ export function ProductTableEnhanced({
   referenceDate,
   onProductEdit,
   onProductDelete,
+  onProductRemoved,
   onProductConsume,
   onProductMoveToActive,
   onProductArchive,
@@ -651,7 +654,7 @@ export function ProductTableEnhanced({
       )}
       {actionBar}
 
-      <div className="md:hidden"><MobileProductList products={products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
+      <div className="md:hidden"><MobileProductList products={products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductRemoved={onProductRemoved} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
       <div className="hidden md:block rounded-xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/50">

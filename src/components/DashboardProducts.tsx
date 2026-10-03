@@ -385,6 +385,7 @@ export function DashboardProducts() {
                 warningThreshold={settings?.warningThreshold}
                 onProductEdit={handleEdit}
                 onProductDelete={handleDelete}
+                onProductRemoved={deleteProduct}
                 onProductConsume={handleConsume}
                 onSelectionChange={setBulkIds}
                 actionBar={actionBar}

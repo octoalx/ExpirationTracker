@@ -636,6 +636,7 @@ const Dashboard = () => {
               }}
               onProductUpdated={updateProduct}
               onProductDelete={(p) => deleteProduct(p.id)}
+              onProductRemoved={(id) => setProducts((prev) => prev.filter((p) => p.id !== id))}
               onProductConsume={onProductConsumed}
               onProductMoveToActive={(p) => {
                 fetch(`/api/products/${p.id}`, {
