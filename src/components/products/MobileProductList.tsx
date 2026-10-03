@@ -9,8 +9,6 @@ interface Props {
   urgentThreshold?: number;
   warningThreshold?: number;
   referenceDate?: Date;
-  selectedIds?: string[];
-  onSelectionChange?: (ids: string[]) => void;
   onProductEdit?: (product: Product) => void;
   onProductDelete?: (product: Product) => void;
   onProductArchive?: (product: Product) => void;
@@ -21,10 +19,8 @@ interface Props {
 /** Phone inventory: readable dates and progressive disclosure of record actions. */
 export default function MobileProductList(props: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [deleteCandidate, setDeleteCandidate] = useState<string | null>(null);
-  const [selecting, setSelecting] = useState(false);
   return <div className="inventory-list">
-    <div className="flex items-center justify-between pb-2 text-sm text-slate-600"><span>Товар</span>{props.onSelectionChange && <button className="min-h-11 px-2 text-blue-700" onClick={() => { setSelecting(!selecting); if (selecting) props.onSelectionChange?.([]); }}>{selecting ? "Отмена выбора" : "Выбрать"}</button>}<span className="pr-8">Годен до</span></div>
+    <div className="flex items-center justify-between pb-2 text-sm text-slate-600"><span>Товар</span><span className="pr-8">Годен до</span></div>
     {props.products.map(product => {
       const urgency = getExpiryStatus(product.expiryDate, props.urgentThreshold, props.warningThreshold, props.referenceDate);
       const days = product.expiryDate ? differenceInDays(startOfDay(new Date(product.expiryDate)), startOfDay(props.referenceDate ?? new Date())) : null;
@@ -33,16 +29,11 @@ export default function MobileProductList(props: Props) {
         ? days === 0 ? "сегодня" : days === 1 ? "1 день" : `${days} дн.`
         : null;
       const open = expanded === product.id;
-      const selected = props.selectedIds?.includes(product.id) ?? false;
       const StatusIcon = product.status === "ARCHIVED" ? Archive : product.status === "DEFECT" ? AlertTriangle : CheckCircle2;
       return <div key={product.id} className="border-t border-slate-200">
-        <div className={cn("inventory-record my-2 rounded-xl", (open || selected) && "inventory-record-highlighted")}>
+        <div className={cn("inventory-record my-2 rounded-xl", open && "inventory-record-highlighted")}>
         <div className="flex items-center gap-1">
-          {props.onSelectionChange && selecting && <label className="flex h-12 w-9 shrink-0 items-center justify-center">
-            <input type="checkbox" className="size-4 accent-blue-700" aria-label={`Выбрать ${product.name}`} checked={props.selectedIds?.includes(product.id) ?? false}
-              onChange={event => props.onSelectionChange?.(event.target.checked ? [...(props.selectedIds ?? []), product.id] : (props.selectedIds ?? []).filter(id => id !== product.id))} />
-          </label>}
-          <button type="button" aria-expanded={open} aria-controls={`record-${product.id}`} onClick={() => { setExpanded(open ? null : product.id); setDeleteCandidate(null); }} className="inventory-row flex min-w-0 flex-1 items-center gap-2 px-3 py-4 text-left">
+          <button type="button" aria-expanded={open} aria-controls={`record-${product.id}`} onClick={() => { setExpanded(open ? null : product.id); }} className="inventory-row flex min-w-0 flex-1 items-center gap-2 px-3 py-4 text-left">
             <span className="min-w-0 flex-1"><span className="block text-base font-bold leading-snug text-slate-950 break-words">{product.name}</span>
               <span className="mt-1.5 flex items-start gap-2 text-sm tabular-nums text-slate-600"><ScanBarcode aria-hidden="true" strokeWidth={1.75} className="mt-0.5 size-4 shrink-0" /><span className="min-w-0 break-all">{product.barcode}</span></span>
               <span className="mt-1 block text-sm text-slate-600">{product.quantity == null ? "Количество не указано" : `${product.quantity} шт.`}</span>
@@ -56,15 +47,15 @@ export default function MobileProductList(props: Props) {
             <ChevronDown aria-hidden="true" className={cn("size-4 shrink-0 text-slate-500 transition-transform", open && "rotate-180")} />
           </button>
         </div>
+        {props.onProductDelete && <div className="flex items-center justify-end gap-2 px-3 pb-2">
+          <button type="button" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-red-700 hover:bg-red-50" aria-label={`Удалить ${product.name}`} onClick={() => props.onProductDelete?.(product)}><Trash2 aria-hidden="true" className="size-5" /></button>
+        </div>}
         {open && <div id={`record-${product.id}`} className="record-actions flex flex-wrap gap-2 px-3 pb-4 pt-1">
           <button onClick={() => props.onProductEdit?.(product)}><Pencil />Изменить</button>
           {product.status !== "ARCHIVED" && <button onClick={() => props.onProductArchive?.(product)}><Archive />В архив</button>}
           {product.status !== "DEFECT" && <button onClick={() => props.onProductDefect?.(product)}><AlertTriangle />В брак</button>}
           {product.status !== "ACTIVE" && <button onClick={() => props.onProductMoveToActive?.(product)}><CheckCircle2 />В активные</button>}
-          <button className="text-red-700" onClick={() => {
-            if (deleteCandidate === product.id) props.onProductDelete?.(product);
-            else setDeleteCandidate(product.id);
-          }}><Trash2 />{deleteCandidate === product.id ? "Подтвердить удаление" : "Удалить"}</button>
+
         </div>}
         </div>
       </div>;

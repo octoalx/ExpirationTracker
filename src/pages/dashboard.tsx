@@ -102,9 +102,10 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
       <button
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage === 1}
-        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
+        aria-label="Предыдущая страница"
+        className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft aria-hidden="true" className="h-4 w-4" />
       </button>
       {pages.map((page) => (
         <button
@@ -130,16 +131,18 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
       <button
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
         disabled={currentPage === totalPages}
-        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
+        aria-label="Следующая страница"
+        className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
       >
         <ChevronRight className="h-4 w-4" />
       </button>
 
       {/* Items per page selector */}
-      <div className="flex items-center gap-2 ml-4 pl-4 border-l border-slate-200 dark:border-slate-700">
+      <div className="flex w-full items-center justify-center gap-2 pt-2 md:ml-4 md:w-auto md:border-l md:border-slate-200 md:pl-4 md:pt-0 dark:md:border-slate-700">
         <span className="text-sm text-slate-500">На странице:</span>
         <select
           value={itemsPerPage}
+          aria-label="Товаров на странице"
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
           className="text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
         >
@@ -493,7 +496,7 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm px-4 py-3 shadow-lg"
+            className="hidden flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 md:flex bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm px-4 py-3 shadow-lg"
           >
             <span className="text-sm font-medium text-slate-600 dark:text-slate-300 mr-2">
               Выбрано: <span className="text-blue-600 font-bold">{selectedIds.length}</span>

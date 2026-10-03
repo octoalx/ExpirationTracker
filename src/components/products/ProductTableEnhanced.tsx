@@ -651,7 +651,7 @@ export function ProductTableEnhanced({
       )}
       {actionBar}
 
-      <div className="md:hidden"><MobileProductList products={products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} selectedIds={selectedIds} onSelectionChange={onSelectionChange} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
+      <div className="md:hidden"><MobileProductList products={products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
       <div className="hidden md:block rounded-xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/50">
