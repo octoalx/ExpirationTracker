@@ -32,3 +32,27 @@ test('production CSS preserves desktop centering and a mobile transform reset', 
   assert.ok(centered, 'Desktop centering must survive CSS optimization');
   assert.ok(mobileReset, 'Mobile full-screen positioning must survive CSS optimization');
 });
+
+test('mobile product dialog cannot scroll sideways and wraps long barcodes', async () => {
+  const source = fs.readFileSync('src/styles/globals.css', 'utf8');
+  const compiled = await postcss([tailwind({ base: process.cwd() })]).process(source, { from: 'src/styles/globals.css' });
+  const optimized = await postcss([cssnano({}, postcss)]).process(compiled.css, { from: undefined });
+  let clipped = false;
+  let wrapped = false;
+  optimized.root.walkRules(rule => {
+    const declarations = Object.fromEntries(rule.nodes.filter(node => node.type === 'decl').map(node => [node.prop, node.value]));
+    if (rule.selector.includes('.product-dialog[data-slot=dialog-content]') && declarations['overflow-x']) {
+      assert.equal(rule.parent.name, 'media');
+      assert.match(rule.parent.params, /max-width:\s*767px/);
+      assert.equal(declarations['overflow-x'], 'hidden');
+      assert.equal(declarations['touch-action'], 'pan-y');
+      clipped = true;
+    }
+    if (rule.selector.includes('.product-entry summary')) {
+      assert.equal(declarations['overflow-wrap'], 'anywhere');
+      wrapped = true;
+    }
+  });
+  assert.ok(clipped, 'Mobile product dialog must clip horizontal overflow');
+  assert.ok(wrapped, 'Long barcode in the summary must wrap instead of widening the form');
+});

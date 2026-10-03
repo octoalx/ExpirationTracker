@@ -5,7 +5,7 @@
   "scripts": {
     "check:context": "node scripts/check-context.mjs",
     "test:harness": "node --test tests/harness.test.mjs",
-    "test:app": "node --import tsx --test tests/instrumentation.test.cjs tests/catalog-api.test.cjs tests/catalog-parser.test.ts tests/inventory-import.test.ts tests/mobile-product-flow.test.ts tests/stats-api.test.cjs tests/admin-recovery.test.cjs",
+    "test:app": "node --import tsx --test tests/instrumentation.test.cjs tests/catalog-api.test.cjs tests/catalog-parser.test.ts tests/inventory-import.test.ts tests/mobile-product-flow.test.ts tests/stats-api.test.cjs tests/admin-recovery.test.cjs tests/dialog-css.test.cjs",
     "typecheck": "tsc --noEmit --incremental false",
     "verify": "node scripts/verify.mjs",
     "verify:release": "node scripts/verify.mjs --profile release",

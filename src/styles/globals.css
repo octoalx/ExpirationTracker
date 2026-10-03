@@ -298,7 +298,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Keep centering in one transform: production CSS optimization can merge
    individual translate resets without overriding Tailwind's translate utility. */
 .dialog-surface { top: 50%; left: 50%; transform: translate(-50%, -50%); }
-.product-entry, .product-entry fieldset { min-width: 0; }
+.product-entry, .product-entry fieldset, .product-entry details { min-width: 0; }
+.product-entry summary { overflow-wrap: anywhere; }
+.product-entry input[type="date"] { min-inline-size: 0; max-width: 100%; }
 .product-entry label { display: block; margin-bottom: .5rem; color: #334155; font-size: 14px; font-weight: 550; }
 .product-entry input {
   min-width: 0; width: 100%; min-height: 48px; padding: .75rem .9rem;
@@ -340,7 +342,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .work-panel [data-slot="dialog-close"] { min-width: 44px; min-height: 44px; }
   .product-dialog[data-slot="dialog-content"] {
     grid-template-columns: minmax(0, 1fr);
+    overflow-x: hidden;
     overscroll-behavior: contain;
+    touch-action: pan-y;
     scroll-padding-top: calc(5rem + env(safe-area-inset-top));
     padding-left: max(1rem, env(safe-area-inset-left));
     padding-right: max(1rem, env(safe-area-inset-right));
