@@ -1,5 +1,22 @@
 # Active context
 
+## Latest production release — admin and settings, 2026-10-03
+- Owner authorized committing and deploying all current changes. Source commit
+  4e3cf91 is deployed from releases/20261003-admin-settings on the same confirmed
+  Alex@146.103.42.228:34657 target; server checkout preserved, no push.
+- Deployed expirationtracker-admin-settings:20261003, image ID
+  sha256:c64219e2c0a296710244025fcb2d834c6ba6f54cc17265627247a751527c0ed3.
+- Includes empty threshold input handling, mobile days below urgency, integration
+  alignment and admin account creation. Existing mobile/date/scanner changes included.
+- Release gate PASS (38 application tests, 3 harness, typecheck/context); Linux build,
+  isolated admin/employee login and creation, critical flows and preservation PASS.
+  Production healthy, background jobs started, 11 assets HTTP 200, Access HTTP 302.
+- Both users, 434 products, 106 catalog entries and settings preserved exactly.
+  Backups pre-admin-settings-20261003.db and pre-admin-settings-switch-20261003.db
+  are restricted and intact; rollback expirationtracker-rollback:pre-admin-settings-20261003.
+- Evidence/recovery: docs/plans/2026-10-03-admin-settings-deployment.md.
+  Actual phone/browser visual checks remain unperformed.
+
 ## Production deployment — 2026-10-03
 - Confirmed target: Alex@146.103.42.228, SSH port 34657; workspace
   /home/Alex/ExpirationTracker; site https://expiry.axnode.xyz behind Cloudflare Access.
