@@ -16,6 +16,7 @@ Read additional context only when relevant:
 | --- | --- |
 | Start or verify local work | [Development](development.md) |
 | Prepare a production release | [Release](release.md) |
+| Update the shared scanner reference | [Catalog updates](catalog-updates.md) |
 | Resume unfinished work | [Active context](../../memory-bank/activeContext.md) |
 | Plan a significant change | [Plan template](../plans/TEMPLATE.md) |
 

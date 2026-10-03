@@ -8,6 +8,8 @@ import {
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 
+const CatalogImport = dynamic(() => import("@/components/CatalogImport"), { ssr: false });
+
 const UsersTab = dynamic(() => import("@/components/admin/UsersTab"), { ssr: false });
 const LogsTab = dynamic(() => import("@/components/admin/LogsTab"), { ssr: false });
 const BackupTab = dynamic(() => import("@/components/admin/BackupTab"), { ssr: false });
@@ -15,6 +17,7 @@ const BackupTab = dynamic(() => import("@/components/admin/BackupTab"), { ssr: f
 const tabs = [
   { id: "users", label: "Пользователи", icon: Users },
   { id: "logs", label: "Журнал", icon: FileText },
+  { id: "catalog", label: "Каталог", icon: Database },
   { id: "backup", label: "Копии данных", icon: Database },
 ];
 
@@ -42,6 +45,8 @@ export default function AdminPage() {
         return <UsersTab />;
       case "logs":
         return <LogsTab />;
+      case "catalog":
+        return <CatalogImport />;
       case "backup":
         return <BackupTab />;
       default:
@@ -51,7 +56,7 @@ export default function AdminPage() {
 
   if (status === "loading") return <p role="status" className="p-4 text-slate-600">Проверка доступа…</p>;
   if (session?.user?.role !== "ADMIN") return <div className="work-surface p-5"><h1>Нет доступа</h1><p className="mt-3 text-sm text-slate-600">Этот раздел доступен администратору.</p></div>;
-  const descriptions: Record<string, string> = { users: "Учётные записи и доступ сотрудников. Изменение роли влияет на доступ к управлению системой.", logs: "События приложения: ошибки, предупреждения и информационные записи.", backup: "Резервные копии и перенос данных. Восстановление заменяет текущие данные — проверьте выбранную копию." };
+  const descriptions: Record<string, string> = { catalog: "Общий справочник штрихкодов и названий для сканера всех пользователей. Количество и сроки из файла не импортируются.", users: "Учётные записи и доступ сотрудников. Изменение роли влияет на доступ к управлению системой.", logs: "События приложения: ошибки, предупреждения и информационные записи.", backup: "Резервные копии и перенос данных. Восстановление заменяет текущие данные — проверьте выбранную копию." };
   return (
     <div className="admin-workspace mx-auto max-w-6xl">
       {/* Header */}
@@ -76,7 +81,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="relative mb-8">
-        <div className="grid grid-cols-3 gap-1 pb-px">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 pb-px">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
             return (

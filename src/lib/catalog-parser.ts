@@ -36,9 +36,9 @@ function csvRecords(text: string): string[][] {
   return records;
 }
 
-export function validateCatalogEntries(input: unknown): CatalogEntryInput[] {
-  if (!Array.isArray(input) || !input.length || input.length > 10000) {
-    throw new Error("Каталог должен содержать от 1 до 10000 товаров");
+export function validateCatalogEntries(input: unknown, maxEntries = 10000): CatalogEntryInput[] {
+  if (!Array.isArray(input) || !input.length || input.length > maxEntries) {
+    throw new Error(`Каталог должен содержать от 1 до ${maxEntries} товаров`);
   }
   const entries = new Map<string, CatalogEntryInput>();
   for (const [index, raw] of input.entries()) {
@@ -58,7 +58,7 @@ export function validateCatalogEntries(input: unknown): CatalogEntryInput[] {
   return [...entries.values()];
 }
 
-export function parseCatalogCsv(text: string): CatalogEntryInput[] {
+export function parseCatalogCsv(text: string, maxEntries = 10000): CatalogEntryInput[] {
   const [header, ...rows] = csvRecords(text.replace(/^\uFEFF/, ""));
   const barcodeColumn = header?.findIndex(cell => cell.trim().toLowerCase().startsWith("штрих-код"));
   const nameColumn = header?.findIndex(cell => cell.trim().toLowerCase() === "наименование товара");
@@ -68,5 +68,5 @@ export function parseCatalogCsv(text: string): CatalogEntryInput[] {
   // The supplied export ends with an empty barcode and a numeric row total.
   const last = rows.at(-1);
   if (last && !last[barcodeColumn]?.trim() && /^\d+$/.test(last[nameColumn]?.trim() ?? "") && Number(last[nameColumn]) === rows.length - 1) rows.pop();
-  return validateCatalogEntries(rows.map(row => ({ barcode: row[barcodeColumn], name: row[nameColumn] })));
+  return validateCatalogEntries(rows.map(row => ({ barcode: row[barcodeColumn], name: row[nameColumn] })), maxEntries);
 }

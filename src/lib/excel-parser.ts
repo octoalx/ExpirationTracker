@@ -122,7 +122,7 @@ function parseCatalog(ws: XLSX.WorkSheet): { products: ParsedProduct[]; errors: 
     const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
     if (cell && typeof cell.v === "string") {
       const val = cell.v.trim().toLowerCase();
-      if (val.includes("штрих-код осн")) barcodeCol = c;
+      if (val.startsWith("штрих-код")) barcodeCol = c;
       else if (val === "наименование товара") nameCol = c;
       else if (val === "доступно") qtyCol = c;
     }
@@ -158,8 +158,8 @@ function parseCatalog(ws: XLSX.WorkSheet): { products: ParsedProduct[]; errors: 
  * @param buffer - Raw Excel file buffer.
  * @returns Parsed products, detected file type, and any parsing errors.
  */
-export function parseExcelFile(buffer: Buffer): ParseResult {
-  const workbook = XLSX.read(buffer, { type: "buffer" });
+export function parseExcelFile(buffer: Buffer | ArrayBuffer): ParseResult {
+  const workbook = XLSX.read(buffer, { type: buffer instanceof ArrayBuffer ? "array" : "buffer" });
   const sheetName = workbook.SheetNames[0];
   const ws = workbook.Sheets[sheetName];
 
