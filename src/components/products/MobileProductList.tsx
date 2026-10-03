@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { cn, getExpiryStatus } from "@/lib/utils";
 import { createPendingDeletes, type PendingDeletes } from "@/lib/pending-delete";
 import { resolveSwipe, shouldStartDrag } from "@/lib/swipe-gesture";
-import { formatDaysLeft } from "@/lib/days-left";
+import { DEFAULT_MOBILE_SORT, MOBILE_SORT_OPTIONS, formatDaysLeft, sortProductsForMobile, type MobileSortOption } from "@/lib/days-left";
 import { getProductActions, type ProductStatusActionKey } from "@/lib/product-status-actions";
 
 interface Props {
@@ -21,6 +21,9 @@ interface Props {
   onProductArchive?: (product: Product) => void;
   onProductDefect?: (product: Product) => void;
   onProductMoveToActive?: (product: Product) => void;
+  /** Phone-list order. Controlled when provided; otherwise managed internally. */
+  sortOption?: MobileSortOption;
+  onSortChange?: (sort: MobileSortOption) => void;
 }
 
 const DELETE_DELAY_MS = 6000;
@@ -59,6 +62,12 @@ export default function MobileProductList(props: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ id: string; x: number } | null>(null);
   const [pendingIds, setPendingIds] = useState<string[]>([]);
+  const [internalSort, setInternalSort] = useState<MobileSortOption>(DEFAULT_MOBILE_SORT);
+  const sortOption = props.sortOption ?? internalSort;
+  const handleSortChange = (next: MobileSortOption) => {
+    setInternalSort(next);
+    props.onSortChange?.(next);
+  };
 
   const productsRef = useRef(props.products);
   productsRef.current = props.products;
@@ -216,9 +225,28 @@ export default function MobileProductList(props: Props) {
     }
   };
 
-  const visibleProducts = props.products.filter((product) => !pendingIds.includes(product.id));
+  const visibleProducts = sortProductsForMobile(
+    props.products.filter((product) => !pendingIds.includes(product.id)),
+    sortOption,
+    props.referenceDate,
+  );
 
   return <div className="inventory-list">
+    <div className="flex items-center justify-end pb-1">
+      <label className="flex items-center gap-1.5 text-sm text-slate-600">
+        <span>Сортировка</span>
+        <select
+          aria-label="Сортировка"
+          value={sortOption}
+          onChange={(event) => handleSortChange(event.target.value as MobileSortOption)}
+          className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700"
+        >
+          {MOBILE_SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </label>
+    </div>
     <div className="flex items-center justify-between pb-2 text-sm text-slate-600"><span>Товар</span><span className="pr-8">Годен до</span></div>
     {visibleProducts.map(product => {
       const urgency = getExpiryStatus(product.expiryDate, props.urgentThreshold, props.warningThreshold, props.referenceDate);

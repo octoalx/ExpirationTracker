@@ -25,3 +25,22 @@ test("desktop and mobile inventory render saved urgency thresholds consistently"
   assert.ok(urgent.includes('Срочно<span class="block tabular-nums">20 дн.</span>'), "Mobile displays days below urgent at the boundary");
   assert.ok(urgent.includes("text-red-600"));
 });
+
+test("mobile sort helpers place missing expiry dates last and map status tabs", async () => {
+  const { mobileSortForStatusFilter, sortProductsForMobile } = await import("../src/lib/days-left");
+  const referenceDate = new Date(2026, 9, 3, 12);
+  const make = (id: string, expiryDate: Date | null, createdAt: Date) => ({
+    id, expiryDate, createdAt,
+  });
+  const records = [
+    make("none", null, new Date(2026, 0, 1)),
+    make("late", new Date(2027, 0, 1), new Date(2026, 0, 2)),
+    make("soon", new Date(2026, 9, 5), new Date(2026, 0, 3)),
+  ];
+  assert.deepEqual(sortProductsForMobile(records, "expiring-soonest", referenceDate).map((r) => r.id), ["soon", "late", "none"]);
+  assert.deepEqual(sortProductsForMobile(records, "expiring-latest", referenceDate).map((r) => r.id), ["late", "soon", "none"]);
+  assert.deepEqual(sortProductsForMobile(records, "newest", referenceDate).map((r) => r.id), ["soon", "late", "none"]);
+  assert.equal(mobileSortForStatusFilter("SOON"), "expiring-soonest");
+  assert.equal(mobileSortForStatusFilter("EXPIRED"), "expiring-soonest");
+  assert.equal(mobileSortForStatusFilter("ALL"), "newest");
+});

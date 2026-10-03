@@ -34,6 +34,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import MobileProductList from "./MobileProductList";
+import type { MobileSortOption } from "@/lib/days-left";
 import { EditableCell } from "./EditableCell";
 
 /* ── Column widths ── */
@@ -49,6 +50,12 @@ const COL_WIDTHS = {
 
 interface ProductTableEnhancedProps {
   products: Product[];
+  /**
+   * Page slice for the phone list. The dashboard paginates the globally
+   * mobile-sorted list here so sorting is not limited to the desktop page.
+   * Falls back to `products` when omitted.
+   */
+  mobileProducts?: Product[];
   urgentThreshold?: number;
   warningThreshold?: number;
   referenceDate?: Date;
@@ -67,6 +74,9 @@ interface ProductTableEnhancedProps {
   sortField?: string;
   sortDesc?: boolean;
   onSortChange?: (field: string) => void;
+  /** Phone-list order; controlled by the dashboard when provided. */
+  mobileSort?: MobileSortOption;
+  onMobileSortChange?: (sort: MobileSortOption) => void;
 }
 
 type ExpiryStatus = "expired" | "urgent" | "warning" | "safe";
@@ -116,6 +126,7 @@ const getStatusConfig = (status: ExpiryStatus, daysLeft: number) => {
 /** Enhanced product table with inline editing, sorting, and bulk selection. */
 export function ProductTableEnhanced({
   products,
+  mobileProducts,
   urgentThreshold = 3,
   warningThreshold = 7,
   referenceDate,
@@ -133,6 +144,8 @@ export function ProductTableEnhanced({
   sortField,
   sortDesc,
   onSortChange,
+  mobileSort,
+  onMobileSortChange,
 }: ProductTableEnhancedProps) {
   // Convert selectedIds array to rowSelection object for TanStack Table
   const rowSelection = useMemo(() => {
@@ -654,7 +667,7 @@ export function ProductTableEnhanced({
       )}
       {actionBar}
 
-      <div className="md:hidden"><MobileProductList products={products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductRemoved={onProductRemoved} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
+      <div className="md:hidden"><MobileProductList products={mobileProducts ?? products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} sortOption={mobileSort} onSortChange={onMobileSortChange} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductRemoved={onProductRemoved} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
       <div className="hidden md:block rounded-xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/50">
