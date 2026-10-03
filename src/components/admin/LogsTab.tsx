@@ -100,7 +100,7 @@ export default function LogsTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
@@ -119,13 +119,13 @@ export default function LogsTab() {
                 setPage(1);
               }}
               className={cn(
-                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                "min-h-11 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
                 levelFilter === level
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
               )}
             >
-              {level || "Все"}
+              {({ INFO: "Инфо", WARN: "Предупреждения", ERROR: "Ошибки" } as Record<string, string>)[level] || "Все"}
             </button>
           ))}
         </div>
@@ -150,14 +150,14 @@ export default function LogsTab() {
               key={log.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-4"
+              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-4"
             >
               <div className="flex items-start gap-3">
                 <div className={cn("rounded-lg p-2", levelColors[log.level as keyof typeof levelColors] || levelColors.INFO)}>
                   <Icon className="h-4 w-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
                     <span className={cn(
                       "text-xs font-semibold px-2 py-0.5 rounded-full",
                       levelColors[log.level as keyof typeof levelColors] || levelColors.INFO
@@ -169,11 +169,11 @@ export default function LogsTab() {
                       {new Date(log.timestamp).toLocaleString("ru-RU")}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-700 dark:text-slate-300">{log.message}</p>
+                  <p className="break-words text-sm text-slate-700 dark:text-slate-300">{log.message}</p>
                   {log.meta && (
-                    <pre className="mt-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg overflow-x-auto">
+                    <details className="mt-2"><summary className="min-h-11 cursor-pointer py-2 text-sm text-blue-700">Технические сведения</summary><pre className="max-w-full text-xs text-slate-600 bg-slate-50 p-3 rounded-lg overflow-x-auto">
                       {log.meta}
-                    </pre>
+                    </pre></details>
                   )}
                 </div>
                 <Button
@@ -181,7 +181,7 @@ export default function LogsTab() {
                   variant="ghost"
                   onClick={() => handleDeleteLog(log.id)}
                   disabled={deletingId === log.id}
-                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="size-11 shrink-0 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                   title="Удалить"
                 >
                   {deletingId === log.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
@@ -198,7 +198,7 @@ export default function LogsTab() {
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+            className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -208,7 +208,7 @@ export default function LogsTab() {
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+            className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
           >
             <ChevronRight className="h-4 w-4" />
           </button>

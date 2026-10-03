@@ -19,7 +19,7 @@ interface BackupData {
       id: string;
       name: string;
       barcode: string;
-      expiryDate: string | Date;
+      expiryDate?: string | Date | null;
       status?: string;
       isExpired?: boolean;
       quantity?: number | null;
@@ -68,6 +68,12 @@ export default async function handler(
     if (!data || !data.data) {
       return res.status(400).json({ message: "Invalid backup data" });
     }
+    if (mode !== "merge" && mode !== "replace") {
+      return res.status(400).json({ message: "Invalid restore mode" });
+    }
+    if (data.data.products?.some(product => product.expiryDate != null && !Number.isFinite(new Date(product.expiryDate).getTime()))) {
+      return res.status(400).json({ message: "Invalid expiry date in backup" });
+    }
 
     const results = {
       users: { created: 0, updated: 0, skipped: 0 },
@@ -75,162 +81,163 @@ export default async function handler(
       settings: { created: 0, updated: 0, skipped: 0 },
     };
 
-    // In replace mode, wipe all existing data first
-    if (mode === "replace") {
-      await prisma.$transaction([
-        prisma.emailLog.deleteMany(),
-        prisma.systemLog.deleteMany(),
-        prisma.product.deleteMany(),
-        prisma.settings.deleteMany(),
-        prisma.user.deleteMany(),
-      ]);
-    }
+    // Keep replacement and all imported records atomic if any write fails.
+    await prisma.$transaction(async transaction => {
+      // In replace mode, wipe all existing data first
+      if (mode === "replace") {
+        await transaction.emailLog.deleteMany();
+        await transaction.systemLog.deleteMany();
+        await transaction.product.deleteMany();
+        await transaction.settings.deleteMany();
+        await transaction.user.deleteMany();
+      }
 
-    // Restore users from backup
-    if (data.data.users && data.data.users.length > 0) {
-      for (const user of data.data.users) {
-        if (!user.email) {
-          results.users.skipped++;
-          continue;
-        }
+      // Restore users from backup
+      if (data.data.users && data.data.users.length > 0) {
+        for (const user of data.data.users) {
+          if (!user.email) {
+            results.users.skipped++;
+            continue;
+          }
 
-        const existing = await prisma.user.findUnique({
-          where: { email: user.email },
-        });
-
-        if (existing && mode === "merge") {
-          await prisma.user.update({
-            where: { id: existing.id },
-            data: {
-              name: user.name ?? existing.name,
-              role: (user.role as Role) ?? existing.role,
-            },
+          const existing = await transaction.user.findUnique({
+            where: { email: user.email },
           });
-          results.users.updated++;
-        } else if (!existing) {
-          await prisma.user.create({
-            data: {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: (user.role as Role) ?? Role.USER,
-            },
-          });
-          results.users.created++;
-        } else {
-          results.users.skipped++;
+
+          if (existing && mode === "merge") {
+            await transaction.user.update({
+              where: { id: existing.id },
+              data: {
+                name: user.name ?? existing.name,
+                role: (user.role as Role) ?? existing.role,
+              },
+            });
+            results.users.updated++;
+          } else if (!existing) {
+            await transaction.user.create({
+              data: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: (user.role as Role) ?? Role.USER,
+              },
+            });
+            results.users.created++;
+          } else {
+            results.users.skipped++;
+          }
         }
       }
-    }
 
-    // Restore products from backup
-    if (data.data.products && data.data.products.length > 0) {
-      for (const product of data.data.products) {
-        const userExists = await prisma.user.findUnique({
-          where: { id: product.userId },
-        });
-        if (!userExists) {
-          results.products.skipped++;
-          continue;
-        }
-
-        const existing = await prisma.product.findUnique({
-          where: { id: product.id },
-        });
-
-        if (existing && mode === "merge") {
-          await prisma.product.update({
-            where: { id: existing.id },
-            data: {
-              name: product.name,
-              barcode: product.barcode,
-              expiryDate: new Date(product.expiryDate),
-              status: product.status ?? "ACTIVE",
-              isExpired: product.isExpired ?? false,
-              quantity: product.quantity,
-            },
+      // Restore products from backup
+      if (data.data.products && data.data.products.length > 0) {
+        for (const product of data.data.products) {
+          const userExists = await transaction.user.findUnique({
+            where: { id: product.userId },
           });
-          results.products.updated++;
-        } else if (!existing) {
-          await prisma.product.create({
-            data: {
-              id: product.id,
-              name: product.name,
-              barcode: product.barcode,
-              expiryDate: new Date(product.expiryDate),
-              status: product.status ?? "ACTIVE",
-              isExpired: product.isExpired ?? false,
-              quantity: product.quantity,
-              userId: product.userId,
-              createdAt: product.createdAt ? new Date(product.createdAt) : undefined,
-              updatedAt: product.updatedAt ? new Date(product.updatedAt) : undefined,
-            },
+          if (!userExists) {
+            results.products.skipped++;
+            continue;
+          }
+
+          const existing = await transaction.product.findUnique({
+            where: { id: product.id },
           });
-          results.products.created++;
-        } else {
-          results.products.skipped++;
+
+          if (existing && mode === "merge") {
+            await transaction.product.update({
+              where: { id: existing.id },
+              data: {
+                name: product.name,
+                barcode: product.barcode,
+                expiryDate: product.expiryDate == null ? null : new Date(product.expiryDate),
+                status: product.status ?? "ACTIVE",
+                isExpired: product.isExpired ?? false,
+                quantity: product.quantity,
+              },
+            });
+            results.products.updated++;
+          } else if (!existing) {
+            await transaction.product.create({
+              data: {
+                id: product.id,
+                name: product.name,
+                barcode: product.barcode,
+                expiryDate: product.expiryDate == null ? null : new Date(product.expiryDate),
+                status: product.status ?? "ACTIVE",
+                isExpired: product.isExpired ?? false,
+                quantity: product.quantity,
+                userId: product.userId,
+                createdAt: product.createdAt ? new Date(product.createdAt) : undefined,
+                updatedAt: product.updatedAt ? new Date(product.updatedAt) : undefined,
+              },
+            });
+            results.products.created++;
+          } else {
+            results.products.skipped++;
+          }
         }
       }
-    }
 
-    // Restore settings from backup
-    if (data.data.settings && data.data.settings.length > 0) {
-      for (const settings of data.data.settings) {
-        const userExists = await prisma.user.findUnique({
-          where: { id: settings.userId },
-        });
-        if (!userExists) {
-          results.settings.skipped++;
-          continue;
-        }
+      // Restore settings from backup
+      if (data.data.settings && data.data.settings.length > 0) {
+        for (const settings of data.data.settings) {
+          const userExists = await transaction.user.findUnique({
+            where: { id: settings.userId },
+          });
+          if (!userExists) {
+            results.settings.skipped++;
+            continue;
+          }
 
-        const existing = await prisma.settings.findUnique({
-          where: { userId: settings.userId },
-        });
-
-        if (existing && mode === "merge") {
-          await prisma.settings.update({
+          const existing = await transaction.settings.findUnique({
             where: { userId: settings.userId },
-            data: {
-              telegramNotifications: settings.telegramNotifications ?? existing.telegramNotifications,
-              emailNotifications: settings.emailNotifications ?? existing.emailNotifications,
-              urgentThreshold: settings.urgentThreshold ?? existing.urgentThreshold,
-              warningThreshold: settings.warningThreshold ?? existing.warningThreshold,
-            },
           });
-          results.settings.updated++;
-        } else if (!existing) {
-          await prisma.settings.create({
-            data: {
-              userId: settings.userId,
-              telegramToken: settings.telegramToken,
-              telegramChatId: settings.telegramChatId,
-              telegramNotifications: settings.telegramNotifications ?? true,
-              notificationEmail: settings.notificationEmail,
-              emailNotifications: settings.emailNotifications ?? false,
-              smtpHost: settings.smtpHost,
-              smtpPort: settings.smtpPort,
-              smtpUser: settings.smtpUser,
-              smtpPass: settings.smtpPass,
-              urgentThreshold: settings.urgentThreshold ?? 3,
-              warningThreshold: settings.warningThreshold ?? 7,
-              urgentNotifyTime: settings.urgentNotifyTime ?? "10:00",
-              warningNotifyTime: settings.warningNotifyTime ?? "10:00",
-            },
-          });
-          results.settings.created++;
-        } else {
-          results.settings.skipped++;
+
+          if (existing && mode === "merge") {
+            await transaction.settings.update({
+              where: { userId: settings.userId },
+              data: {
+                telegramNotifications: settings.telegramNotifications ?? existing.telegramNotifications,
+                emailNotifications: settings.emailNotifications ?? existing.emailNotifications,
+                urgentThreshold: settings.urgentThreshold ?? existing.urgentThreshold,
+                warningThreshold: settings.warningThreshold ?? existing.warningThreshold,
+              },
+            });
+            results.settings.updated++;
+          } else if (!existing) {
+            await transaction.settings.create({
+              data: {
+                userId: settings.userId,
+                telegramToken: settings.telegramToken,
+                telegramChatId: settings.telegramChatId,
+                telegramNotifications: settings.telegramNotifications ?? true,
+                notificationEmail: settings.notificationEmail,
+                emailNotifications: settings.emailNotifications ?? false,
+                smtpHost: settings.smtpHost,
+                smtpPort: settings.smtpPort,
+                smtpUser: settings.smtpUser,
+                smtpPass: settings.smtpPass,
+                urgentThreshold: settings.urgentThreshold ?? 3,
+                warningThreshold: settings.warningThreshold ?? 7,
+                urgentNotifyTime: settings.urgentNotifyTime ?? "10:00",
+                warningNotifyTime: settings.warningNotifyTime ?? "10:00",
+              },
+            });
+            results.settings.created++;
+          } else {
+            results.settings.skipped++;
+          }
         }
       }
-    }
 
-    await prisma.systemLog.create({
-      data: {
-        level: "INFO",
-        message: `Admin ${session.user.email} imported database backup (${mode} mode)`,
-        meta: JSON.stringify({ adminId: session.user.id, mode, results }),
-      },
+      await transaction.systemLog.create({
+        data: {
+          level: "INFO",
+          message: `Admin ${session.user.email} imported database backup (${mode} mode)`,
+          meta: JSON.stringify({ adminId: session.user.id, mode, results }),
+        },
+      });
     });
 
     res.status(200).json({

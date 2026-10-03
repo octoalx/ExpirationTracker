@@ -3,8 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
-import { differenceInDays, format, startOfDay, subDays, parseISO } from "date-fns";
-import { ru } from "date-fns/locale";
+import { format, startOfDay, subDays } from "date-fns";
+import { expiryOverview } from "@/lib/expiry-overview";
 
 /** Category mapping based on product name keywords (Russian). */
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
@@ -61,8 +61,8 @@ export default async function handler(
       where: { userId },
     });
 
-    const urgentThreshold = settings?.urgentThreshold || 5;
-    const warningThreshold = settings?.warningThreshold || 30;
+    const urgentThreshold = settings?.urgentThreshold ?? 3;
+    const warningThreshold = settings?.warningThreshold ?? 7;
 
     // Load all products owned by the user
     const products = await prisma.product.findMany({
@@ -85,61 +85,25 @@ export default async function handler(
       DEFECT: 0,
     };
 
-    // Classify products by expiry urgency
-    let expired = 0;
-    let urgent = 0;
-    let warning = 0;
-    let safe = 0;
-
-    const problemProducts: typeof products = [];
-    const productsWithoutQuantity: typeof products = [];
+    const overview = expiryOverview(products, now, urgentThreshold, warningThreshold);
+    const { expired, urgent, warning, safe, unknown } = overview.counts;
+    const productsWithoutQuantity = products.filter(p => p.quantity === null);
     const categoryCounts: Record<string, number> = {};
     let totalQuantity = 0;
     let productsWithQuantity = 0;
-
-    // Track nearest and farthest expiry dates
-    let nearestExpiry: { product: typeof products[0] | null; daysLeft: number } = { product: null, daysLeft: Infinity };
-    let farthestExpiry: { product: typeof products[0] | null; daysLeft: number } = { product: null, daysLeft: -Infinity };
-
-    products.forEach((product) => {
-      const daysLeft = differenceInDays(product.expiryDate, now);
-
-      // Increment status counter
+    for (const product of products) {
       statusCounts[product.status as keyof typeof statusCounts]++;
-
-      // Classify by expiry urgency
-      if (daysLeft < 0) {
-        expired++;
-        problemProducts.push(product);
-      } else if (daysLeft <= urgentThreshold) {
-        urgent++;
-        problemProducts.push(product);
-      } else if (daysLeft <= warningThreshold) {
-        warning++;
-      } else {
-        safe++;
-      }
-
-      // Group by category
       const category = categorizeProduct(product.name);
       categoryCounts[category] = (categoryCounts[category] || 0) + 1;
-
-      // Accumulate quantity metrics
       if (product.quantity !== null) {
         totalQuantity += product.quantity;
         productsWithQuantity++;
-      } else {
-        productsWithoutQuantity.push(product);
       }
-
-      // Update nearest/farthest expiry trackers
-      if (daysLeft < nearestExpiry.daysLeft) {
-        nearestExpiry = { product, daysLeft };
-      }
-      if (daysLeft > farthestExpiry.daysLeft) {
-        farthestExpiry = { product, daysLeft };
-      }
-    });
+    }
+    const serializeExpiry = (entry: typeof overview.dated[number] | undefined) => entry ? {
+      id: entry.product.id, name: entry.product.name, daysLeft: entry.daysLeft,
+      expiryDate: entry.product.expiryDate!.toISOString(),
+    } : null;
 
     // Top 5 products by quantity
     const productsWithQty = products.filter(p => p.quantity !== null);
@@ -165,7 +129,7 @@ export default async function handler(
 
     // Products added per day (last 30 days)
     const productsByDay: Record<string, number> = {};
-    for (let i = 0; i <= 30; i++) {
+    for (let i = 0; i < 30; i++) {
       const date = format(subDays(now, i), "yyyy-MM-dd");
       productsByDay[date] = 0;
     }
@@ -210,21 +174,14 @@ export default async function handler(
       status: emailLogs[0].status,
     } : null;
 
-    // Problem products (expired + urgent) for the detail table
-    const problemProductsTable = problemProducts
-      .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
-      .map(p => {
-        const daysLeft = differenceInDays(p.expiryDate, now);
-        return {
-          id: p.id,
-          name: p.name,
-          barcode: p.barcode,
-          quantity: p.quantity,
-          expiryDate: p.expiryDate.toISOString(),
-          daysLeft,
-          status: daysLeft < 0 ? "expired" as const : "urgent" as const,
-        };
-      });
+    // Active records within the configured warning window, oldest expiry first
+    const problemProductsTable = overview.dated
+      .filter(entry => entry.daysLeft <= warningThreshold)
+      .map(({ product: p, daysLeft }) => ({
+        id: p.id, name: p.name, barcode: p.barcode, quantity: p.quantity,
+        expiryDate: p.expiryDate!.toISOString(), daysLeft,
+        status: daysLeft < 0 ? "expired" : daysLeft <= urgentThreshold ? "urgent" : "warning",
+      }));
 
     res.status(200).json({
       // KPI totals
@@ -239,18 +196,10 @@ export default async function handler(
       urgentCount: urgent,
       warningCount: warning,
       safeCount: safe,
-      nearestExpiry: nearestExpiry.product ? {
-        id: nearestExpiry.product.id,
-        name: nearestExpiry.product.name,
-        daysLeft: nearestExpiry.daysLeft,
-        expiryDate: nearestExpiry.product.expiryDate.toISOString(),
-      } : null,
-      farthestExpiry: farthestExpiry.product ? {
-        id: farthestExpiry.product.id,
-        name: farthestExpiry.product.name,
-        daysLeft: farthestExpiry.daysLeft,
-        expiryDate: farthestExpiry.product.expiryDate.toISOString(),
-      } : null,
+      unknownExpiryCount: unknown,
+      productsWithoutExpiry: overview.unknown.map(p => ({ id: p.id, name: p.name, barcode: p.barcode })),
+      nearestExpiry: serializeExpiry(overview.dated[0]),
+      farthestExpiry: serializeExpiry(overview.dated.at(-1)),
 
       // Quantity statistics
       totalQuantity,

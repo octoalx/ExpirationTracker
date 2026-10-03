@@ -1,7 +1,7 @@
 import { SessionProvider } from "next-auth/react";
 import type { AppProps } from "next/app";
 import { useRouter } from "next/router";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import "@/styles/globals.css";
 import Layout from "@/components/Layout";
 import Toaster from "@/components/Toaster";
@@ -17,6 +17,7 @@ export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
 
   return (
+    <MotionConfig reducedMotion="user">
     <SessionProvider session={pageProps.session}>
       <Layout>
         <AnimatePresence mode="wait" initial={false}>
@@ -35,5 +36,6 @@ export default function App({ Component, pageProps }: AppProps) {
       </Layout>
       <Toaster />
     </SessionProvider>
+    </MotionConfig>
   );
 }

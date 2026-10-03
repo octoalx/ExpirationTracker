@@ -4,8 +4,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Loader2, Mail, Lock, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import AnimatedBackground from "@/components/AnimatedBackground";
-import ParallaxCard from "@/components/ParallaxCard";
 
 /* ── Floating input ── */
 interface FloatingInputProps {
@@ -27,7 +25,7 @@ function FloatingInput({ id, label, value, onChange, type = "text", icon }: Floa
         <div
           className={cn(
             "absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-10",
-            focused ? "text-emerald-500" : "text-slate-400",
+            focused ? "text-blue-500" : "text-slate-400",
           )}
         >
           {icon}
@@ -42,11 +40,11 @@ function FloatingInput({ id, label, value, onChange, type = "text", icon }: Floa
         onBlur={() => setFocused(false)}
         required
         className={cn(
-          "peer w-full rounded-xl border bg-white/60 dark:bg-slate-800/60 px-4 py-3.5 text-sm text-slate-900 dark:text-slate-100",
+          "peer w-full rounded-xl border bg-white px-4 py-3.5 text-base text-slate-900 dark:text-slate-100",
           "border-slate-200 dark:border-slate-700",
           "transition-all duration-200",
-          "focus:scale-[1.02] focus:border-emerald-400",
-          "focus:ring-2 focus:ring-emerald-300/40 focus:shadow-[0_0_16px_rgba(16,185,129,0.12)]",
+          " focus:border-blue-400",
+          "focus:ring-2 focus:ring-blue-300/40 ",
           "placeholder-transparent",
           icon ? "pl-10" : "pl-4",
         )}
@@ -58,7 +56,7 @@ function FloatingInput({ id, label, value, onChange, type = "text", icon }: Floa
           "absolute transition-all duration-200 pointer-events-none text-slate-500",
           icon ? "left-10" : "left-4",
           floated
-            ? "-top-2.5 text-[11px] font-semibold bg-white dark:bg-slate-900 px-1.5 rounded text-emerald-600 dark:text-emerald-400"
+            ? "-top-2.5 text-[11px] font-semibold bg-white dark:bg-slate-900 px-1.5 rounded text-blue-600 dark:text-blue-400"
             : "top-3.5 text-sm",
         )}
       >
@@ -121,19 +119,19 @@ export default function Register() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-animated-gradient px-4 overflow-hidden">
-      <AnimatedBackground />
+    <div className="relative min-h-screen flex items-center justify-center auth-shell px-4 py-10">
 
-      <ParallaxCard className="relative z-10 w-full max-w-md">
+
+      <div className="relative z-10 w-full max-w-md">
         <motion.div
           key={shakeKey}
           variants={shakeVariants}
           animate={error ? "shake" : "idle"}
-          className="glass-card p-8 space-y-6"
+          className="work-surface p-8 space-y-6"
         >
           {/* Header */}
           <div className="text-center">
-            <h1 className="text-2xl font-extrabold tracking-tight bg-linear-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+            <h1 className="work-brand">
               ExpiTrack
             </h1>
             <h2 className="mt-3 text-xl font-bold text-foreground">
@@ -196,9 +194,7 @@ export default function Register() {
               disabled={isLoading}
               className={cn(
                 "w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white",
-                "bg-linear-to-r from-emerald-600 to-teal-500",
-                "shadow-lg shadow-emerald-500/20",
-                "hover:shadow-emerald-500/30 hover:scale-[1.02]",
+                "bg-blue-700 hover:bg-blue-800",
                 "active:scale-[0.98]",
                 "transition-all duration-200",
                 "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100",
@@ -219,13 +215,13 @@ export default function Register() {
             Уже есть аккаунт?{" "}
             <Link
               href="/auth/signin"
-              className="font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+              className="font-semibold text-blue-600 dark:text-blue-400 hover:underline"
             >
               Войти
             </Link>
           </p>
         </motion.div>
-      </ParallaxCard>
+      </div>
     </div>
   );
 }

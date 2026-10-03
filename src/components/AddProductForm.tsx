@@ -1,275 +1,80 @@
-import { useState, useEffect, type FormEvent } from "react";
-import { addDays, addMonths, addWeeks, format } from "date-fns";
-import { Loader2, Barcode, Package, Calendar, Factory, Hash } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
+import type { Product } from "@prisma/client";
+import { Loader2, ScanBarcode, CheckCircle2 } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import toast from "react-hot-toast";
+import BarcodeCamera from "./BarcodeCamera";
+import { calculateExpiryDate, type ShelfLifeUnit } from "@/lib/shelf-life";
+import { interactionFeedback } from "@/lib/interaction-feedback";
 
-interface AddProductFormProps {
-  onProductAdded: (product: Record<string, unknown>) => void;
-  initialBarcode?: string;
-}
+interface AddProductFormProps { onProductAdded: (product: Product) => void; initialBarcode?: string }
 
-type DateInputType = "expiry" | "manufacture";
-type ShelfLifeUnit = "days" | "weeks" | "months";
-
-/** Form for adding a new product with barcode, name, quantity, and expiry date. */
-export default function AddProductForm({
-  onProductAdded,
-  initialBarcode = "",
-}: AddProductFormProps) {
+/** Focused registration with catalog lookup and an explicit calculated-date preview. */
+export default function AddProductForm({ onProductAdded, initialBarcode = "" }: AddProductFormProps) {
   const [barcode, setBarcode] = useState(initialBarcode);
   const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState<number | "">("");
+  const [quantity, setQuantity] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [dateInputType, setDateInputType] = useState<DateInputType>("expiry");
+  const [dateInputType, setDateInputType] = useState<"expiry" | "manufacture">("expiry");
   const [manufacturingDate, setManufacturingDate] = useState("");
   const [shelfLife, setShelfLife] = useState("");
   const [shelfLifeUnit, setShelfLifeUnit] = useState<ShelfLifeUnit>("months");
-
-  // Auto-calculate expiry date from manufacturing date + shelf life
-  useEffect(() => {
-    if (
-      dateInputType === "manufacture" &&
-      manufacturingDate &&
-      shelfLife &&
-      shelfLifeUnit
-    ) {
-      const startDate = new Date(manufacturingDate);
-      const life = parseInt(shelfLife, 10);
-      let endDate;
-      if (shelfLifeUnit === "days") endDate = addDays(startDate, life);
-      else if (shelfLifeUnit === "weeks") endDate = addWeeks(startDate, life);
-      else endDate = addMonths(startDate, life);
-      setExpiryDate(format(endDate, "yyyy-MM-dd"));
-    }
-  }, [dateInputType, manufacturingDate, shelfLife, shelfLifeUnit]);
-
-  const resetForm = () => {
-    setBarcode(initialBarcode);
-    setName("");
-    setQuantity("");
-    setExpiryDate("");
-    setManufacturingDate("");
-    setShelfLife("");
-  };
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-
+  const [catalogMessage, setCatalogMessage] = useState("");
+  const [error, setError] = useState("");
+  const [isLookingUp, setLookingUp] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const barcodeVersion = useRef(0);
+  const saving = useRef(false);
+  const lookupBarcode = useCallback(async (code: string) => {
+    const version = ++barcodeVersion.current;
+    setLookingUp(true); setCatalogMessage("");
     try {
-      const productData: { name: string; barcode: string; expiryDate: string; quantity?: number } = { name, barcode, expiryDate };
-      if (quantity !== "" && quantity > 0) {
-        productData.quantity = quantity;
-      }
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(productData),
-      });
+      const response = await fetch(`/api/catalog?barcode=${encodeURIComponent(code.trim())}`);
+      const data = await response.json();
+      if (version !== barcodeVersion.current) return;
+      if (response.status === 404) { setCatalogMessage("В каталоге нет названия. Введите его вручную."); return; }
+      if (!response.ok) throw new Error(data.error || "Не удалось прочитать каталог. Повторите поиск или введите название.");
+      setName(data.name); setCatalogMessage("Название найдено. Укажите срок годности.");
+    } catch (failure) {
+      if (version === barcodeVersion.current) setCatalogMessage(failure instanceof Error ? failure.message : "Ошибка сети. Повторите поиск.");
+    } finally { if (version === barcodeVersion.current) setLookingUp(false); }
+  }, []);
+  useEffect(() => { if (initialBarcode) void lookupBarcode(initialBarcode); return () => { barcodeVersion.current++; }; }, [initialBarcode, lookupBarcode]);
+  const closeCamera = useCallback(() => setCameraOpen(false), []);
+  const onDetected = useCallback((code: string) => { setBarcode(code); setName(""); setCameraOpen(false); interactionFeedback("scan"); void lookupBarcode(code); }, [lookupBarcode]);
+  const calculatedExpiry = calculateExpiryDate(manufacturingDate, shelfLife, shelfLifeUnit);
+  const selectedExpiry = dateInputType === "manufacture" ? calculatedExpiry : expiryDate;
 
-      if (res.ok) {
-        const data = await res.json();
-        toast.success("Товар добавлен!");
-        resetForm();
-        onProductAdded(data);
-      } else {
-        toast.error("Не удалось добавить товар");
-      }
-    } catch {
-      toast.error("Ошибка сети");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (saving.current) return;
+    if (dateInputType === "manufacture" && !calculatedExpiry) { setError("Укажите дату изготовления и положительный целый срок хранения."); return; }
+    saving.current = true; setIsLoading(true); setError("");
+    try {
+      const response = await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), barcode: barcode.trim(), expiryDate: selectedExpiry, ...(quantity ? { quantity: Number(quantity) } : {}) }) });
+      if (!response.ok) throw new Error("Не удалось сохранить товар. Введённые данные сохранены в форме.");
+      const product: Product = await response.json(); interactionFeedback("save"); toast.success(`${product.name} — товар сохранён`); onProductAdded(product);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Ошибка сети. Проверьте подключение и повторите сохранение."); }
+    finally { saving.current = false; setIsLoading(false); }
+  }
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Barcode */}
-      <div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-          <Barcode size={14} />
-          Штрих-код
-        </label>
-        <input
-          type="text"
-          value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-          placeholder="Например: 4601234567890"
-        />
-      </div>
-
-      {/* Product name */}
-      <div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-          <Package size={14} />
-          Название продукта
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-          placeholder="Например: Цемент М500"
-          required
-        />
-      </div>
-
-      {/* Quantity */}
-      <div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-          <Hash size={14} />
-          Количество <span className="text-slate-400 font-normal normal-case">(опционально)</span>
-        </label>
-        <input
-          type="number"
-          min="1"
-          value={quantity}
-          onChange={(e) => {
-            const val = e.target.value;
-            setQuantity(val === "" ? "" : parseInt(val, 10));
-          }}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-          placeholder="Например: 5"
-        />
-      </div>
-
-      {/* Separator */}
-      <div className="border-t border-slate-100 my-4" />
-
-      {/* Date input method */}
-      <div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-          <Calendar size={14} />
-          Способ указания даты
-        </label>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              value="expiry"
-              checked={dateInputType === "expiry"}
-              onChange={() => setDateInputType("expiry")}
-              className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-            />
-            <span className="text-sm text-slate-700">Срок годности</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              value="manufacture"
-              checked={dateInputType === "manufacture"}
-              onChange={() => setDateInputType("manufacture")}
-              className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-            />
-            <span className="text-sm text-slate-700">Дата изготовления</span>
-          </label>
-        </div>
-      </div>
-
-      {/* Date fields based on selection */}
-      {dateInputType === "expiry" ? (
-        <div>
-          <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-            <Calendar size={14} />
-            Дата окончания срока годности
-          </label>
-          <input
-            type="date"
-            value={expiryDate}
-            onChange={(e) => setExpiryDate(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-            required
-          />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-              <Factory size={14} />
-              Дата изготовления
-            </label>
-            <input
-              type="date"
-              value={manufacturingDate}
-              onChange={(e) => setManufacturingDate(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-              required
-            />
-          </div>
-
-          <div>
-  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">
-    Срок хранения
-  </label>
-  <div className="flex gap-3">
-    <input
-      type="number"
-      value={shelfLife}
-      onChange={(e) => setShelfLife(e.target.value)}
-      className="w-28 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400"
-      placeholder="Кол-во"
-    />
-    
-    <div className="flex-1 grid grid-cols-3 gap-2">
-      <button
-        type="button"
-        onClick={() => setShelfLifeUnit("days")}
-        className={`py-3 rounded-xl text-sm font-medium transition-all ${
-          shelfLifeUnit === "days"
-            ? "bg-emerald-600 text-white shadow-md"
-            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-        }`}
-      >
-        Дни
-      </button>
-      <button
-        type="button"
-        onClick={() => setShelfLifeUnit("weeks")}
-        className={`py-3 rounded-xl text-sm font-medium transition-all ${
-          shelfLifeUnit === "weeks"
-            ? "bg-emerald-600 text-white shadow-md"
-            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-        }`}
-      >
-        Недели
-      </button>
-      <button
-        type="button"
-        onClick={() => setShelfLifeUnit("months")}
-        className={`py-3 rounded-xl text-sm font-medium transition-all ${
-          shelfLifeUnit === "months"
-            ? "bg-emerald-600 text-white shadow-md"
-            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-        }`}
-      >
-        Месяцы
-      </button>
-    </div>
-  </div>
-</div>
-        </div>
-      )}
-
-      {/* Separator */}
-      <div className="border-t border-slate-100 my-4" />
-
-      {/* Submit button */}
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full bg-linear-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-semibold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Добавление...
-          </span>
-        ) : (
-          "Добавить товар"
-        )}
-      </button>
-    </form>
-  );
+  return <form onSubmit={handleSubmit} className="product-entry space-y-5">
+    <fieldset disabled={isLoading} className="space-y-5">
+      <details open={!initialBarcode}><summary className="min-h-11 cursor-pointer py-2 text-sm text-slate-600">Штрих-код{barcode && ` · ${barcode}`}</summary><div><label htmlFor="add-barcode">Штрих-код</label><div className="flex gap-2"><input id="add-barcode" inputMode="numeric" value={barcode} placeholder="Введите или отсканируйте код" onChange={event => { barcodeVersion.current++; setLookingUp(false); setBarcode(event.target.value); setName(""); setCatalogMessage(""); }} />
+        <button type="button" aria-label="Сканировать штрих-код" className="entry-icon" disabled={cameraOpen || isLookingUp} onClick={() => setCameraOpen(true)}><ScanBarcode /></button></div>
+        <button type="button" className="entry-link" disabled={isLookingUp || !barcode.trim()} onClick={() => void lookupBarcode(barcode)}>{isLookingUp ? "Поиск названия…" : "Найти название в каталоге"}</button>
+        {cameraOpen && <BarcodeCamera onDetected={onDetected} onClose={closeCamera} />}
+      </div></details>
+      <div><label htmlFor="add-name">Название товара</label><input id="add-name" required value={name} onChange={event => { barcodeVersion.current++; setLookingUp(false); setCatalogMessage(""); setName(event.target.value); }} placeholder="Например: Герметик силиконовый" />{isLookingUp && <p role="status" className="mt-2 text-sm text-slate-600">Ищем название в каталоге…</p>}{catalogMessage && <p role="status" className="mt-2 text-sm text-slate-600">{catalogMessage}</p>}</div>
+      <div className="entry-segment" role="group" aria-label="Способ указания срока"><button type="button" aria-pressed={dateInputType === "expiry"} onClick={() => setDateInputType("expiry")}>Годен до</button><button type="button" aria-pressed={dateInputType === "manufacture"} onClick={() => setDateInputType("manufacture")}>Изготовлен</button></div>
+      {dateInputType === "expiry" ? <div><label htmlFor="add-expiry">Дата окончания срока <span className="text-slate-500">(необязательно)</span></label><input id="add-expiry" type="date" value={expiryDate} onChange={event => setExpiryDate(event.target.value)} /></div> : <>
+        <div><label htmlFor="add-manufacture">Дата изготовления</label><input id="add-manufacture" type="date" required value={manufacturingDate} onChange={event => setManufacturingDate(event.target.value)} /></div>
+        <div><label htmlFor="add-duration">Срок хранения</label><div className="entry-duration flex gap-2"><input id="add-duration" type="number" inputMode="numeric" min="1" step="1" required className="shrink-0" value={shelfLife} onChange={event => setShelfLife(event.target.value)} placeholder="6" /><div className="entry-segment flex-1" role="group" aria-label="Единицы срока">{([["days", "Дни"], ["weeks", "Недели"], ["months", "Месяцы"]] as const).map(([unit, label]) => <button key={unit} type="button" aria-pressed={shelfLifeUnit === unit} onClick={() => setShelfLifeUnit(unit)}>{label}</button>)}</div></div></div>
+        <div className="expiry-preview" role="status"><span>Годен до</span><strong>{calculatedExpiry ? format(parseISO(calculatedExpiry), "dd.MM.yyyy") : "Укажите дату и срок"}</strong>{calculatedExpiry && <CheckCircle2 aria-hidden="true" className="size-5 text-blue-700" />}</div>
+      </>}
+      <div><label htmlFor="add-quantity">Количество <span className="text-slate-500">(необязательно)</span></label><input id="add-quantity" type="number" inputMode="numeric" min="1" step="1" value={quantity} onChange={event => setQuantity(event.target.value)} placeholder="Например: 3" /></div>
+    </fieldset>
+    {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+    <button type="submit" className="primary-action w-full" disabled={isLoading || isLookingUp || cameraOpen}>{isLoading ? <><Loader2 className="size-5 animate-spin" />Сохраняем…</> : "Сохранить товар"}</button>
+  </form>;
 }

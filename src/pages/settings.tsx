@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useId } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import confetti from "canvas-confetti";
 import toast from "react-hot-toast";
 import {
   User,
@@ -25,22 +24,24 @@ interface GlowInputProps {
 }
 
 function GlowInput({ label, value, onChange, type = "text", placeholder, inputClassName }: GlowInputProps) {
+  const id = useId();
   return (
     <div>
-      <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+      <label htmlFor={id} className="block text-sm font-semibold text-muted-foreground mb-1.5">
         {label}
       </label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          "w-full rounded-xl border bg-slate-50/80 dark:bg-slate-800/60 px-4 py-3 text-sm text-foreground",
+          "w-full rounded-xl border bg-slate-50/80 dark:bg-slate-800/60 px-4 py-3 text-base text-foreground",
           "border-slate-200 dark:border-slate-700",
           "transition-all duration-200",
-          "focus:scale-[1.01] focus:border-emerald-400 focus:bg-white dark:focus:bg-slate-800",
-          "focus:ring-2 focus:ring-emerald-300/40 focus:shadow-[0_0_16px_rgba(16,185,129,0.12)]",
+          " focus:border-blue-400 focus:bg-white dark:focus:bg-slate-800",
+          "focus:ring-2 focus:ring-blue-300/40 ",
           "placeholder:text-slate-400",
           inputClassName,
         )}
@@ -69,7 +70,6 @@ const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState("personal");
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingEmail, setIsTestingEmail] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
 
   const [user, setUser] = useState({
     name: session?.user?.name || "",
@@ -103,22 +103,6 @@ const SettingsPage = () => {
       });
   }, []);
 
-  const fireConfetti = () => {
-    if (!btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    const x = (rect.left + rect.width / 2) / window.innerWidth;
-    const y = (rect.top + rect.height / 2) / window.innerHeight;
-    confetti({
-      particleCount: 60,
-      spread: 50,
-      origin: { x, y },
-      colors: ["#059669", "#10b981", "#34d399", "#6ee7b7"],
-      ticks: 100,
-      gravity: 1.3,
-      scalar: 0.85,
-    });
-  };
-
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -129,7 +113,6 @@ const SettingsPage = () => {
         body: JSON.stringify({ user: cleanUser, settings }),
       });
       if (res.ok) {
-        fireConfetti();
         toast.success("Настройки сохранены!");
         updateSession({ user: { ...session?.user, ...cleanUser } });
       } else {
@@ -198,7 +181,6 @@ const SettingsPage = () => {
               title="Telegram"
               description="Мгновенные уведомления в мессенджер"
               icon={<Send className="h-5 w-5 text-white" />}
-              gradient="from-sky-400 to-blue-500"
               enabled={settings.telegramNotifications}
               onToggle={(v) => setSettings({ ...settings, telegramNotifications: v })}
             >
@@ -221,7 +203,6 @@ const SettingsPage = () => {
               title="Email (SMTP)"
               description="Уведомления на электронную почту"
               icon={<Mail className="h-5 w-5 text-white" />}
-              gradient="from-rose-400 to-pink-500"
               enabled={settings.emailNotifications}
               onToggle={(v) => setSettings({ ...settings, emailNotifications: v })}
             >
@@ -353,7 +334,7 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-8">
+    <div className="mx-auto max-w-4xl">
       {/* Page title */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -369,28 +350,29 @@ const SettingsPage = () => {
 
       {/* Animated tabs */}
       <div className="relative mb-8">
-        <div className="flex gap-1 overflow-x-auto pb-px scrollbar-none">
+        <div className="grid grid-cols-3 gap-1 pb-px">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
+                aria-pressed={active}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "relative flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-t-xl",
+                  "relative flex min-h-16 flex-col items-center justify-center gap-2 rounded-t-xl px-2 py-3 text-center text-sm font-semibold sm:min-h-12 sm:flex-row",
                   "transition-colors duration-200",
                   active
-                    ? "text-emerald-700 dark:text-emerald-400"
+                    ? "text-blue-700 dark:text-blue-400"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <tab.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span>{tab.label}</span>
                 {active && (
                   <motion.div
                     layoutId="settings-tab-underline"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-emerald-500"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-blue-500"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
@@ -402,7 +384,7 @@ const SettingsPage = () => {
       </div>
 
       {/* Tab content */}
-      <div className="glass-card p-6">
+      <div className="work-surface p-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -418,14 +400,11 @@ const SettingsPage = () => {
         {/* Save button */}
         <div className="mt-8 pt-5 border-t border-slate-200/60 dark:border-slate-700/40">
           <button
-            ref={btnRef}
             onClick={handleSave}
             disabled={isSaving}
             className={cn(
               "relative inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white",
-              "bg-linear-to-r from-emerald-600 to-teal-500",
-              "shadow-lg shadow-emerald-500/20 dark:shadow-emerald-900/30",
-              "hover:shadow-emerald-500/30 hover:scale-[1.02]",
+              "bg-blue-700 hover:bg-blue-800",
               "active:scale-[0.98]",
               "transition-all duration-200",
               "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100",

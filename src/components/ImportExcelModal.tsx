@@ -222,7 +222,7 @@ export default function ImportExcelModal({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+            <FileSpreadsheet className="h-5 w-5 text-blue-600" />
             Импорт из Excel
           </DialogTitle>
           <DialogDescription>
@@ -235,7 +235,7 @@ export default function ImportExcelModal({
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center hover:border-emerald-400 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 transition-all cursor-pointer"
+            className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all cursor-pointer"
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="h-10 w-10 mx-auto text-slate-400 mb-3" />
@@ -275,7 +275,7 @@ export default function ImportExcelModal({
                   {preview.fileName}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Тип: <span className="font-medium text-emerald-600">{preview.fileType}</span>
+                  Тип: <span className="font-medium text-blue-600">{preview.fileType}</span>
                   {" · "}
                   Найдено товаров: <span className="font-medium">{preview.products.length}</span>
                 </p>
@@ -332,7 +332,7 @@ export default function ImportExcelModal({
         {/* Uploading */}
         {state === "uploading" && (
           <div className="flex flex-col items-center py-8 gap-3">
-            <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
+            <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
             <p className="text-sm text-slate-600 dark:text-slate-400">Импортируем товары...</p>
           </div>
         )}
@@ -340,7 +340,7 @@ export default function ImportExcelModal({
         {/* Success */}
         {state === "success" && (
           <div className="flex flex-col items-center py-8 gap-3">
-            <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+            <CheckCircle2 className="h-10 w-10 text-blue-600" />
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Успешно импортировано: {importedCount} товаров
             </p>
@@ -350,13 +350,13 @@ export default function ImportExcelModal({
         {/* Footer */}
         <DialogFooter>
           {state === "previewing" && preview && (
-            <Button onClick={handleImport} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleImport} className="bg-blue-600 hover:bg-blue-700 text-white">
               <Upload className="h-4 w-4 mr-2" />
               Импортировать {preview.products.length} товаров
             </Button>
           )}
           {state === "success" && (
-            <Button onClick={() => handleClose(false)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={() => handleClose(false)} className="bg-blue-600 hover:bg-blue-700 text-white">
               Закрыть
             </Button>
           )}

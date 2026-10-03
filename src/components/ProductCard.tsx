@@ -1,11 +1,11 @@
 import React, { useState, type FormEvent } from "react";
 import { format, differenceInDays } from "date-fns";
 import { ru } from "date-fns/locale";
-import { 
-  CalendarCheck, 
-  Clock, 
-  AlertCircle, 
-  CheckCircle, 
+import {
+  CalendarCheck,
+  Clock,
+  AlertCircle,
+  CheckCircle,
   Trash2,
   Barcode,
   Calendar,
@@ -31,9 +31,9 @@ interface ProductCardProps {
 }
 
 /** Card displaying a single product with status, expiry info, and action buttons. */
-function ProductCard({ 
-  product, 
-  onProductDeleted, 
+function ProductCard({
+  product,
+  onProductDeleted,
   onProductConsumed,
   onProductUpdated
 }: ProductCardProps) {
@@ -41,14 +41,16 @@ function ProductCard({
   const [editName, setEditName] = useState(product.name);
   const [editBarcode, setEditBarcode] = useState(product.barcode);
   const [editExpiryDate, setEditExpiryDate] = useState(
-    format(new Date(product.expiryDate), "yyyy-MM-dd")
+    product.expiryDate ? format(new Date(product.expiryDate), "yyyy-MM-dd") : ""
   );
   const [isSaving, setIsSaving] = useState(false);
 
-  const daysLeft = differenceInDays(new Date(product.expiryDate), new Date());
+  const daysLeft = product.expiryDate ? differenceInDays(new Date(product.expiryDate), new Date()) : Number.POSITIVE_INFINITY;
   const isExpired = daysLeft < 0;
 
   const getStatusConfig = () => {
+    if (!product.expiryDate) return { stripeColor: "bg-slate-300", icon: Calendar,
+      iconColor: "text-slate-400", statusText: "Срок не указан", statusColor: "text-slate-500" };
     if (isExpired) {
       return {
         stripeColor: "bg-red-500",
@@ -60,37 +62,37 @@ function ProductCard({
     }
     if (daysLeft <= 3) {
       return {
-        stripeColor: "bg-orange-500",
+        stripeColor: "bg-expiry-soft0",
         icon: Clock,
-        iconColor: "text-orange-600",
+        iconColor: "text-expiry-ink",
         statusText: `Осталось ${daysLeft} ${getDaysText(daysLeft)}`,
-        statusColor: "text-orange-600"
+        statusColor: "text-expiry-ink"
       };
     }
     if (daysLeft <= 7) {
       return {
-        stripeColor: "bg-yellow-500",
+        stripeColor: "bg-expiry-soft0",
         icon: Clock,
-        iconColor: "text-yellow-600",
+        iconColor: "text-expiry-ink",
         statusText: `Осталось ${daysLeft} ${getDaysText(daysLeft)}`,
-        statusColor: "text-yellow-600"
+        statusColor: "text-expiry-ink"
       };
     }
     if (daysLeft <= 30) {
       return {
-        stripeColor: "bg-emerald-400",
+        stripeColor: "bg-blue-400",
         icon: CalendarCheck,
-        iconColor: "text-emerald-600",
+        iconColor: "text-blue-600",
         statusText: `Осталось ${daysLeft} ${getDaysText(daysLeft)}`,
-        statusColor: "text-emerald-600"
+        statusColor: "text-blue-600"
       };
     }
     return {
-      stripeColor: "bg-emerald-600",
+      stripeColor: "bg-blue-600",
       icon: CalendarCheck,
-      iconColor: "text-emerald-600",
+      iconColor: "text-blue-600",
       statusText: `Осталось ${daysLeft} ${getDaysText(daysLeft)}`,
-      statusColor: "text-emerald-600"
+      statusColor: "text-blue-600"
     };
   };
 
@@ -107,7 +109,7 @@ function ProductCard({
   const openEdit = () => {
     setEditName(product.name);
     setEditBarcode(product.barcode);
-    setEditExpiryDate(format(new Date(product.expiryDate), "yyyy-MM-dd"));
+    setEditExpiryDate(product.expiryDate ? format(new Date(product.expiryDate), "yyyy-MM-dd") : "");
     setIsEditOpen(true);
   };
 
@@ -141,11 +143,10 @@ function ProductCard({
   return (
     <>
       <div className={cn(
-        "relative bg-white/80 backdrop-blur-sm rounded-2xl",
-        "border border-slate-200/60",
+        "relative bg-white rounded-xl",
+        "border border-slate-200",
         "flex flex-col min-h-[280px] h-full",
         "transition-all duration-300 ease-out",
-        "hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50",
         "overflow-hidden"
       )}>
         {/* Top color stripe indicating urgency */}
@@ -160,7 +161,7 @@ function ProductCard({
             "w-7 h-7 flex items-center justify-center rounded-lg",
             "bg-slate-100 text-slate-400",
             "transition-all duration-200",
-            "hover:bg-emerald-50 hover:text-emerald-600",
+            "hover:bg-blue-50 hover:text-blue-600",
             "active:scale-90"
           )}
         >
@@ -178,7 +179,7 @@ function ProductCard({
             </div>
             <div className="flex items-center gap-1 text-xs text-slate-400 font-medium whitespace-nowrap">
               <Calendar className="w-3 h-3" />
-              {format(new Date(product.expiryDate), "dd.MM.yyyy", { locale: ru })}
+              {product.expiryDate ? format(new Date(product.expiryDate), "dd.MM.yyyy", { locale: ru }) : "—"}
             </div>
           </div>
 
@@ -201,10 +202,10 @@ function ProductCard({
               onClick={() => onProductConsumed(product)}
               className={cn(
                 "flex-1 flex items-center justify-center gap-1.5",
-                "bg-emerald-50 text-emerald-700",
+                "bg-blue-50 text-blue-700",
                 "py-2.5 px-3 rounded-xl text-sm font-medium",
                 "transition-all duration-200",
-                "hover:bg-emerald-100 hover:shadow-sm",
+                "hover:bg-blue-100 hover:shadow-sm",
                 "active:scale-95"
               )}
             >
@@ -248,7 +249,7 @@ function ProductCard({
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 required
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
                 placeholder="Название продукта"
               />
             </div>
@@ -263,7 +264,7 @@ function ProductCard({
                 type="text"
                 value={editBarcode}
                 onChange={(e) => setEditBarcode(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all font-mono tracking-wider"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all font-mono tracking-wider"
                 placeholder="Штрих-код"
               />
             </div>
@@ -279,7 +280,7 @@ function ProductCard({
                 value={editExpiryDate}
                 onChange={(e) => setEditExpiryDate(e.target.value)}
                 required
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
               />
             </div>
 
@@ -294,7 +295,7 @@ function ProductCard({
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
                   <span className="flex items-center justify-center gap-2">

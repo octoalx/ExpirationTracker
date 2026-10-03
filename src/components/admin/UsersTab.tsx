@@ -139,7 +139,7 @@ export default function UsersTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
@@ -150,6 +150,7 @@ export default function UsersTab() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <Input
+          aria-label="Поиск пользователей"
           placeholder="Поиск по имени или email..."
           value={searchTerm}
           onChange={(e) => {
@@ -160,9 +161,20 @@ export default function UsersTab() {
         />
       </div>
 
+      <div className="space-y-3 md:hidden">
+        {paginatedUsers.length === 0 && <p className="work-surface p-5 text-sm text-slate-600">Пользователей не найдено</p>}
+        {paginatedUsers.map(user => <article key={user.id} className="work-surface p-4">
+          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words text-base font-bold">{user.name || "Без имени"}</h2><p className="mt-1 break-all text-sm text-slate-600">{user.email || "Email не указан"}</p></div><span className={cn("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", user.role === "ADMIN" ? "bg-blue-50 text-blue-800" : "bg-slate-100 text-slate-700")}>{user.role === "ADMIN" ? "Админ" : "Сотрудник"}</span></div>
+          <details className="mt-3 border-t border-slate-200 pt-2"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-blue-700">Управление доступом</summary><div className="flex flex-col gap-2">
+            <Button variant="outline" onClick={() => handleRoleChange(user.id, user.role === "ADMIN" ? "USER" : "ADMIN")}>{user.role === "ADMIN" ? "Снять права администратора" : "Назначить администратором"}</Button>
+            <Button variant="outline" onClick={() => openResetModal(user)}><Key className="size-4" />Сбросить пароль</Button>
+            <Button variant="outline" className="text-red-700" onClick={() => handleDelete(user.id, user.name)}><Trash2 className="size-4" />Удалить пользователя</Button>
+          </div></details>
+        </article>)}
+      </div>
       {/* Table */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white overflow-hidden">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
@@ -202,7 +214,7 @@ export default function UsersTab() {
                       className={cn(
                         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
                         user.role === "ADMIN"
-                          ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                           : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
                       )}
                     >
@@ -220,7 +232,7 @@ export default function UsersTab() {
                           "text-xs",
                           user.role === "ADMIN"
                             ? "text-slate-600 hover:text-slate-900"
-                            : "text-purple-600 hover:text-purple-900"
+                            : "text-blue-600 hover:text-blue-900"
                         )}
                       >
                         {user.role === "ADMIN" ? "Сделать USER" : "Сделать ADMIN"}
@@ -230,7 +242,7 @@ export default function UsersTab() {
                         size="sm"
                         onClick={() => openResetModal(user)}
                         className="text-amber-600 hover:text-amber-900"
-                        title="Сбросить пароль"
+                        title="Сбросить пароль" aria-label={`Сбросить пароль ${user.name || user.email || "пользователя"}`}
                       >
                         <Key className="h-4 w-4" />
                       </Button>
@@ -238,6 +250,7 @@ export default function UsersTab() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDelete(user.id, user.name)}
+                        aria-label={`Удалить ${user.name || user.email || "пользователя"}`}
                         className="text-red-600 hover:text-red-900"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -257,7 +270,7 @@ export default function UsersTab() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+              className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -267,7 +280,7 @@ export default function UsersTab() {
             <button
               onClick={() => setPage((p) => Math.min(Math.ceil(filteredUsers.length / limit), p + 1))}
               disabled={page >= Math.ceil(filteredUsers.length / limit)}
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+              className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -282,7 +295,7 @@ export default function UsersTab() {
           <span>Всего: {filteredUsers.length}</span>
         </div>
         <div className="flex items-center gap-1">
-          <Shield className="h-4 w-4 text-purple-600" />
+          <Shield className="h-4 w-4 text-blue-600" />
           <span>Admin: {users.filter((u) => u.role === "ADMIN").length}</span>
         </div>
       </div>
@@ -344,7 +357,7 @@ export default function UsersTab() {
                   Отмена
                 </Button>
                 <Button
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                   onClick={handleResetPassword}
                   disabled={resetting || newPassword.length < 6}
                 >

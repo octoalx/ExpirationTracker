@@ -272,11 +272,11 @@ export default function BackupTab() {
   return (
     <div className="space-y-6">
       {/* Auto Backups Section */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-4 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-purple-100 dark:bg-purple-900/50 p-3">
-              <History className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            <div className="rounded-xl bg-blue-100 dark:bg-blue-900/50 p-3">
+              <History className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
               <h3 className="font-semibold text-foreground">Автоматические бэкапы</h3>
@@ -291,7 +291,7 @@ export default function BackupTab() {
               onClick={() => setBackupEnabled(!backupEnabled)}
               className={cn(
                 "relative h-6 w-11 rounded-full transition-colors",
-                backupEnabled ? "bg-purple-600" : "bg-slate-300 dark:bg-slate-600"
+                backupEnabled ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
               )}
               title={backupEnabled ? "Отключить" : "Включить"}
             >
@@ -306,7 +306,7 @@ export default function BackupTab() {
               onClick={handleCreateBackup}
               disabled={creating}
               variant="outline"
-              className="border-purple-200 hover:bg-purple-50"
+              className="border-blue-200 hover:bg-blue-50"
             >
             {creating ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -319,7 +319,7 @@ export default function BackupTab() {
         </div>
 
         {/* Time settings */}
-        <div className="mb-4 flex items-center gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+        <div className="mb-4 flex flex-wrap items-center gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-slate-400" />
             <span className="text-sm text-slate-600 dark:text-slate-400">Время бэкапа:</span>
@@ -335,7 +335,7 @@ export default function BackupTab() {
             size="sm"
             onClick={saveBackupSettings}
             disabled={savingSettings}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
           >
             {savingSettings ? (
               <Loader2 className="h-3 w-3 animate-spin mr-1" />
@@ -346,20 +346,20 @@ export default function BackupTab() {
 
         {loadingBackups ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
           </div>
         ) : autoBackups.length === 0 ? (
           <div className="text-center py-8 text-slate-500">
             <Clock className="h-10 w-10 mx-auto mb-2 text-slate-300" />
             <p className="text-sm">Автобэкапов пока нет</p>
-            <p className="text-xs mt-1">Первый бэкап создастся сегодня ночью</p>
+            <p className="text-xs mt-1">Проверьте расписание автоматического резервного копирования.</p>
           </div>
         ) : (
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {autoBackups.map((backup) => (
               <div
                 key={backup.name}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <Database className="h-4 w-4 text-slate-400" />
@@ -373,7 +373,7 @@ export default function BackupTab() {
                     size="sm"
                     variant="ghost"
                     onClick={() => handleDownloadBackup(backup.name)}
-                    className="h-8 w-8 p-0"
+                    className="size-11 p-0"
                     title="Скачать"
                   >
                     <Download className="h-4 w-4" />
@@ -383,7 +383,7 @@ export default function BackupTab() {
                     variant="ghost"
                     onClick={() => handleRestoreBackup(backup.name)}
                     disabled={restoring === backup.name}
-                    className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                    className="size-11 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                     title="Восстановить"
                   >
                     {restoring === backup.name ? (
@@ -397,7 +397,7 @@ export default function BackupTab() {
                     variant="ghost"
                     onClick={() => handleDeleteBackup(backup.name)}
                     disabled={deletingBackup === backup.name}
-                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="size-11 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                     title="Удалить"
                   >
                     {deletingBackup === backup.name ? (
@@ -419,10 +419,10 @@ export default function BackupTab() {
       </div>
 
       {/* Export */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-6">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/50 p-3">
-            <Download className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+          <div className="rounded-xl bg-blue-100 dark:bg-blue-900/50 p-3">
+            <Download className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Экспорт данных</h3>
@@ -432,7 +432,7 @@ export default function BackupTab() {
         <Button
           onClick={handleExport}
           disabled={exporting}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="bg-blue-600 hover:bg-blue-700 text-white"
         >
           {exporting ? (
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -444,7 +444,7 @@ export default function BackupTab() {
       </div>
 
       {/* Import */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-6">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="rounded-xl bg-blue-100 dark:bg-blue-900/50 p-3">
             <Upload className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -489,7 +489,7 @@ export default function BackupTab() {
           className={cn(
             "relative rounded-xl border-2 border-dashed p-8 text-center transition-colors",
             dragActive
-              ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
+              ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
               : "border-slate-300 dark:border-slate-600 hover:border-slate-400"
           )}
         >
@@ -508,7 +508,7 @@ export default function BackupTab() {
 
         {importing && (
           <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
             <span className="ml-2 text-sm text-slate-600">Импорт данных...</span>
           </div>
         )}
@@ -518,11 +518,11 @@ export default function BackupTab() {
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30"
+            className="mt-4 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30"
           >
             <div className="flex items-center gap-2 mb-3">
-              <CheckCircle className="h-5 w-5 text-emerald-600" />
-              <span className="font-medium text-emerald-900 dark:text-emerald-400">Импорт завершен</span>
+              <CheckCircle className="h-5 w-5 text-blue-600" />
+              <span className="font-medium text-blue-900 dark:text-blue-400">Импорт завершен</span>
             </div>
             {importResult.results && (
               <div className="grid grid-cols-3 gap-2 text-sm">
@@ -560,7 +560,7 @@ export default function BackupTab() {
               <li>• Бэкап включает: пользователей, товары, настройки, логи</li>
               <li>• Режим "Объединить" — обновляет существующие, добавляет новые</li>
               <li>• Режим "Заменить" — полная очистка перед импортом</li>
-              <li>• Email и пароли пользователей сохраняются</li>
+              <li>• JSON не содержит паролей. При объединении пароли существующих пользователей сохраняются; после замены потребуется восстановить доступ.</li>
             </ul>
           </div>
         </div>

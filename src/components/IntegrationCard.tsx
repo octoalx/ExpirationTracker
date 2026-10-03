@@ -10,7 +10,6 @@ interface IntegrationCardProps {
   icon: React.ReactNode;
   enabled: boolean;
   onToggle: (value: boolean) => void;
-  gradient: string;
   children: React.ReactNode;
 }
 
@@ -21,30 +20,30 @@ export default function IntegrationCard({
   icon,
   enabled,
   onToggle,
-  gradient,
   children,
 }: IntegrationCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="relative rounded-2xl p-px overflow-hidden">
-      <div className={cn("absolute inset-0 rounded-2xl bg-linear-to-br opacity-50", gradient)} />
-      <div className="relative rounded-2xl bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl">
+    <div className="rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white">
         {/* Card header */}
-        <div className="flex items-center gap-4 p-4">
-          <div className={cn("flex items-center justify-center w-11 h-11 rounded-xl bg-linear-to-br shrink-0", gradient)}>
+        <div className="flex flex-wrap items-center gap-3 p-4">
+          <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-700 text-white shrink-0">
             {icon}
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-            <p className="text-xs text-muted-foreground truncate">{description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
-          <IosToggle checked={enabled} onChange={onToggle} />
+          <IosToggle label={`Уведомления ${title}`} checked={enabled} onChange={onToggle} />
           <button
             type="button"
+            aria-label={`${expanded ? "Свернуть" : "Настроить"} ${title}`}
+            aria-expanded={expanded}
             onClick={() => setExpanded((prev) => !prev)}
             className={cn(
-              "rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200",
+              "flex size-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 transition-colors duration-200",
             )}
           >
             <motion.span

@@ -22,7 +22,7 @@ export default function EditProductForm({
   const [name, setName] = useState(product.name);
   const [quantity, setQuantity] = useState<number | "">(product.quantity ?? "");
   const [expiryDate, setExpiryDate] = useState(
-    format(product.expiryDate, "yyyy-MM-dd")
+    product.expiryDate ? format(new Date(product.expiryDate), "yyyy-MM-dd") : ""
   );
   const [isLoading, setIsLoading] = useState(false);
 
@@ -78,7 +78,7 @@ export default function EditProductForm({
           type="text"
           value={barcode}
           onChange={(e) => setBarcode(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
           placeholder="Например: 4601234567890"
         />
       </div>
@@ -93,7 +93,7 @@ export default function EditProductForm({
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
           placeholder="Введите название"
           required
         />
@@ -113,7 +113,7 @@ export default function EditProductForm({
             const val = e.target.value;
             setQuantity(val === "" ? "" : parseInt(val, 10));
           }}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
           placeholder="Например: 5"
         />
       </div>
@@ -128,7 +128,7 @@ export default function EditProductForm({
           type="date"
           value={expiryDate}
           onChange={(e) => setExpiryDate(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
           required
         />
       </div>
@@ -152,7 +152,7 @@ export default function EditProductForm({
         <button
           type="submit"
           disabled={isLoading}
-          className="flex-1 bg-linear-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-semibold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex-1 bg-blue-700 hover:bg-blue-800  text-white font-semibold py-3.5 rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">
