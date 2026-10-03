@@ -20,6 +20,13 @@ export default async function handler(
 
   if (req.method === "GET") {
     try {
+      res.setHeader("Cache-Control", "private, no-store");
+      if (req.query.scope === "thresholds") {
+        const settings = await prisma.settings.findUnique({
+          where: { userId }, select: { urgentThreshold: true, warningThreshold: true },
+        });
+        return res.status(200).json({ settings: settings ?? { urgentThreshold: 3, warningThreshold: 7 } });
+      }
       const userWithSettings = await prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -76,6 +83,11 @@ export default async function handler(
   } else if (req.method === "POST") {
     try {
       const { user: userData, settings: settingsData } = req.body;
+      const { urgentThreshold, warningThreshold } = settingsData;
+      if (!Number.isSafeInteger(urgentThreshold) || !Number.isSafeInteger(warningThreshold) ||
+          urgentThreshold < 0 || warningThreshold < urgentThreshold) {
+        return res.status(400).json({ message: "Пороги должны быть целыми неотрицательными числами. «Внимание» должно быть не меньше «Срочно»." });
+      }
 
       // 1. Strip non-allowed fields from user data
       const { id: _i, ...cleanUserData } = userData;

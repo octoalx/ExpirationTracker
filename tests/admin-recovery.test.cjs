@@ -65,11 +65,14 @@ test('admin role, password and JSON merge preserve disposable SQLite data', asyn
     const before = await prisma.user.findUnique({ where: { id: 'employee' } });
     assert.ok(await bcrypt.compare('fixture-new', before.password));
     assert.ok(!(await bcrypt.compare('fixture-original', before.password)));
-    const product = { id: 'record', name: 'Restored', barcode: '00123456', expiryDate: null, status: 'DEFECT', quantity: null, userId: 'employee' };
+    const product = { id: 'record', name: 'Restored', barcode: '00123456', expiryDate: null, manufacturingDate: '2026-01-31', shelfLife: 2, shelfLifeUnit: 'months', status: 'DEFECT', quantity: null, userId: 'employee' };
     assert.equal((await call(restore, 'POST', { mode: 'merge', data: { data: { products: [product] } } })).code, 200);
     const restored = await prisma.product.findUnique({ where: { id: 'record' } });
     assert.equal(restored.expiryDate, null);
     assert.equal(restored.quantity, null);
+    assert.equal(restored.manufacturingDate, '2026-01-31');
+    assert.equal(restored.shelfLife, 2);
+    assert.equal(restored.shelfLifeUnit, 'months');
     assert.equal(restored.status, 'DEFECT');
     assert.equal(restored.barcode, '00123456');
     assert.equal((await prisma.user.findUnique({ where: { id: 'employee' } })).password, before.password);
@@ -97,7 +100,7 @@ test('admin role, password and JSON merge preserve disposable SQLite data', asyn
     assert.equal(await prisma.user.count(), 2);
     const created = { ...product, id: 'new-record', status: 'ACTIVE' };
     assert.equal((await call(restore, 'POST', { data: { data: { products: [created] } } })).code, 200);
-    assert.equal((await prisma.product.findUnique({ where: { id: 'new-record' } })).expiryDate, null);
+    assert.equal((await prisma.product.findUnique({ where: { id: 'new-record' } })).manufacturingDate, '2026-01-31');
     assert.equal((await call(restore, 'POST', { mode: 'replace', data: { data: { products: [{ ...product, expiryDate: 'invalid' }] } } })).code, 400);
     assert.equal(await prisma.product.count(), 2);
     // A later database error must roll back earlier writes, including replacement deletion.

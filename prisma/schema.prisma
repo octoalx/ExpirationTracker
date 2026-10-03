@@ -41,6 +41,9 @@ model Product {
   name       String
   barcode    String   // Убрал @unique, чтобы не блокировать добавление одинаковых товаров
   expiryDate DateTime?
+  manufacturingDate String?
+  shelfLife Int?
+  shelfLifeUnit String?
   status     String   @default("ACTIVE") // ACTIVE, ARCHIVED, DEFECT
   isExpired          Boolean   @default(false)   // Авто-флаг просрочки
   quantity           Int?                         // Опциональное количество

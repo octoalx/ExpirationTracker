@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import { productDates } from "@/lib/product-dates";
 
 /** DELETE: remove product | PUT: update status | PATCH: partial field update. */
 export default async (req: NextApiRequest, res: NextApiResponse) => {
@@ -35,19 +36,13 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     }
   } else if (req.method === "PATCH") {
     try {
-      const { name, barcode, expiryDate, quantity } = req.body;
+      const { name, barcode, quantity } = req.body;
+      let dates;
+      try { dates = productDates(req.body); }
+      catch (error) { return res.status(400).json({ message: (error as Error).message }); }
 
       // Build partial update payload from provided fields
-      const updateData: { name?: string; barcode?: string; expiryDate?: Date; isExpired?: boolean; quantity?: number | null } = {};
-      if (name !== undefined) updateData.name = name;
-      if (barcode !== undefined) updateData.barcode = barcode;
-      if (quantity !== undefined) updateData.quantity = quantity;
-      if (expiryDate !== undefined) {
-        const newDate = new Date(expiryDate);
-        updateData.expiryDate = newDate;
-        // Recalculate isExpired flag based on the new expiry date
-        updateData.isExpired = newDate < new Date();
-      }
+      const updateData = { ...dates, ...(name !== undefined ? { name } : {}), ...(barcode !== undefined ? { barcode } : {}), ...(quantity !== undefined ? { quantity } : {}) };
 
       const updatedProduct = await prisma.product.update({
         where: { id: String(productId), userId: session.user.id },

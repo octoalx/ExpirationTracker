@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Users, Shield, User, Trash2, ChevronLeft, ChevronRight, 
-  Loader2, Search, Key, X, Eye, EyeOff
+  Loader2, Search, Key, X, Eye, EyeOff, UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ interface UserWithStats {
   };
 }
 
-/** Admin tab for managing users: search, role changes, deletion, password reset. */
+/** Admin tab for account creation, search, role changes, deletion and password reset. */
 export default function UsersTab() {
   const [users, setUsers] = useState<UserWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +27,10 @@ export default function UsersTab() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [draft, setDraft] = useState({ name: "", email: "", password: "", role: "USER" });
 
   // Password reset dialog state
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -38,6 +42,7 @@ export default function UsersTab() {
   const fetchUsers = async () => {
     try {
       const res = await fetch("/api/admin/users");
+      if (!res.ok) throw new Error("User list request failed");
       const data = await res.json();
       const usersArray = Array.isArray(data) ? data : data.users || [];
       setUsers(usersArray);
@@ -52,6 +57,35 @@ export default function UsersTab() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (creating) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCreateError(data.message || "Не удалось создать учётную запись");
+        return;
+      }
+      setDraft({ name: "", email: "", password: "", role: "USER" });
+      setCreateOpen(false);
+      setSearchTerm("");
+      setPage(1);
+      toast.success("Учётная запись создана");
+      await fetchUsers();
+    } catch {
+      setCreateError("Ошибка сети. Проверьте список пользователей перед повторной попыткой.");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
@@ -146,6 +180,32 @@ export default function UsersTab() {
 
   return (
     <div className="space-y-4">
+      <Button type="button" aria-expanded={createOpen} aria-controls="create-account-form" disabled={creating}
+        onClick={() => { setCreateOpen(!createOpen); setCreateError(""); setDraft({ name: "", email: "", password: "", role: "USER" }); }}>
+        <UserPlus className="size-4" />{createOpen ? "Закрыть форму" : "Создать учётную запись"}
+      </Button>
+      {createOpen && <form id="create-account-form" onSubmit={handleCreate} className="space-y-4 border-b border-slate-200 pb-5">
+        <h2 className="text-lg font-bold">Новая учётная запись</h2>
+        <fieldset disabled={creating} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="min-w-0 space-y-1.5 text-sm font-semibold">Имя
+            <Input className="min-h-11" name="name" autoComplete="off" required maxLength={120} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />
+          </label>
+          <label className="min-w-0 space-y-1.5 text-sm font-semibold">Email
+            <Input className="min-h-11" name="email" type="email" autoComplete="off" required maxLength={254} value={draft.email} onChange={e => setDraft({ ...draft, email: e.target.value })} />
+          </label>
+          <label className="min-w-0 space-y-1.5 text-sm font-semibold">Пароль
+            <Input className="min-h-11" name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={72} aria-describedby="account-password-hint" value={draft.password} onChange={e => setDraft({ ...draft, password: e.target.value })} />
+            <span id="account-password-hint" className="block text-xs font-normal text-slate-600">Минимум 8 символов; максимум 72 латинских символа или 36 кириллических.</span>
+          </label>
+          <label className="min-w-0 space-y-1.5 text-sm font-semibold">Роль
+            <select className="block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base focus-visible:outline-2 focus-visible:outline-blue-700" name="role" value={draft.role} onChange={e => setDraft({ ...draft, role: e.target.value })}>
+              <option value="USER">Сотрудник</option><option value="ADMIN">Администратор</option>
+            </select>
+          </label>
+        </fieldset>
+        {createError && <p role="alert" className="text-sm text-red-700">{createError}</p>}
+        <Button type="submit" disabled={creating}>{creating && <Loader2 className="size-4 animate-spin" />}{creating ? "Создание…" : "Создать"}</Button>
+      </form>}
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

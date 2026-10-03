@@ -3,6 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { apiErrorHandler } from "../../../lib/apiErrorHandler";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
+import { productDates } from "@/lib/product-dates";
 
 /** GET: list products (optionally filtered by status) | POST: create a new product. */
 export default async function handler(
@@ -32,12 +33,15 @@ export default async function handler(
     }
   } else if (req.method === "POST") {
     try {
-      const { name, barcode, expiryDate, quantity } = req.body;
+      const { name, barcode, quantity } = req.body;
+      let dates;
+      try { dates = productDates(req.body); }
+      catch (error) { return res.status(400).json({ message: (error as Error).message }); }
       const product = await prisma.product.create({
         data: {
           name,
           barcode,
-          expiryDate: expiryDate ? new Date(expiryDate) : null,
+          ...dates,
           quantity: quantity || null,
           userId: session.user.id,
         },

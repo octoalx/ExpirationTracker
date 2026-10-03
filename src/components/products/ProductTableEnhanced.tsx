@@ -51,6 +51,7 @@ interface ProductTableEnhancedProps {
   products: Product[];
   urgentThreshold?: number;
   warningThreshold?: number;
+  referenceDate?: Date;
   onProductEdit?: (product: Product) => void;
   onProductDelete?: (product: Product) => void;
   onProductConsume?: (product: Product) => void;
@@ -83,11 +84,11 @@ const getStatusConfig = (status: ExpiryStatus, daysLeft: number) => {
     case "urgent":
       return {
         icon: Clock,
-        color: "text-expiry-ink",
-        bg: "bg-expiry-soft",
-        border: "border-expiry-border",
-        label: `Осталось ${daysLeft} дн.`,
-        stripe: "bg-expiry-soft0",
+        color: "text-red-700",
+        bg: "bg-red-50",
+        border: "border-red-200",
+        label: `Срочно · ${daysLeft} дн.`,
+        stripe: "bg-red-500",
       };
     case "warning":
       return {
@@ -95,8 +96,8 @@ const getStatusConfig = (status: ExpiryStatus, daysLeft: number) => {
         color: "text-expiry-ink",
         bg: "bg-expiry-soft",
         border: "border-expiry-border",
-        label: `Осталось ${daysLeft} дн.`,
-        stripe: "bg-expiry-soft0",
+        label: `Внимание · ${daysLeft} дн.`,
+        stripe: "bg-expiry-marker",
       };
     case "safe":
       return {
@@ -115,6 +116,7 @@ export function ProductTableEnhanced({
   products,
   urgentThreshold = 3,
   warningThreshold = 7,
+  referenceDate,
   onProductEdit,
   onProductDelete,
   onProductConsume,
@@ -436,8 +438,8 @@ export function ProductTableEnhanced({
             </span>;
           }
 
-          const daysLeft = differenceInDays(startOfDay(date), startOfDay(new Date()));
-          const status = getExpiryStatus(date, urgentThreshold, warningThreshold);
+          const daysLeft = differenceInDays(startOfDay(date), startOfDay(referenceDate ?? new Date()));
+          const status = getExpiryStatus(date, urgentThreshold, warningThreshold, referenceDate);
           const config = getStatusConfig(status, daysLeft);
           const StatusIcon = config.icon;
 
@@ -606,6 +608,7 @@ export function ProductTableEnhanced({
       onProductUpdated,
       urgentThreshold,
       warningThreshold,
+      referenceDate,
     ]
   );
 
@@ -648,7 +651,7 @@ export function ProductTableEnhanced({
       )}
       {actionBar}
 
-      <div className="md:hidden"><MobileProductList products={products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} selectedIds={selectedIds} onSelectionChange={onSelectionChange} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
+      <div className="md:hidden"><MobileProductList products={products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} selectedIds={selectedIds} onSelectionChange={onSelectionChange} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
       <div className="hidden md:block rounded-xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/50">

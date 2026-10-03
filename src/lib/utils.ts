@@ -21,9 +21,10 @@ export function getExpiryStatus(
   expiryDate: Date | string | null,
   urgentThreshold = 3,
   warningThreshold = 7,
+  referenceDate: Date = new Date(),
 ): ExpiryStatus {
   if (!expiryDate) return "safe"
-  const now = startOfDay(new Date())
+  const now = startOfDay(referenceDate)
   const expiry = startOfDay(new Date(expiryDate))
   const daysLeft = differenceInDays(expiry, now)
 

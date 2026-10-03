@@ -1,3 +1,4 @@
+import { notifySettingsChanged } from "@/lib/inventory-settings";
 import { useState, useEffect, useId } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,15 +19,16 @@ interface GlowInputProps {
   label: string;
   value: string | number;
   onChange: (v: string) => void;
+  onBlur?: () => void;
   type?: string;
   placeholder?: string;
   inputClassName?: string;
 }
 
-function GlowInput({ label, value, onChange, type = "text", placeholder, inputClassName }: GlowInputProps) {
+function GlowInput({ label, value, onChange, onBlur, type = "text", placeholder, inputClassName }: GlowInputProps) {
   const id = useId();
   return (
-    <div>
+    <div className="min-w-0">
       <label htmlFor={id} className="block text-sm font-semibold text-muted-foreground mb-1.5">
         {label}
       </label>
@@ -35,9 +37,10 @@ function GlowInput({ label, value, onChange, type = "text", placeholder, inputCl
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         placeholder={placeholder}
         className={cn(
-          "w-full rounded-xl border bg-slate-50/80 dark:bg-slate-800/60 px-4 py-3 text-base text-foreground",
+          "w-full min-w-0 rounded-xl border bg-slate-50/80 dark:bg-slate-800/60 px-4 py-3 text-base text-foreground",
           "border-slate-200 dark:border-slate-700",
           "transition-all duration-200",
           " focus:border-blue-400 focus:bg-white dark:focus:bg-slate-800",
@@ -79,8 +82,8 @@ const SettingsPage = () => {
   const [settings, setSettings] = useState({
     telegramNotifications: true,
     emailNotifications: false,
-    urgentThreshold: 3,
-    warningThreshold: 7,
+    urgentThreshold: 3 as number | string,
+    warningThreshold: 7 as number | string,
     telegramToken: "",
     telegramChatId: "",
     smtpHost: "",
@@ -104,19 +107,27 @@ const SettingsPage = () => {
   }, []);
 
   const handleSave = async () => {
+    const normalizedSettings = {
+      ...settings,
+      urgentThreshold: Number(settings.urgentThreshold),
+      warningThreshold: Number(settings.warningThreshold),
+    };
+    setSettings(normalizedSettings);
     setIsSaving(true);
     try {
       const cleanUser = { name: user.name, email: user.email };
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: cleanUser, settings }),
+        body: JSON.stringify({ user: cleanUser, settings: normalizedSettings }),
       });
       if (res.ok) {
+        notifySettingsChanged();
         toast.success("Настройки сохранены!");
         updateSession({ user: { ...session?.user, ...cleanUser } });
       } else {
-        toast.error("Ошибка сохранения");
+        const error = await res.json();
+        toast.error(error.message || "Ошибка сохранения");
       }
     } catch {
       toast.error("Ошибка сети");
@@ -206,7 +217,7 @@ const SettingsPage = () => {
               enabled={settings.emailNotifications}
               onToggle={(v) => setSettings({ ...settings, emailNotifications: v })}
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 items-end sm:grid-cols-2 gap-3">
                 <GlowInput
                   label="SMTP Host"
                   value={settings.smtpHost || ""}
@@ -243,7 +254,7 @@ const SettingsPage = () => {
                 placeholder="notify@example.com"
               />
               {/* Notify times */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 items-end sm:grid-cols-2 gap-3">
                 <GlowInput
                   label="Время отчёта Срочно"
                   value={settings.urgentNotifyTime || "10:00"}
@@ -302,7 +313,8 @@ const SettingsPage = () => {
                   <GlowInput
                     label="Дней до истечения"
                     value={settings.urgentThreshold}
-                    onChange={(v) => setSettings({ ...settings, urgentThreshold: parseInt(v) || 0 })}
+                    onChange={(v) => setSettings({ ...settings, urgentThreshold: v === "" ? "" : parseInt(v, 10) || 0 })}
+                    onBlur={() => setSettings((prev) => ({ ...prev, urgentThreshold: Number(prev.urgentThreshold) }))}
                     type="number"
                   />
                 </div>
@@ -319,7 +331,8 @@ const SettingsPage = () => {
                   <GlowInput
                     label="Дней до истечения"
                     value={settings.warningThreshold}
-                    onChange={(v) => setSettings({ ...settings, warningThreshold: parseInt(v) || 0 })}
+                    onChange={(v) => setSettings({ ...settings, warningThreshold: v === "" ? "" : parseInt(v, 10) || 0 })}
+                    onBlur={() => setSettings((prev) => ({ ...prev, warningThreshold: Number(prev.warningThreshold) }))}
                     type="number"
                   />
                 </div>
@@ -384,7 +397,7 @@ const SettingsPage = () => {
       </div>
 
       {/* Tab content */}
-      <div className="work-surface p-6">
+      <div className="work-surface p-4 sm:p-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

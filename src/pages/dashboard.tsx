@@ -1,3 +1,4 @@
+import { watchInventorySettings } from "@/lib/inventory-settings";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { Product } from "@prisma/client";
 import { useSession } from "next-auth/react";
@@ -161,6 +162,7 @@ const Dashboard = () => {
     urgentThreshold: number;
     warningThreshold: number;
   } | null>(null);
+  const [referenceDate, setReferenceDate] = useState(() => new Date());
   const [scanOpen, setScanOpen] = useState(false);
   const [scanCameraOpen, setScanCameraOpen] = useState(false);
   const [scanCode, setScanCode] = useState("");
@@ -213,8 +215,8 @@ const Dashboard = () => {
   }, []);
   useEffect(() => {
     void loadProducts();
-    fetch("/api/settings").then(res => res.ok ? res.json() : null).then(setSettings).catch(() => {});
   }, [loadProducts]);
+  useEffect(() => watchInventorySettings((next, now) => { setSettings(next); setReferenceDate(now); }, setReferenceDate), []);
 
   const closeScan = useCallback(() => {
     scanVersion.current++; scanLock.current = false;
@@ -343,7 +345,7 @@ const Dashboard = () => {
       // Status filter
       if (statusFilter !== "ALL") {
         if (statusFilter === "EXPIRED" || statusFilter === "SOON") {
-          const urgency = getExpiryStatus(p.expiryDate, settings?.urgentThreshold, settings?.warningThreshold);
+          const urgency = getExpiryStatus(p.expiryDate, settings?.urgentThreshold, settings?.warningThreshold, referenceDate);
           if (p.status !== "ACTIVE" || !p.expiryDate) return false;
           if (statusFilter === "EXPIRED" ? urgency !== "expired" : urgency !== "urgent" && urgency !== "warning") return false;
         } else if (p.status !== statusFilter) {
@@ -414,19 +416,21 @@ const Dashboard = () => {
         p.expiryDate,
         settings?.urgentThreshold,
         settings?.warningThreshold,
+        referenceDate,
       );
-      return s === "urgent" || s === "warning";
+      return p.status === "ACTIVE" && (s === "urgent" || s === "warning");
     }).length;
     const expired = products.filter(
-      (p) =>
+      (p) => p.status === "ACTIVE" &&
         getExpiryStatus(
           p.expiryDate,
           settings?.urgentThreshold,
           settings?.warningThreshold,
+          referenceDate,
         ) === "expired",
     ).length;
     return { total, expiringSoon, expired };
-  }, [products, settings]);
+  }, [products, settings, referenceDate]);
 
   /* ── Status chip options ── */
   const statusChips = [
@@ -611,6 +615,7 @@ const Dashboard = () => {
               products={paginatedProducts}
               urgentThreshold={settings?.urgentThreshold}
               warningThreshold={settings?.warningThreshold}
+              referenceDate={referenceDate}
               selectedIds={selectedIds}
               sortField={sortField}
               sortDesc={sortDesc}
@@ -724,7 +729,7 @@ const Dashboard = () => {
 
       {/* Edit product dialog */}
       <Dialog open={isEditModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="work-panel sm:max-w-md max-h-[90dvh] overflow-y-auto">
+        <DialogContent className="work-panel product-dialog sm:max-w-md max-h-[90dvh] overflow-y-auto" onOpenAutoFocus={event => event.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Редактировать товар</DialogTitle>
           </DialogHeader>

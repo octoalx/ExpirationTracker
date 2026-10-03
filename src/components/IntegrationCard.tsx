@@ -66,7 +66,7 @@ export default function IntegrationCard({
               transition={{ duration: 0.25, ease: "easeInOut" }}
               className="overflow-hidden"
             >
-              <div className="px-4 pb-4 pt-1 space-y-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="px-4 py-4 space-y-3 border-t border-slate-100 dark:border-slate-800">
                 {children}
               </div>
             </motion.div>

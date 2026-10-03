@@ -20,6 +20,9 @@ interface BackupData {
       name: string;
       barcode: string;
       expiryDate?: string | Date | null;
+      manufacturingDate?: string | null;
+      shelfLife?: number | null;
+      shelfLifeUnit?: string | null;
       status?: string;
       isExpired?: boolean;
       quantity?: number | null;
@@ -151,6 +154,9 @@ export default async function handler(
                 name: product.name,
                 barcode: product.barcode,
                 expiryDate: product.expiryDate == null ? null : new Date(product.expiryDate),
+                manufacturingDate: product.manufacturingDate ?? null,
+                shelfLife: product.shelfLife ?? null,
+                shelfLifeUnit: product.shelfLifeUnit ?? null,
                 status: product.status ?? "ACTIVE",
                 isExpired: product.isExpired ?? false,
                 quantity: product.quantity,
@@ -164,6 +170,9 @@ export default async function handler(
                 name: product.name,
                 barcode: product.barcode,
                 expiryDate: product.expiryDate == null ? null : new Date(product.expiryDate),
+                manufacturingDate: product.manufacturingDate ?? null,
+                shelfLife: product.shelfLife ?? null,
+                shelfLifeUnit: product.shelfLifeUnit ?? null,
                 status: product.status ?? "ACTIVE",
                 isExpired: product.isExpired ?? false,
                 quantity: product.quantity,

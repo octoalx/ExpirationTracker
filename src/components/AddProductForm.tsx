@@ -51,7 +51,7 @@ export default function AddProductForm({ onProductAdded, initialBarcode = "" }: 
     if (dateInputType === "manufacture" && !calculatedExpiry) { setError("Укажите дату изготовления и положительный целый срок хранения."); return; }
     saving.current = true; setIsLoading(true); setError("");
     try {
-      const response = await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), barcode: barcode.trim(), expiryDate: selectedExpiry, ...(quantity ? { quantity: Number(quantity) } : {}) }) });
+      const response = await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), barcode: barcode.trim(), expiryDate: selectedExpiry, manufacturingDate: dateInputType === "manufacture" ? manufacturingDate : null, shelfLife: dateInputType === "manufacture" ? Number(shelfLife) : null, shelfLifeUnit: dateInputType === "manufacture" ? shelfLifeUnit : null, ...(quantity ? { quantity: Number(quantity) } : {}) }) });
       if (!response.ok) throw new Error("Не удалось сохранить товар. Введённые данные сохранены в форме.");
       const product: Product = await response.json(); interactionFeedback("save"); toast.success(`${product.name} — товар сохранён`); onProductAdded(product);
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Ошибка сети. Проверьте подключение и повторите сохранение."); }
