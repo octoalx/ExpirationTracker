@@ -22,7 +22,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <Layout>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={router.asPath}
+            key={router.pathname}
             variants={pageVariants}
             initial="initial"
             animate="animate"
