@@ -26,6 +26,9 @@ export function mobileSortForStatusFilter(statusFilter: string): MobileSortOptio
     : DEFAULT_MOBILE_SORT;
 }
 
+/** Non-breaking space that keeps a day count and its unit on one line. */
+const NBSP = " ";
+
 /**
  * Formats the remaining shelf-life days for the phone product list.
  * Non-finite, negative or missing values return an empty string so the
@@ -35,8 +38,21 @@ export function formatDaysLeft(days: number): string {
   if (!Number.isFinite(days) || days < 0) return "";
   const wholeDays = Math.floor(days);
   if (wholeDays === 0) return "сегодня";
-  if (wholeDays === 1) return "1 день";
-  return `${wholeDays} дн.`;
+  if (wholeDays === 1) return `1${NBSP}день`;
+  return `${wholeDays}${NBSP}дн.`;
+}
+
+/**
+ * Formats the overdue part of an expired product for the phone list.
+ *
+ * differenceInDays reports already-expired dates as negative values. The
+ * badge drops the minus sign and shows the elapsed whole days, e.g. `-3`
+ * becomes `3 дн.` and `-1` becomes `1 день`. Zero (expires today) and
+ * invalid values return an empty string.
+ */
+export function formatExpiredDaysLeft(daysLeft: number): string {
+  if (!Number.isFinite(daysLeft) || daysLeft >= 0) return "";
+  return formatDaysLeft(Math.abs(daysLeft));
 }
 
 /**

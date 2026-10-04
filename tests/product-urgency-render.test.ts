@@ -18,11 +18,11 @@ test("desktop and mobile inventory render saved urgency thresholds consistently"
   assert.ok(!safe.includes("Внимание · 20 дн."));
   const warning = render(3, 30);
   assert.ok(warning.includes("Внимание · 20 дн."), "Desktop displays warning and days");
-  assert.ok(warning.includes('Внимание<span class="block tabular-nums">20 дн.</span>'), "Mobile displays days below warning");
+  assert.ok(warning.includes('Внимание<span class="block tabular-nums">20\u00A0дн.</span>'), "Mobile displays days below warning");
   assert.ok(warning.includes("text-expiry-marker"));
   const urgent = render(20, 30);
   assert.ok(urgent.includes("Срочно · 20 дн."), "Desktop displays urgent at the boundary");
-  assert.ok(urgent.includes('Срочно<span class="block tabular-nums">20 дн.</span>'), "Mobile displays days below urgent at the boundary");
+  assert.ok(urgent.includes('Срочно<span class="block tabular-nums">20\u00A0дн.</span>'), "Mobile displays days below urgent at the boundary");
   assert.ok(urgent.includes("text-red-600"));
 });
 
@@ -43,4 +43,23 @@ test("mobile sort helpers place missing expiry dates last and map status tabs", 
   assert.equal(mobileSortForStatusFilter("SOON"), "expiring-soonest");
   assert.equal(mobileSortForStatusFilter("EXPIRED"), "expiring-soonest");
   assert.equal(mobileSortForStatusFilter("ALL"), "newest");
+});
+
+test("mobile expired status renders overdue days on a second line", () => {
+  const referenceDate = new Date(2026, 9, 3, 12);
+  const make = (id: string, expiryDate: Date): Product => ({
+    id, name: `Product ${id}`, barcode: "4607015330124", expiryDate,
+    status: "ACTIVE", isExpired: false, quantity: null, createdAt: referenceDate,
+    updatedAt: referenceDate, userId: "owner", manufacturingDate: null,
+    shelfLife: null, shelfLifeUnit: null,
+  });
+  const render = (expiryDate: Date) => renderToStaticMarkup(createElement(ProductTableEnhanced,
+    { products: [make("expired", expiryDate)], urgentThreshold: 3, warningThreshold: 7, referenceDate }));
+
+  const threeDays = render(new Date(2026, 8, 30));
+  assert.ok(threeDays.includes(`Просрочен<span class="block tabular-nums">3\u00A0дн.</span>`), "Mobile expired status shows overdue days below the label");
+  assert.ok(threeDays.includes("text-red-700"), "Expired mobile status keeps its red styling");
+
+  const oneDay = render(new Date(2026, 9, 2));
+  assert.ok(oneDay.includes(`Просрочен<span class="block tabular-nums">1\u00A0день</span>`), "Mobile expired status uses the singular for one day");
 });
