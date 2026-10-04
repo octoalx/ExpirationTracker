@@ -299,6 +299,7 @@ const SettingsPage = () => {
             <div>
               <h2 className="text-lg font-bold text-foreground">Статусы</h2>
               <p className="text-sm text-muted-foreground">Пороги для срочности товаров</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Поля «Срочно» и «Внимание» определяют, какие товары попадают во вкладку «Скоро истекает».</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="relative rounded-2xl p-px overflow-hidden">

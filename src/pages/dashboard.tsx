@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import BarcodeCamera from "../components/BarcodeCamera";
 import { findScannedProducts } from "@/lib/product-scan";
 import { interactionFeedback } from "@/lib/interaction-feedback";
+import { DEFAULT_MOBILE_SORT, mobileSortForStatusFilter, sortProductsForMobile, type MobileSortOption } from "@/lib/days-left";
 import toast from "react-hot-toast";
 import AddProductForm from "../components/AddProductForm";
 import EditProductForm from "../components/EditProductForm";
@@ -187,6 +188,7 @@ const Dashboard = () => {
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [sortField, setSortField] = useState<"name" | "barcode" | "expiryDate" | "quantity" | "status" | "createdAt">("createdAt");
   const [sortDesc, setSortDesc] = useState(true);
+  const [mobileSort, setMobileSort] = useState<MobileSortOption>(DEFAULT_MOBILE_SORT);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -397,7 +399,13 @@ const Dashboard = () => {
   // Reset to first page when filters or sort change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, scannedBarcode, statusFilter, sortField, itemsPerPage]);
+  }, [searchTerm, scannedBarcode, statusFilter, sortField, mobileSort, itemsPerPage]);
+
+  // Expiry tabs start with the closest expiry dates; the user can still pick
+  // another mobile order afterwards without it being overwritten.
+  useEffect(() => {
+    setMobileSort(mobileSortForStatusFilter(statusFilter));
+  }, [statusFilter]);
 
   const handleBulkPrint = useCallback(() => {
     const selected = filteredProducts.filter((p) => selectedIds.includes(p.id));
@@ -407,6 +415,15 @@ const Dashboard = () => {
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
   const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
+
+  // The phone list sorts the whole filtered set globally (not only the visible
+  // page) so "soonest/latest" always leads with the real global extreme, while
+  // products missing an expiry date stay at the very end across pages.
+  const mobileSortedProducts = sortProductsForMobile(filteredProducts, mobileSort, referenceDate);
+  const mobilePaginatedProducts = mobileSortedProducts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
@@ -616,12 +633,15 @@ const Dashboard = () => {
           >
             <ProductTableEnhanced
               products={paginatedProducts}
+              mobileProducts={mobilePaginatedProducts}
               urgentThreshold={settings?.urgentThreshold}
               warningThreshold={settings?.warningThreshold}
               referenceDate={referenceDate}
               selectedIds={selectedIds}
               sortField={sortField}
               sortDesc={sortDesc}
+              mobileSort={mobileSort}
+              onMobileSortChange={setMobileSort}
               onSortChange={(field) => {
                 if (sortField === field) {
                   setSortDesc(!sortDesc);
