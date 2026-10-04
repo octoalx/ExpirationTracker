@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { cn, getExpiryStatus } from "@/lib/utils";
 import { createPendingDeletes, type PendingDeletes } from "@/lib/pending-delete";
 import { resolveSwipe, shouldStartDrag } from "@/lib/swipe-gesture";
-import { DEFAULT_MOBILE_SORT, MOBILE_SORT_OPTIONS, formatDaysLeft, sortProductsForMobile, type MobileSortOption } from "@/lib/days-left";
+import { DEFAULT_MOBILE_SORT, MOBILE_SORT_OPTIONS, formatDaysLeft, formatExpiredDaysLeft, sortProductsForMobile, type MobileSortOption } from "@/lib/days-left";
 import { getProductActions, type ProductStatusActionKey } from "@/lib/product-status-actions";
 
 interface Props {
@@ -253,9 +253,13 @@ export default function MobileProductList(props: Props) {
       const days = product.expiryDate ? differenceInDays(startOfDay(new Date(product.expiryDate)), startOfDay(props.referenceDate ?? new Date())) : null;
       const safeLabel = days === null ? "" : formatDaysLeft(days);
       const label = days === null ? "Срок не указан" : urgency === "expired" ? "Просрочен" : urgency === "safe" ? (safeLabel || "В норме") : urgency === "urgent" ? "Срочно" : "Внимание";
-      const daysLabel = days !== null && (urgency === "urgent" || urgency === "warning")
-        ? formatDaysLeft(days) || null
-        : null;
+      const daysLabel = days === null
+        ? null
+        : urgency === "expired"
+          ? formatExpiredDaysLeft(days) || null
+          : urgency === "urgent" || urgency === "warning"
+            ? formatDaysLeft(days) || null
+            : null;
       const open = expanded === product.id;
       const isOpen = openId === product.id;
       const isDragging = dragOffset?.id === product.id;
