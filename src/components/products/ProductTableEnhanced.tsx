@@ -77,6 +77,8 @@ interface ProductTableEnhancedProps {
   /** Phone-list order; controlled by the dashboard when provided. */
   mobileSort?: MobileSortOption;
   onMobileSortChange?: (sort: MobileSortOption) => void;
+  /** The parent renders the phone sort select in its own toolbar. */
+  mobileSortInToolbar?: boolean;
 }
 
 type ExpiryStatus = "expired" | "urgent" | "warning" | "safe";
@@ -146,6 +148,7 @@ export function ProductTableEnhanced({
   onSortChange,
   mobileSort,
   onMobileSortChange,
+  mobileSortInToolbar,
 }: ProductTableEnhancedProps) {
   // Convert selectedIds array to rowSelection object for TanStack Table
   const rowSelection = useMemo(() => {
@@ -667,7 +670,7 @@ export function ProductTableEnhanced({
       )}
       {actionBar}
 
-      <div className="md:hidden"><MobileProductList products={mobileProducts ?? products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} sortOption={mobileSort} onSortChange={onMobileSortChange} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductRemoved={onProductRemoved} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
+      <div className="md:hidden"><MobileProductList products={mobileProducts ?? products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} sortOption={mobileSort} onSortChange={onMobileSortChange} hideSortControl={mobileSortInToolbar} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductRemoved={onProductRemoved} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
       <div className="hidden md:block rounded-xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/50">

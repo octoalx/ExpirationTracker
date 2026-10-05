@@ -24,6 +24,8 @@ interface Props {
   /** Phone-list order. Controlled when provided; otherwise managed internally. */
   sortOption?: MobileSortOption;
   onSortChange?: (sort: MobileSortOption) => void;
+  /** Hides the built-in sort select when the parent renders it in its own toolbar. */
+  hideSortControl?: boolean;
 }
 
 const DELETE_DELAY_MS = 6000;
@@ -232,7 +234,7 @@ export default function MobileProductList(props: Props) {
   );
 
   return <div className="inventory-list">
-    <div className="flex items-center justify-end pb-1">
+    {!props.hideSortControl && <div className="flex items-center justify-end pb-1">
       <label className="flex items-center gap-2 text-sm text-slate-600">
         <ArrowUpDown aria-hidden="true" className="size-4" />
         <select
@@ -246,8 +248,8 @@ export default function MobileProductList(props: Props) {
           ))}
         </select>
       </label>
-    </div>
-    <div className="flex items-center justify-between pb-2 text-sm text-slate-600"><span>Товар</span><span className="pr-8">Годен до</span></div>
+    </div>}
+    <div className="flex items-center justify-between px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><span>Товар</span><span className="pr-8">Годен до</span></div>
     {visibleProducts.map(product => {
       const urgency = getExpiryStatus(product.expiryDate, props.urgentThreshold, props.warningThreshold, props.referenceDate);
       const days = product.expiryDate ? differenceInDays(startOfDay(new Date(product.expiryDate)), startOfDay(props.referenceDate ?? new Date())) : null;
