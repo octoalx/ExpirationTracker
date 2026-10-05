@@ -6,6 +6,7 @@ import { Loader2, Barcode, Package, Calendar, X, Hash } from "lucide-react";
 import toast from "react-hot-toast";
 import { Product } from "@prisma/client";
 import { calculateExpiryDate, type ShelfLifeUnit } from "@/lib/shelf-life";
+import { useKeyboardInset } from "@/lib/keyboard-inset";
 
 interface EditProductFormProps {
   product: Product;
@@ -19,6 +20,7 @@ export default function EditProductForm({
   onProductUpdated,
   onCancel,
 }: EditProductFormProps) {
+  useKeyboardInset();
   const [barcode, setBarcode] = useState(product.barcode || "");
   const [name, setName] = useState(product.name);
   const [quantity, setQuantity] = useState<number | "">(product.quantity ?? "");
