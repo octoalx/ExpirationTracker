@@ -120,8 +120,11 @@ export default function SignIn() {
           {/* Header */}
           <div className="text-center">
             <h1 className="work-brand">
-              ExpiTrack
+              Expi<span className="text-[#1554b5]">Track</span>
             </h1>
+            <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+              Учёт сроков годности
+            </p>
             <h2 className="mt-3 text-xl font-bold text-foreground">
               С возвращением
             </h2>

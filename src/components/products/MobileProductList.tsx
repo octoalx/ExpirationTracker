@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { Product } from "@prisma/client";
 import { format, differenceInDays, startOfDay } from "date-fns";
-import { ChevronDown, Pencil, Archive, AlertTriangle, CheckCircle2, Trash2, ScanBarcode, Circle, type LucideIcon } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Pencil, Archive, AlertTriangle, CheckCircle2, Trash2, ScanBarcode, Circle, type LucideIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn, getExpiryStatus } from "@/lib/utils";
 import { createPendingDeletes, type PendingDeletes } from "@/lib/pending-delete";
@@ -233,13 +233,13 @@ export default function MobileProductList(props: Props) {
 
   return <div className="inventory-list">
     <div className="flex items-center justify-end pb-1">
-      <label className="flex items-center gap-1.5 text-sm text-slate-600">
-        <span>Сортировка</span>
+      <label className="flex items-center gap-2 text-sm text-slate-600">
+        <ArrowUpDown aria-hidden="true" className="size-4" />
         <select
           aria-label="Сортировка"
           value={sortOption}
           onChange={(event) => handleSortChange(event.target.value as MobileSortOption)}
-          className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700"
+          className="min-h-11 rounded-lg bg-transparent pr-2 text-sm text-slate-700"
         >
           {MOBILE_SORT_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>

@@ -481,10 +481,6 @@ const Dashboard = () => {
             />
           </div>
 
-          <Button variant="outline" size="sm" onClick={resetFilters} className="hidden md:inline-flex">
-            Сбросить
-          </Button>
-
           <button type="button" onClick={openScan} className="primary-action w-full md:w-auto"><ScanBarcode className="size-6" />Сканировать товар</button>
         </div>
 
@@ -502,7 +498,7 @@ const Dashboard = () => {
         </div>
         <div className="flex items-center justify-between gap-2 text-sm">
           <label className="flex items-center gap-2 text-slate-600"><ListFilter className="size-4" /><span className="sr-only">Состояние товаров</span><select className="min-h-11 rounded-lg bg-transparent pr-2" aria-label="Состояние товаров" value={["ACTIVE", "ARCHIVED", "DEFECT"].includes(statusFilter) ? statusFilter : "ALL"} onChange={event => { setStatusFilter(event.target.value); }}><option value="ALL">Все состояния</option><option value="ACTIVE">Активные</option><option value="ARCHIVED">Архив</option><option value="DEFECT">Брак</option></select></label>
-          {(searchTerm || scannedBarcode || statusFilter !== "ALL") && <button className="min-h-11 px-2 text-blue-700 md:hidden" onClick={resetFilters}>Сбросить</button>}
+          {(searchTerm || scannedBarcode || statusFilter !== "ALL") && <button className="min-h-11 px-2 text-sm font-semibold text-[#1554b5] hover:text-[#12479a]" onClick={resetFilters}>Сбросить</button>}
         </div>
       </div>
 

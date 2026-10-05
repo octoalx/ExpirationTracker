@@ -92,7 +92,7 @@ export default function CatalogImport() {
       {entries.length > 100 && <p className="mt-2 text-xs">Показаны первые 100 записей. Загружены будут все {entries.length}.</p>}
       <p className="mt-2 text-sm">Существующие названия с совпадающим штрих-кодом будут заменены. Повторная загрузка не создаёт дубликаты.</p>
       <p className="mt-2 text-sm">Товары, которых нет в новой выгрузке, останутся в справочнике. Главные таблицы пользователей не изменятся. Дождитесь завершения загрузки, не закрывая вкладку.</p>
-      <button type="button" disabled={busy} className="mt-3 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50" onClick={async () => {
+      <button type="button" disabled={busy} className="mt-3 rounded-lg bg-[#1554b5] px-3 py-2 text-sm text-white disabled:opacity-50" onClick={async () => {
         setBusy(true); setMessage(""); setCompleted(0);
         try {
           const imported = await importCatalogBatches(entries, async batch => {

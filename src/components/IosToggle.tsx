@@ -24,7 +24,7 @@ export default function IosToggle({ label, checked, onChange, disabled = false }
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
         "disabled:opacity-50 disabled:cursor-not-allowed",
         checked
-          ? "bg-blue-500"
+          ? "bg-[#1554b5]"
           : "bg-slate-300 dark:bg-slate-600",
       )}
     >

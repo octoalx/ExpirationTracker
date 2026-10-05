@@ -417,7 +417,7 @@ export default function UsersTab() {
                   Отмена
                 </Button>
                 <Button
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex-1 bg-[#1554b5] hover:bg-[#12479a] text-white"
                   onClick={handleResetPassword}
                   disabled={resetting || newPassword.length < 6}
                 >

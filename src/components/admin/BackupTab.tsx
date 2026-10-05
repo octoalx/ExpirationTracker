@@ -335,7 +335,7 @@ export default function BackupTab() {
             size="sm"
             onClick={saveBackupSettings}
             disabled={savingSettings}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-[#1554b5] hover:bg-[#12479a] text-white"
           >
             {savingSettings ? (
               <Loader2 className="h-3 w-3 animate-spin mr-1" />
@@ -432,7 +432,7 @@ export default function BackupTab() {
         <Button
           onClick={handleExport}
           disabled={exporting}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-[#1554b5] hover:bg-[#12479a] text-white"
         >
           {exporting ? (
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
