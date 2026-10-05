@@ -173,7 +173,7 @@ export default function EditProductForm({
         <button
           type="submit"
           disabled={isLoading}
-          className="flex-1 bg-blue-700 hover:bg-blue-800  text-white font-semibold py-3.5 rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex-1 bg-[#1554b5] hover:bg-[#12479a] text-white font-semibold py-3.5 rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">

@@ -194,7 +194,7 @@ export default function Register() {
               disabled={isLoading}
               className={cn(
                 "w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white",
-                "bg-blue-700 hover:bg-blue-800",
+                "bg-[#1554b5] hover:bg-[#12479a]",
                 "active:scale-[0.98]",
                 "transition-all duration-200",
                 "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100",
