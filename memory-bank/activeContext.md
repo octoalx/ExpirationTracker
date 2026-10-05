@@ -1,5 +1,10 @@
 # Active context
 
+## Mobile UI polish — 2026-10-05
+- Unified primary blue (#1554b5) across auth, admin, import and toggle controls; mobile inventory toolbar now keeps filter, sort and reset in one row; statistics page uses compact tiles, a segmented risk filter and the threshold note under the list.
+- Add/Edit product dialogs: `useKeyboardInset` (src/lib/keyboard-inset.ts) sets `--keyboard-inset` from visualViewport so the last field scrolls above the phone keyboard. Verified with an emulated viewport shrink and unit tests; real iOS/Android keyboard check remains with the owner.
+- Unused `ProductCard.tsx` and inert `dark:` classes left untouched.
+
 ## Owner acceptance — 2026-10-03
 - Owner confirmed all outstanding phone camera, mobile form/navigation and public
   Cloudflare Access checks work correctly. Physical-device acceptance is complete.

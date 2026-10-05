@@ -6,11 +6,13 @@ import toast from "react-hot-toast";
 import BarcodeCamera from "./BarcodeCamera";
 import { calculateExpiryDate, type ShelfLifeUnit } from "@/lib/shelf-life";
 import { interactionFeedback } from "@/lib/interaction-feedback";
+import { useKeyboardInset } from "@/lib/keyboard-inset";
 
 interface AddProductFormProps { onProductAdded: (product: Product) => void; initialBarcode?: string }
 
 /** Focused registration with catalog lookup and an explicit calculated-date preview. */
 export default function AddProductForm({ onProductAdded, initialBarcode = "" }: AddProductFormProps) {
+  useKeyboardInset();
   const [barcode, setBarcode] = useState(initialBarcode);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");

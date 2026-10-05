@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import BarcodeCamera from "../components/BarcodeCamera";
 import { findScannedProducts } from "@/lib/product-scan";
 import { interactionFeedback } from "@/lib/interaction-feedback";
-import { DEFAULT_MOBILE_SORT, mobileSortForStatusFilter, sortProductsForMobile, type MobileSortOption } from "@/lib/days-left";
+import { DEFAULT_MOBILE_SORT, MOBILE_SORT_OPTIONS, mobileSortForStatusFilter, sortProductsForMobile, type MobileSortOption } from "@/lib/days-left";
 import toast from "react-hot-toast";
 import AddProductForm from "../components/AddProductForm";
 import EditProductForm from "../components/EditProductForm";
@@ -41,6 +41,8 @@ import {
   ListFilter,
   FileSpreadsheet,
   Printer,
+  ArrowUpDown,
+  X,
 } from "lucide-react";
 
 /* ── Debounce hook ── */
@@ -460,7 +462,7 @@ const Dashboard = () => {
   ];
 
   const content = (
-    <div className="inventory-page mx-auto flex w-full max-w-7xl flex-col gap-5">
+    <div className="inventory-page mx-auto flex w-full max-w-7xl flex-col gap-4 md:gap-5">
       <header className="flex items-center justify-between gap-3">
         <h1 className="flex items-center gap-3 work-page-title">Товары <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-base font-medium tabular-nums text-slate-600">{products.length}</span></h1>
         <Button variant="outline" onClick={openAdd} className="min-h-11 gap-2"><Plus className="size-4" /><span>Добавить</span></Button>
@@ -481,16 +483,12 @@ const Dashboard = () => {
             />
           </div>
 
-          <Button variant="outline" size="sm" onClick={resetFilters} className="hidden md:inline-flex">
-            Сбросить
-          </Button>
-
           <button type="button" onClick={openScan} className="primary-action w-full md:w-auto"><ScanBarcode className="size-6" />Сканировать товар</button>
         </div>
 
         {scannedBarcode && <div role="status" className="scan-result flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-900"><span>Штрих-код <strong className="tabular-nums">{scannedBarcode}</strong> · Найдено: {filteredProducts.length}</span><button className="min-h-11 font-medium underline underline-offset-4" onClick={resetFilters}>Все товары</button></div>}
         {/* Status filter chips */}
-        <div className="flex items-center gap-1 border-b border-slate-200">
+        <div className="flex items-center gap-1 border-b border-slate-200 !mt-4">
           {statusChips.map((c) => (
             <Chip
               key={c.value}
@@ -500,9 +498,10 @@ const Dashboard = () => {
             />
           ))}
         </div>
-        <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="!mt-1 flex items-center justify-between gap-2 text-sm">
           <label className="flex items-center gap-2 text-slate-600"><ListFilter className="size-4" /><span className="sr-only">Состояние товаров</span><select className="min-h-11 rounded-lg bg-transparent pr-2" aria-label="Состояние товаров" value={["ACTIVE", "ARCHIVED", "DEFECT"].includes(statusFilter) ? statusFilter : "ALL"} onChange={event => { setStatusFilter(event.target.value); }}><option value="ALL">Все состояния</option><option value="ACTIVE">Активные</option><option value="ARCHIVED">Архив</option><option value="DEFECT">Брак</option></select></label>
-          {(searchTerm || scannedBarcode || statusFilter !== "ALL") && <button className="min-h-11 px-2 text-blue-700 md:hidden" onClick={resetFilters}>Сбросить</button>}
+          <label className="flex items-center gap-2 text-slate-600 md:hidden"><ArrowUpDown aria-hidden="true" className="size-4" /><select className="min-h-11 rounded-lg bg-transparent pr-2" aria-label="Сортировка" value={mobileSort} onChange={event => setMobileSort(event.target.value as MobileSortOption)}>{MOBILE_SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+          {(searchTerm || scannedBarcode || statusFilter !== "ALL") && <button className="min-h-11 px-2 text-sm font-semibold text-[#1554b5] hover:text-[#12479a] max-md:-mr-2 max-md:min-w-11 max-md:justify-center max-md:px-2.5 inline-flex items-center" aria-label="Сбросить фильтры" onClick={resetFilters}><span className="max-md:sr-only">Сбросить</span><X aria-hidden="true" className="size-6 md:hidden" /></button>}
         </div>
       </div>
 
@@ -642,6 +641,7 @@ const Dashboard = () => {
               sortDesc={sortDesc}
               mobileSort={mobileSort}
               onMobileSortChange={setMobileSort}
+              mobileSortInToolbar
               onSortChange={(field) => {
                 if (sortField === field) {
                   setSortDesc(!sortDesc);

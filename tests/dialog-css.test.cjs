@@ -56,3 +56,20 @@ test('mobile product dialog cannot scroll sideways and wraps long barcodes', asy
   assert.ok(clipped, 'Mobile product dialog must clip horizontal overflow');
   assert.ok(wrapped, 'Long barcode in the summary must wrap instead of widening the form');
 });
+
+test('mobile product dialog reserves room for the on-screen keyboard', async () => {
+  const source = fs.readFileSync('src/styles/globals.css', 'utf8');
+  const compiled = await postcss([tailwind({ base: process.cwd() })]).process(source, { from: 'src/styles/globals.css' });
+  const optimized = await postcss([cssnano({}, postcss)]).process(compiled.css, { from: undefined });
+  let reserved = false;
+  optimized.root.walkRules(rule => {
+    if (!rule.selector.includes('.product-dialog[data-slot=dialog-content]')) return;
+    const declarations = Object.fromEntries(rule.nodes.filter(node => node.type === 'decl').map(node => [node.prop, node.value]));
+    if (declarations['padding-bottom']) {
+      assert.match(rule.parent.params, /max-width:\s*767px/);
+      assert.match(declarations['padding-bottom'], /var\(--keyboard-inset/);
+      reserved = true;
+    }
+  });
+  assert.ok(reserved, 'Keyboard inset padding must survive CSS optimization');
+});

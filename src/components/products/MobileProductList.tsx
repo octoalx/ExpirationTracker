@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { Product } from "@prisma/client";
 import { format, differenceInDays, startOfDay } from "date-fns";
-import { ChevronDown, Pencil, Archive, AlertTriangle, CheckCircle2, Trash2, ScanBarcode, Circle, type LucideIcon } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Pencil, Archive, AlertTriangle, CheckCircle2, Trash2, ScanBarcode, Circle, type LucideIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn, getExpiryStatus } from "@/lib/utils";
 import { createPendingDeletes, type PendingDeletes } from "@/lib/pending-delete";
@@ -24,6 +24,8 @@ interface Props {
   /** Phone-list order. Controlled when provided; otherwise managed internally. */
   sortOption?: MobileSortOption;
   onSortChange?: (sort: MobileSortOption) => void;
+  /** Hides the built-in sort select when the parent renders it in its own toolbar. */
+  hideSortControl?: boolean;
 }
 
 const DELETE_DELAY_MS = 6000;
@@ -232,22 +234,22 @@ export default function MobileProductList(props: Props) {
   );
 
   return <div className="inventory-list">
-    <div className="flex items-center justify-end pb-1">
-      <label className="flex items-center gap-1.5 text-sm text-slate-600">
-        <span>Сортировка</span>
+    {!props.hideSortControl && <div className="flex items-center justify-end pb-1">
+      <label className="flex items-center gap-2 text-sm text-slate-600">
+        <ArrowUpDown aria-hidden="true" className="size-4" />
         <select
           aria-label="Сортировка"
           value={sortOption}
           onChange={(event) => handleSortChange(event.target.value as MobileSortOption)}
-          className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700"
+          className="min-h-11 rounded-lg bg-transparent pr-2 text-sm text-slate-700"
         >
           {MOBILE_SORT_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
       </label>
-    </div>
-    <div className="flex items-center justify-between pb-2 text-sm text-slate-600"><span>Товар</span><span className="pr-8">Годен до</span></div>
+    </div>}
+    <div className="flex items-center justify-between px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><span>Товар</span><span className="pr-8">Годен до</span></div>
     {visibleProducts.map(product => {
       const urgency = getExpiryStatus(product.expiryDate, props.urgentThreshold, props.warningThreshold, props.referenceDate);
       const days = product.expiryDate ? differenceInDays(startOfDay(new Date(product.expiryDate)), startOfDay(props.referenceDate ?? new Date())) : null;

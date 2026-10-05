@@ -120,8 +120,11 @@ export default function SignIn() {
           {/* Header */}
           <div className="text-center">
             <h1 className="work-brand">
-              ExpiTrack
+              Expi<span className="text-[#1554b5]">Track</span>
             </h1>
+            <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+              Учёт сроков годности
+            </p>
             <h2 className="mt-3 text-xl font-bold text-foreground">
               С возвращением
             </h2>
@@ -165,7 +168,7 @@ export default function SignIn() {
               disabled={isLoading}
               className={cn(
                 "w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white",
-                "bg-blue-700 hover:bg-blue-800",
+                "bg-[#1554b5] hover:bg-[#12479a]",
                 "active:scale-[0.98]",
                 "transition-all duration-200",
                 "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100",
