@@ -3,11 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 
-interface ProductInput {
-  barcode: string;
-  name: string;
-  quantity: number | null;
-}
+import { validateInventoryProducts } from "../../../lib/inventory-import";
 
 interface ImportResponse {
   imported: number;
@@ -30,10 +26,11 @@ export default async function handler(
   }
 
   try {
-    const { products } = req.body as { products: ProductInput[] };
-
-    if (!products || !Array.isArray(products) || products.length === 0) {
-      return res.status(400).json({ error: "Нет товаров для импорта" });
+    let products;
+    try {
+      products = validateInventoryProducts(req.body?.products);
+    } catch (error) {
+      return res.status(400).json({ error: error instanceof Error ? error.message : "Некорректные товары" });
     }
 
     const userId = session.user.id;
@@ -44,7 +41,7 @@ export default async function handler(
             name: p.name,
             barcode: p.barcode,
             quantity: p.quantity,
-            expiryDate: new Date(),
+            expiryDate: p.expiryDate ? new Date(`${p.expiryDate}T00:00:00.000Z`) : null,
             user: { connect: { id: userId } },
           },
         }),

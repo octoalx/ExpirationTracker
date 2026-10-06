@@ -5,7 +5,7 @@
   "scripts": {
     "check:context": "node scripts/check-context.mjs",
     "test:harness": "node --test tests/harness.test.mjs",
-    "test:app": "node --import tsx --test tests/instrumentation.test.cjs tests/catalog-api.test.cjs tests/catalog-parser.test.ts tests/catalog-excel.test.ts tests/catalog-import.test.ts tests/catalog-dbf.test.ts tests/inventory-import.test.ts tests/mobile-product-flow.test.ts tests/inventory-thresholds.test.cjs tests/product-urgency-render.test.ts tests/barcode-camera.test.ts tests/product-dates-api.test.cjs tests/stats-api.test.cjs tests/admin-recovery.test.cjs tests/admin-account-creation.test.cjs tests/dialog-css.test.cjs tests/keyboard-inset.test.ts",
+    "test:app": "node --import tsx --test tests/instrumentation.test.cjs tests/catalog-api.test.cjs tests/catalog-parser.test.ts tests/catalog-excel.test.ts tests/catalog-import.test.ts tests/catalog-dbf.test.ts tests/inventory-import.test.ts tests/simple-excel-import.test.ts tests/simple-excel-api.test.cjs tests/mobile-product-flow.test.ts tests/inventory-thresholds.test.cjs tests/product-urgency-render.test.ts tests/barcode-camera.test.ts tests/product-dates-api.test.cjs tests/stats-api.test.cjs tests/admin-recovery.test.cjs tests/admin-account-creation.test.cjs tests/account-settings.test.cjs tests/dialog-css.test.cjs tests/keyboard-inset.test.ts",
     "typecheck": "tsc --noEmit --incremental false",
     "verify": "node scripts/verify.mjs",
     "verify:release": "node scripts/verify.mjs --profile release",

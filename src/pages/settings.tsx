@@ -23,9 +23,10 @@ interface GlowInputProps {
   type?: string;
   placeholder?: string;
   inputClassName?: string;
+  autoComplete?: string;
 }
 
-function GlowInput({ label, value, onChange, onBlur, type = "text", placeholder, inputClassName }: GlowInputProps) {
+function GlowInput({ label, value, onChange, onBlur, type = "text", placeholder, inputClassName, autoComplete }: GlowInputProps) {
   const id = useId();
   return (
     <div className="min-w-0">
@@ -35,6 +36,7 @@ function GlowInput({ label, value, onChange, onBlur, type = "text", placeholder,
       <input
         id={id}
         type={type}
+        autoComplete={autoComplete}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
@@ -73,6 +75,10 @@ const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState("personal");
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingEmail, setIsTestingEmail] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [user, setUser] = useState({
     name: session?.user?.name || "",
@@ -97,16 +103,21 @@ const SettingsPage = () => {
 
   useEffect(() => {
     fetch("/api/settings")
-      .then((res) => res.json())
+      .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
       .then((data) => {
         if (data) {
           setSettings((prev) => ({ ...prev, ...data.settings }));
           setUser((prev) => ({ ...prev, ...data.user }));
+          setIsLoaded(true);
         }
-      });
+      }).catch(() => toast.error("Не удалось загрузить настройки. Обновите страницу."));
   }, []);
 
   const handleSave = async () => {
+    if (newPassword !== confirmPassword) { toast.error("Новые пароли не совпадают."); return; }
+    if (newPassword && (newPassword.length < 8 || new TextEncoder().encode(newPassword).length > 72)) {
+      toast.error("Пароль: минимум 8 символов, максимум 72 байта UTF-8."); return;
+    }
     const normalizedSettings = {
       ...settings,
       urgentThreshold: Number(settings.urgentThreshold),
@@ -119,12 +130,13 @@ const SettingsPage = () => {
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: cleanUser, settings: normalizedSettings }),
+        body: JSON.stringify({ user: cleanUser, settings: normalizedSettings, currentPassword, newPassword }),
       });
       if (res.ok) {
         notifySettingsChanged();
         toast.success("Настройки сохранены!");
-        updateSession({ user: { ...session?.user, ...cleanUser } });
+        setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+        await updateSession();
       } else {
         const error = await res.json();
         toast.error(error.message || "Ошибка сохранения");
@@ -168,6 +180,7 @@ const SettingsPage = () => {
               value={user.name}
               onChange={(v) => setUser({ ...user, name: v })}
               placeholder="Ваше имя"
+              autoComplete="name"
             />
             <GlowInput
               label="Email"
@@ -175,7 +188,17 @@ const SettingsPage = () => {
               onChange={(v) => setUser({ ...user, email: v })}
               type="email"
               placeholder="name@example.com"
+              autoComplete="email"
             />
+            <p className="text-sm text-muted-foreground">Этот email используется для входа. Отдельный адрес для уведомлений можно указать во вкладке «Интеграции».</p>
+            <div className="space-y-4 border-t pt-5">
+              <h3 className="text-base font-semibold">Безопасность аккаунта</h3>
+              <p className="text-sm text-muted-foreground">Для смены email или пароля нужен текущий пароль. Чтобы сохранить только имя или настройки, оставьте поля пароля пустыми.</p>
+              <GlowInput label="Текущий пароль" type="password" autoComplete="current-password" value={currentPassword} onChange={setCurrentPassword} />
+              <GlowInput label="Новый пароль" type="password" autoComplete="new-password" value={newPassword} onChange={setNewPassword} />
+              <GlowInput label="Повторите новый пароль" type="password" autoComplete="new-password" value={confirmPassword} onChange={setConfirmPassword} />
+              <p className="text-sm text-muted-foreground">Минимум 8 символов, максимум 72 байта UTF-8 (до 72 латинских или 36 кириллических символов). После сохранения используйте новый email и пароль при входе.</p>
+            </div>
           </div>
         );
 
@@ -415,7 +438,7 @@ const SettingsPage = () => {
         <div className="mt-8 pt-5 border-t border-slate-200/60 dark:border-slate-700/40">
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !isLoaded}
             className={cn(
               "relative inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white",
               "bg-blue-700 hover:bg-blue-800",

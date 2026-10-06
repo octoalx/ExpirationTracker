@@ -5,6 +5,7 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 function load(file, modules, globals = {}) {
+  modules = { 'bcryptjs': { default: require('bcryptjs') }, zod: require('zod'), ...modules };
   const exports = {};
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -42,10 +43,10 @@ test('saved thresholds persist and are immediately returned for the verified own
   };
   try {
     for (const id of ['owner', 'other']) {
-      await prisma.user.create({ data: { id } });
+      await prisma.user.create({ data: { id, email: `${id}@example.invalid` } });
       await prisma.settings.create({ data: { userId: id } });
     }
-    const payload = { user: { name: 'Owner', id: 'other' }, settings: { userId: 'other', urgentThreshold: 3, warningThreshold: 30 } };
+    const payload = { user: { name: 'Owner', email: 'owner@example.invalid', id: 'other' }, settings: { userId: 'other', urgentThreshold: 3, warningThreshold: 30 } };
     assert.equal((await call('POST', payload)).code, 200);
     assert.equal((await call('GET')).data.settings.warningThreshold, 30);
     session = { user: { id: 'other' } };

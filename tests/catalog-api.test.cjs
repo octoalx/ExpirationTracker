@@ -45,7 +45,8 @@ test('catalog/import APIs preserve data, isolate owners and validate before writ
   const catalogParser = load('src/lib/catalog-parser.ts', {});
   const catalog = load('src/pages/api/catalog/index.ts', { 'next-auth/next': auth, '@/lib/auth': { authOptions: {} }, '@/lib/prisma': { prisma }, '@/lib/catalog-parser': catalogParser }).default;
   const adminCatalog = load('src/pages/api/admin/catalog.ts', { 'next-auth/next': auth, '@/lib/auth': { authOptions: {} }, '@/lib/prisma': { prisma }, '@/lib/catalog-parser': catalogParser }).default;
-  const inventory = load('src/pages/api/products/import.ts', { 'next-auth/next': auth, '../../../lib/auth': { authOptions: {} }, '../../../lib/prisma': { prisma } }).default;
+  const inventoryParser = load('src/lib/inventory-import.ts', {});
+  const inventory = load('src/pages/api/products/import.ts', { 'next-auth/next': auth, '../../../lib/auth': { authOptions: {} }, '../../../lib/prisma': { prisma }, '../../../lib/inventory-import': inventoryParser }).default;
   const call = async (handler, method, body = {}, query = {}) => { const res = response(); await handler({ method, body, query }, res); return res; };
   try {
     const entries = [{ barcode: '0123456789012', name: 'Catalog A' }];
@@ -76,12 +77,11 @@ test('catalog/import APIs preserve data, isolate owners and validate before writ
     assert.equal((await call(catalog, 'GET', {}, { barcode: entries[0].barcode })).code, 401);
     session = { user: { id: 'owner' } };
     const products = [{ barcode: '0123456789012', name: 'Excel batch', quantity: null }];
-    const before = Date.now();
     const imported = await call(inventory, 'POST', { products, userId: 'other' });
     assert.equal(imported.data.imported, 1, JSON.stringify(imported.data));
     const batch = await prisma.product.findFirst({ where: { name: 'Excel batch' } });
     assert.equal(batch.userId, 'owner');
-    assert.ok(batch.expiryDate.getTime() >= before && batch.expiryDate.getTime() <= Date.now());
+    assert.equal(batch.expiryDate, null, 'Missing expiry remains unknown');
     assert.equal((await call(inventory, 'POST', { products: [] })).code, 400);
   } finally {
     await prisma.$disconnect();

@@ -1,12 +1,14 @@
 import * as XLSX from "xlsx";
+import { expiryFromManufacture } from "./inventory-import";
 
 export interface ParsedProduct {
   barcode: string;
   name: string;
   quantity: number | null;
+  expiryDate?: string | null;
 }
 
-export type ExcelFileType = "inventory" | "catalog";
+export type ExcelFileType = "inventory" | "catalog" | "simple";
 
 export interface ParseResult {
   fileType: ExcelFileType;
@@ -39,6 +41,14 @@ function detectFileType(ws: XLSX.WorkSheet): ExcelFileType | null {
     ) {
       return "inventory";
     }
+  }
+
+  // A compact table uses fixed columns and arbitrary header labels.
+  const header = [0, 1, 2].map(c => ws[XLSX.utils.encode_cell({ r: 0, c })]?.v);
+  const rangeForSimple = XLSX.utils.decode_range(ws["!ref"] || "A1");
+  if (rangeForSimple.e.c <= 3 && header.every(value => typeof value === "string" && value.trim()) &&
+      String(header[2]).trim().toLowerCase() !== "доступно") {
+    return "simple";
   }
 
   // Catalog type: row 1 has "Штрих-код" or "Наименование товара"
@@ -158,6 +168,37 @@ function parseCatalog(ws: XLSX.WorkSheet): { products: ParsedProduct[]; errors: 
  * @param buffer - Raw Excel file buffer.
  * @returns Parsed products, detected file type, and any parsing errors.
  */
+function parseSimple(ws: XLSX.WorkSheet, date1904: boolean): { products: ParsedProduct[]; errors: string[] } {
+  const products: ParsedProduct[] = [];
+  const errors: string[] = [];
+  const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+  for (let r = 1; r <= range.e.r; r++) {
+    const cells = [0, 1, 2, 3].map(c => ws[XLSX.utils.encode_cell({ r, c })]);
+    const values = cells.map(cell => String(cell?.v ?? "").trim());
+    if (values.every(value => !value)) continue;
+    try {
+      const [barcode, name, dateText, monthsText] = values;
+      if (!barcode || !name) throw new Error("Укажите штрих-код и название");
+      if (!dateText) throw new Error("Укажите дату");
+      if (monthsText && !/^\d+$/.test(monthsText)) throw new Error("Срок должен быть целым числом месяцев");
+      let sourceDate = dateText;
+      if (cells[2]?.t === "n") {
+        const date = XLSX.SSF.parse_date_code(Number(cells[2].v), { date1904 });
+        if (!date) throw new Error("Некорректная дата Excel");
+        sourceDate = `${date.d}.${date.m}.${date.y}`;
+      } else {
+        const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText);
+        if (iso) sourceDate = `${iso[3]}.${iso[2]}.${iso[1]}`;
+      }
+      const expiryDate = expiryFromManufacture(sourceDate, monthsText ? Number(monthsText) : null);
+      products.push({ barcode, name, quantity: null, expiryDate });
+    } catch (error) {
+      errors.push(`Строка ${r + 1}: ${error instanceof Error ? error.message : "Некорректные данные"}`);
+    }
+  }
+  return { products, errors };
+}
+
 export function parseExcelFile(buffer: Buffer | ArrayBuffer): ParseResult {
   const workbook = XLSX.read(buffer, { type: buffer instanceof ArrayBuffer ? "array" : "buffer" });
   const sheetName = workbook.SheetNames[0];
@@ -173,11 +214,12 @@ export function parseExcelFile(buffer: Buffer | ArrayBuffer): ParseResult {
     return {
       fileType: "inventory",
       products: [],
-      errors: ["Не удалось определить тип файла. Поддерживаются: Инвентаризация и Каталог товаров."],
+      errors: ["Не удалось определить тип файла. Поддерживаются: простая таблица, Инвентаризация и Каталог товаров."],
     };
   }
 
-  const result = fileType === "inventory" ? parseInventory(ws) : parseCatalog(ws);
+  const result = fileType === "simple" ? parseSimple(ws, !!workbook.Workbook?.WBProps?.date1904)
+    : fileType === "inventory" ? parseInventory(ws) : parseCatalog(ws);
 
   return {
     fileType,
