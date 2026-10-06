@@ -1,5 +1,26 @@
 # Active context
 
+2026-10-06: Settings now save changed fields from the active tab, retain other
+tab drafts and mark unsaved tabs. API accepts partial updates; disabled email
+accepts incomplete recipient/port drafts, enabling validates retained values.
+Password confirmation and shared threshold authorization preserved. All 90 app
+tests, 3 harness tests, typecheck/context and focused diff checks passed. Browser
+and deployment unverified. Plan: `docs/plans/2026-10-06-settings-partial-save.md`.
+
+2026-10-06: Telegram/shared-store assistant deployed from exact uncommitted source.
+One main store with explicit preview/confirm transfer, MANAGER/EMPLOYEE access,
+inspection claims/versioned actions/audit, confirmed Telegram linking and durable
+inbox/outbox. CRUD/import/stats/email/backup/restore use the new scope; restoring
+pauses Telegram. Release gate passed 89 application + 3 harness tests and
+context/typecheck; isolated build and responsive walk/action browser checks passed.
+Production migration/transfer and @expitrackbot webhook registration completed;
+app healthy, 434 shared + 3 private products preserved. Manager is existing ADMIN,
+two empty department accounts are employees. Telegram unpaused, probe DONE; no
+personal links yet. Webhook-only Access bypass added; parent policy unchanged.
+Source archive 320d969fb214; old image/final backup retained. No commit/push.
+Production evidence: `docs/plans/2026-10-06-telegram-production.md`. Activation:
+`docs/engineering/telegram.md`; evidence: `docs/plans/2026-10-06-telegram-store-assistant.md`.
+
 2026-10-06: Committed pending changes as d4909d5 and mobile reset/date alignment
 as f24d84f; deployed exact f24d84f archive to the verified VPS. 62 app tests,
 3 harness tests, context/typecheck, Linux build and network-disabled representative

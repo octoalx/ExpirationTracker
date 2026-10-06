@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { resolvePrismaDbPath } from "./prisma";
 import { logger } from "./logger";
+import { copySqliteSnapshot } from "./server/sqlite-snapshot";
 
 /** Directory where database backups are stored. */
 const BACKUP_DIR = path.join(process.cwd(), "backups");
@@ -33,7 +34,7 @@ export function getBackupPath(): string {
  *
  * @returns The backup filename on success, or `null` on failure.
  */
-export function createBackup(): string | null {
+export async function createBackup(): Promise<string | null> {
   try {
     ensureBackupDir();
     const dbPath = resolvePrismaDbPath();
@@ -41,7 +42,7 @@ export function createBackup(): string | null {
     const backupName = `expitrack-backup-${timestamp}.db`;
     const backupPath = path.join(BACKUP_DIR, backupName);
 
-    fs.copyFileSync(dbPath, backupPath);
+    await copySqliteSnapshot(dbPath, backupPath);
     cleanupOldBackups();
 
     console.log(`[Backup] Created: ${backupName}`);

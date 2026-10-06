@@ -4,6 +4,9 @@ import { Role } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
+import { parseStoreBackup, prepareStoreRestore, restoreStoreHeader, restoreStoreDetails } from "@/lib/server/store-backup";
+import { expiredOn } from "@/lib/expiry-calendar";
+import { suspendTelegram, resumeTelegramRuntime } from "@/lib/server/telegram-runtime";
 
 interface BackupData {
   version?: string;
@@ -28,7 +31,14 @@ interface BackupData {
       quantity?: number | null;
       createdAt?: string | Date;
       updatedAt?: string | Date;
-      userId: string;
+      userId: string | null;
+      storeId?: string | null;
+      version?: number;
+      resolution?: string | null;
+      missing?: boolean;
+      checkedAt?: string | null;
+      checkedBy?: string | null;
+      deletedAt?: string | null;
     }>;
     settings?: Array<{
       id?: string;
@@ -83,9 +93,15 @@ export default async function handler(
       products: { created: 0, updated: 0, skipped: 0 },
       settings: { created: 0, updated: 0, skipped: 0 },
     };
+    let extension;
+    try { extension = parseStoreBackup(data.data); }
+    catch { return res.status(400).json({ message: "Некорректные данные магазина в копии." }); }
+    const userMap = new Map<string, string>();
+    if (!suspendTelegram()) return res.status(409).json({ message: "Telegram завершает текущее действие. Повторите восстановление через минуту." });
 
     // Keep replacement and all imported records atomic if any write fails.
     await prisma.$transaction(async transaction => {
+      await prepareStoreRestore(transaction, mode === "replace");
       // In replace mode, wipe all existing data first
       if (mode === "replace") {
         await transaction.emailLog.deleteMany();
@@ -108,6 +124,7 @@ export default async function handler(
           });
 
           if (existing && mode === "merge") {
+            userMap.set(user.id, existing.id);
             await transaction.user.update({
               where: { id: existing.id },
               data: {
@@ -117,6 +134,7 @@ export default async function handler(
             });
             results.users.updated++;
           } else if (!existing) {
+            userMap.set(user.id, user.id);
             await transaction.user.create({
               data: {
                 id: user.id,
@@ -132,25 +150,32 @@ export default async function handler(
         }
       }
 
+      await restoreStoreHeader(transaction, extension, userMap, mode === "replace");
+
       // Restore products from backup
       if (data.data.products && data.data.products.length > 0) {
         for (const product of data.data.products) {
-          const userExists = await transaction.user.findUnique({
-            where: { id: product.userId },
-          });
-          if (!userExists) {
+          const userId = product.userId ? userMap.get(product.userId) ?? product.userId : null;
+          const userExists = userId ? await transaction.user.findUnique({ where: { id: userId } }) : null;
+          if (!userExists && !product.storeId) {
             results.products.skipped++;
             continue;
           }
-
-          const existing = await transaction.product.findUnique({
-            where: { id: product.id },
-          });
+          const existing = await transaction.product.findUnique({ where: { id: product.id } });
+          const legacyMerge = existing && mode === "merge" && product.storeId === undefined;
+          const operational = legacyMerge ? { storeId: existing.storeId, version: existing.version + 1,
+            resolution: existing.resolution, missing: existing.missing, checkedAt: existing.checkedAt,
+            checkedBy: existing.checkedBy, deletedAt: existing.deletedAt } : { storeId: product.storeId ?? null, version: product.version ?? 0,
+            resolution: product.resolution ?? null, missing: product.missing ?? false,
+            checkedAt: product.checkedAt ? new Date(product.checkedAt) : null,
+            checkedBy: product.checkedBy ? userMap.get(product.checkedBy) ?? product.checkedBy : null,
+            deletedAt: product.deletedAt ? new Date(product.deletedAt) : null };
 
           if (existing && mode === "merge") {
             await transaction.product.update({
               where: { id: existing.id },
               data: {
+                ...operational,
                 name: product.name,
                 barcode: product.barcode,
                 expiryDate: product.expiryDate == null ? null : new Date(product.expiryDate),
@@ -158,7 +183,7 @@ export default async function handler(
                 shelfLife: product.shelfLife ?? null,
                 shelfLifeUnit: product.shelfLifeUnit ?? null,
                 status: product.status ?? "ACTIVE",
-                isExpired: product.isExpired ?? false,
+                isExpired: expiredOn(product.expiryDate),
                 quantity: product.quantity,
               },
             });
@@ -166,6 +191,7 @@ export default async function handler(
           } else if (!existing) {
             await transaction.product.create({
               data: {
+                ...operational,
                 id: product.id,
                 name: product.name,
                 barcode: product.barcode,
@@ -174,9 +200,9 @@ export default async function handler(
                 shelfLife: product.shelfLife ?? null,
                 shelfLifeUnit: product.shelfLifeUnit ?? null,
                 status: product.status ?? "ACTIVE",
-                isExpired: product.isExpired ?? false,
+                isExpired: expiredOn(product.expiryDate),
                 quantity: product.quantity,
-                userId: product.userId,
+                userId: userExists ? userId : null,
                 createdAt: product.createdAt ? new Date(product.createdAt) : undefined,
                 updatedAt: product.updatedAt ? new Date(product.updatedAt) : undefined,
               },
@@ -191,6 +217,7 @@ export default async function handler(
       // Restore settings from backup
       if (data.data.settings && data.data.settings.length > 0) {
         for (const settings of data.data.settings) {
+          settings.userId = userMap.get(settings.userId) ?? settings.userId;
           const userExists = await transaction.user.findUnique({
             where: { id: settings.userId },
           });
@@ -240,6 +267,7 @@ export default async function handler(
         }
       }
 
+      await restoreStoreDetails(transaction, extension, userMap);
       await transaction.systemLog.create({
         data: {
           level: "INFO",
@@ -248,6 +276,7 @@ export default async function handler(
         },
       });
     });
+    resumeTelegramRuntime();
 
     res.status(200).json({
       success: true,
@@ -255,6 +284,7 @@ export default async function handler(
       results,
     });
   } catch (error) {
+    resumeTelegramRuntime();
     apiErrorHandler(error, res);
   }
 }

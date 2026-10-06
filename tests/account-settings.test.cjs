@@ -32,7 +32,7 @@ test('account settings verify credentials, ownership, atomic conflicts and passw
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/pages/api/settings.ts', 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText, { exports, Buffer, require: name => {
-    if (!(name in modules)) throw new Error(`Unexpected dependency: ${name}`);
+    if (!(name in modules)) { const offline = require("./helpers/offline-modules.cjs"); if (name in offline) return offline[name]; throw new Error(`Unexpected dependency: ${name}`); }
     return modules[name];
   } });
   const call = async (body, method = 'POST') => {
@@ -48,6 +48,22 @@ test('account settings verify credentials, ownership, atomic conflicts and passw
     const other = await prisma.user.create({ data: { id: 'other', email: 'other@example.invalid', name: 'Other' } });
     assert.equal((await call(draft)).code, 401);
     session = { user: { id: 'owner' } };
+    for (const [field, value, label] of [
+      ['notificationEmail', 'invalid', 'email для уведомлений'],
+      ['smtpPort', 0, 'SMTP Port'],
+      ['urgentNotifyTime', '', 'Срочно'],
+      ['warningNotifyTime', '25:00', 'Внимание'],
+    ]) {
+      const response = await call({ ...draft, settings: { ...draft.settings, emailNotifications: true, [field]: value },
+        currentPassword: 'private-credential' });
+      assert.equal(response.code, 400);
+      assert.deepEqual(Array.from(response.data.fields), [`settings.${field}`]);
+      assert.ok(response.data.message.includes(label));
+      assert.equal(JSON.stringify(response.data).includes('private-credential'), false);
+    }
+    const missingName = await call({ ...draft, user: { ...draft.user, name: null } });
+    assert.equal(missingName.code, 400);
+    assert.ok(missingName.data.message.includes('Укажите имя'));
     for (const invalid of [null, {}, { ...draft, user: { ...draft.user, name: ' ' } },
       { ...draft, user: { ...draft.user, email: 'invalid' } },
       { ...draft, settings: { urgentThreshold: 8, warningThreshold: 7 } },
@@ -57,11 +73,30 @@ test('account settings verify credentials, ownership, atomic conflicts and passw
     }
     assert.equal((await call(draft)).code, 200);
     assert.equal((await prisma.user.findUnique({ where: { id: 'owner' } })).name, 'New name');
-    const storedSettings = await prisma.settings.findUnique({ where: { userId: 'owner' } });
+    const profileBeforePatch = await prisma.user.findUnique({ where: { id: 'owner' } });
+    assert.equal((await call({ settings: { emailNotifications: false, notificationEmail: 'unfinished', smtpPort: 0 } })).code, 200);
+    assert.equal((await call({ settings: { urgentThreshold: 4 } })).code, 200);
+    let partial = await prisma.settings.findUnique({ where: { userId: 'owner' } });
+    assert.equal(partial.urgentThreshold, 4);
+    assert.equal(partial.warningThreshold, 7);
+    assert.equal(partial.notificationEmail, 'unfinished');
+    assert.deepEqual(await prisma.user.findUnique({ where: { id: 'owner' } }), profileBeforePatch);
+    assert.equal((await call({ settings: { warningThreshold: 2 } })).code, 400);
+    assert.equal((await call({ settings: { emailNotifications: true } })).code, 400);
+    assert.equal((await prisma.settings.findUnique({ where: { userId: 'owner' } })).emailNotifications, false);
+    assert.equal((await call({ user: { name: 'Renamed' } })).code, 200);
+    assert.equal((await prisma.user.findUnique({ where: { id: 'owner' } })).email, profileBeforePatch.email);
+    assert.equal((await call({ settings: { notificationEmail: '', smtpPort: 587, emailNotifications: true } })).code, 200);
+    assert.equal((await call({ settings: { notificationEmail: 'invalid' } })).code, 400);
+    await prisma.settings.update({ where: { userId: 'owner' }, data: { smtpPass: 'stored-secret' } });
+    assert.equal((await call({ settings: { telegramNotifications: true } })).code, 200);
+    assert.equal((await prisma.settings.findUnique({ where: { userId: 'owner' } })).smtpPass, 'stored-secret');
+    let storedSettings = await prisma.settings.findUnique({ where: { userId: 'owner' } });
     assert.equal(storedSettings.backupEnabled, true);
     const changed = { ...draft, user: { name: 'Changed', email: 'changed@example.invalid' }, newPassword: 'new-password' };
     assert.equal((await call(changed)).code, 400);
     assert.equal((await call({ ...changed, currentPassword: 'old-password' })).code, 200);
+    storedSettings = await prisma.settings.findUnique({ where: { userId: 'owner' } });
     const stored = await prisma.user.findUnique({ where: { id: 'owner' } });
     assert.ok(await bcrypt.compare('new-password', stored.password));
     assert.equal(await bcrypt.compare('old-password', stored.password), false);

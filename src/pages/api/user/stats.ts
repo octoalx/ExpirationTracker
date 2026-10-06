@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 import { format, startOfDay, subDays } from "date-fns";
 import { expiryOverview } from "@/lib/expiry-overview";
+import { inventoryScope, inventoryThresholds } from "@/lib/server/inventory";
 
 /** Category mapping based on product name keywords (Russian). */
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
@@ -57,16 +58,14 @@ export default async function handler(
     const userId = session.user.id;
 
     // Load user settings for threshold values
-    const settings = await prisma.settings.findUnique({
-      where: { userId },
-    });
+    const settings = await inventoryThresholds(prisma, userId);
 
     const urgentThreshold = settings?.urgentThreshold ?? 3;
     const warningThreshold = settings?.warningThreshold ?? 7;
 
     // Load all products owned by the user
     const products = await prisma.product.findMany({
-      where: { userId },
+      where: (await inventoryScope(prisma, userId)).where,
       orderBy: { createdAt: "desc" },
     });
 

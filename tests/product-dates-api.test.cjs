@@ -15,7 +15,7 @@ function load(file, modules) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(code, { exports, Date, require(name) {
-    if (!(name in modules)) throw new Error(`Unexpected dependency: ${name}`);
+    if (!(name in modules)) { const offline = require("./helpers/offline-modules.cjs"); if (name in offline) return offline[name]; throw new Error(`Unexpected dependency: ${name}`); }
     return modules[name];
   } });
   return exports;
@@ -34,6 +34,7 @@ test('manufacture metadata survives edits; migration preserves legacy records an
   const after = db.prepare('SELECT * FROM Product').get();
   for (const key of Object.keys(before)) assert.equal(after[key], before[key]);
   assert.equal(after.manufacturingDate, null);
+  for (const name of names.filter(name => name > "20261003000000_product_manufacture_date")) db.exec(fs.readFileSync(path.join(migrations, name, "migration.sql"), "utf8"));
   db.close();
   const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
   let session = { user: { id: 'owner' } };
@@ -61,7 +62,7 @@ test('manufacture metadata survives edits; migration preserves legacy records an
     assert.equal((await call(edit, 'PATCH', { manufacturingDate: '2026-02-30', shelfLife: 1, shelfLifeUnit: 'months' }, id)).code, 400);
     assert.equal((await prisma.product.findUnique({ where: { id } })).manufacturingDate, '2026-12-31');
     session = { user: { id: 'other' } };
-    assert.equal((await call(edit, 'PATCH', { name: 'Forbidden' }, id)).code, 400);
+    assert.equal((await call(edit, 'PATCH', { name: 'Forbidden' }, id)).code, 404);
     assert.equal((await prisma.product.findUnique({ where: { id } })).name, 'Renamed');
     session = null;
     assert.equal((await call(edit, 'PATCH', {}, id)).code, 401);

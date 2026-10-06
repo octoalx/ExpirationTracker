@@ -1,4 +1,4 @@
-import { differenceInDays, startOfDay } from "date-fns";
+import { expiryDays } from "./expiry-calendar";
 
 /** Sort orders offered by the phone product list. */
 export type MobileSortOption = "newest" | "expiring-soonest" | "expiring-latest";
@@ -45,7 +45,7 @@ export function formatDaysLeft(days: number): string {
 /**
  * Formats the overdue part of an expired product for the phone list.
  *
- * differenceInDays reports already-expired dates as negative values. The
+ * Calendar comparison reports already-expired dates as negative values. The
  * badge drops the minus sign and shows the elapsed whole days, e.g. `-3`
  * becomes `3 дн.` and `-1` becomes `1 день`. Zero (expires today) and
  * invalid values return an empty string.
@@ -57,17 +57,14 @@ export function formatExpiredDaysLeft(daysLeft: number): string {
 
 /**
  * Remaining whole calendar days until the expiry date, or `null` when the
- * product has no valid expiry date. Day boundaries are compared in local
- * time (matching `getExpiryStatus`) so sorting agrees with status badges.
+ * product has no valid expiry date. Day boundaries use Europe/Minsk
+ * (matching `getExpiryStatus`) so sorting agrees with status badges.
  */
 export function getDaysLeft(
   expiryDate: Date | string | null | undefined,
   referenceDate: Date = new Date(),
 ): number | null {
-  if (!expiryDate) return null;
-  const expiry = new Date(expiryDate);
-  if (!Number.isFinite(expiry.getTime())) return null;
-  return differenceInDays(startOfDay(expiry), startOfDay(referenceDate));
+  return expiryDays(expiryDate, referenceDate);
 }
 
 interface MobileSortableProduct {

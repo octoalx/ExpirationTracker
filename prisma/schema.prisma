@@ -22,6 +22,9 @@ model User {
   products      Product[]
   catalogEntries CatalogEntry[]
   settings      Settings?
+  membership    StoreMembership?
+  telegramLink  TelegramLink?
+  telegramLinkRequest TelegramLinkRequest?
 }
 
 model CatalogEntry {
@@ -57,14 +60,133 @@ model Product {
   quantity           Int?                         // Опциональное количество
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  storeId    String?
+  store      Store?   @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  version    Int      @default(0)
+  resolution String?
+  missing    Boolean  @default(false)
+  checkedAt  DateTime?
+  checkedBy  String?
+  deletedAt  DateTime?
+  claim      ProductClaim?
+  events     ProductEvent[]
 
   // Позволяет одному пользователю иметь несколько одинаковых товаров с разными датами,
   // но защищает от дубликатов при случайном двойном клике.
   @@index([userId])
   @@index([barcode])
   @@index([status])
+  @@index([storeId, status])
+}
+
+model Store {
+  id               String @id
+  name             String
+  urgentThreshold  Int @default(3)
+  warningThreshold Int @default(7)
+  members          StoreMembership[]
+  products         Product[]
+}
+
+model StoreMembership {
+  id        String @id @default(cuid())
+  storeId   String
+  userId    String @unique
+  role      String @default("EMPLOYEE")
+  createdAt DateTime @default(now())
+  store     Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ProductClaim {
+  productId String @id
+  userId    String
+  expiresAt DateTime
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductEvent {
+  id        String @id @default(cuid())
+  productId String?
+  storeId   String?
+  actorId   String
+  actorName String
+  source    String
+  action    String
+  details   String
+  key       String @unique
+  createdAt DateTime @default(now())
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  @@index([storeId, createdAt])
+}
+
+model TelegramLink {
+  userId         String @id
+  telegramUserId String @unique
+  chatId         String
+  displayName    String
+  deliveryStatus String @default("READY")
+  createdAt      DateTime @default(now())
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TelegramLinkRequest {
+  userId         String @id
+  tokenHash      String @unique
+  expiresAt      DateTime
+  telegramUserId String?
+  chatId         String?
+  displayName    String?
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TelegramButton {
+  id        String @id
+  userId    String
+  payload   String
+  expiresAt DateTime
+}
+
+model TelegramUpdate {
+  id         Int @id
+  payload    String
+  state      String @default("QUEUED")
+  attempts   Int @default(0)
+  availableAt DateTime @default(now())
+  leaseUntil DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model TelegramDelivery {
+  id          String @id @default(cuid())
+  key         String @unique
+  userId      String
+  kind        String
+  scheduleDate String
+  state       String @default("QUEUED")
+  attempts    Int @default(0)
+  availableAt DateTime @default(now())
+  leaseUntil  DateTime?
+  messageId   String?
+  error       String?
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+  @@index([state, availableAt])
+}
+
+model TelegramWarning {
+  id          String @id @default(cuid())
+  userId      String
+  productId   String
+  fingerprint String
+  @@unique([userId, productId])
+}
+
+model IntegrationState {
+  id     String @id
+  paused Boolean @default(false)
 }
 
 model Settings {

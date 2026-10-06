@@ -10,8 +10,6 @@ import {
   type RowSelectionState,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { format, differenceInDays, startOfDay } from "date-fns";
-import { ru } from "date-fns/locale";
 import {
   CheckCircle2,
   Trash2,
@@ -34,6 +32,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import MobileProductList from "./MobileProductList";
+import { expiryDays, expiryLabel, expiryDisplay } from "@/lib/expiry-calendar";
 import type { MobileSortOption } from "@/lib/days-left";
 import { EditableCell } from "./EditableCell";
 
@@ -49,6 +48,7 @@ const COL_WIDTHS = {
 };
 
 interface ProductTableEnhancedProps {
+  canDelete?: boolean;
   products: Product[];
   /**
    * Page slice for the phone list. The dashboard paginates the globally
@@ -127,6 +127,7 @@ const getStatusConfig = (status: ExpiryStatus, daysLeft: number) => {
 
 /** Enhanced product table with inline editing, sorting, and bulk selection. */
 export function ProductTableEnhanced({
+  canDelete = true,
   products,
   mobileProducts,
   urgentThreshold = 3,
@@ -205,12 +206,15 @@ export function ProductTableEnhanced({
         const res = await fetch(`/api/products/${product.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updateData),
+          body: JSON.stringify({ ...updateData, version: product.version }),
         });
 
         if (res.ok) {
           const updated = await res.json();
           onProductUpdated?.(updated);
+        } else {
+          const error = await res.json();
+          window.alert(error.message ?? "Не удалось сохранить. Обновите список.");
         }
       } catch (error) {
         console.error("Failed to update product:", error);
@@ -435,7 +439,7 @@ export function ProductTableEnhanced({
             editingCell?.columnId === "expiryDate";
           const rawDate = getValue() as string | Date | null;
           const date = rawDate ? new Date(rawDate) : null;
-          const value = date ? format(date, "yyyy-MM-dd") : "";
+          const value = expiryLabel(date) ?? "";
 
           if (isEditing) {
             return (
@@ -457,7 +461,7 @@ export function ProductTableEnhanced({
             </span>;
           }
 
-          const daysLeft = differenceInDays(startOfDay(date), startOfDay(referenceDate ?? new Date()));
+          const daysLeft = expiryDays(date, referenceDate ?? new Date())!;
           const status = getExpiryStatus(date, urgentThreshold, warningThreshold, referenceDate);
           const config = getStatusConfig(status, daysLeft);
           const StatusIcon = config.icon;
@@ -483,7 +487,7 @@ export function ProductTableEnhanced({
                 <span>{config.label}</span>
               </div>
               <span className="text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
-                {format(date, "dd.MM.yyyy", { locale: ru })}
+                {expiryDisplay(date)}
               </span>
             </div>
           );
@@ -599,7 +603,7 @@ export function ProductTableEnhanced({
               </Button>
 
               {/* Delete */}
-              <Button
+              {canDelete && <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onProductDelete?.(product)}
@@ -607,7 +611,7 @@ export function ProductTableEnhanced({
                 title="Удалить"
               >
                 <Trash2 className="h-4 w-4" />
-              </Button>
+              </Button>}
             </div>
           );
         },
@@ -619,6 +623,7 @@ export function ProductTableEnhanced({
       handleCellEdit,
       copyToClipboard,
       onProductDelete,
+      canDelete,
       onProductConsume,
       onProductEdit,
       onProductMoveToActive,
@@ -670,7 +675,7 @@ export function ProductTableEnhanced({
       )}
       {actionBar}
 
-      <div className="md:hidden"><MobileProductList products={mobileProducts ?? products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} sortOption={mobileSort} onSortChange={onMobileSortChange} hideSortControl={mobileSortInToolbar} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductRemoved={onProductRemoved} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
+      <div className="md:hidden"><MobileProductList canDelete={canDelete} products={mobileProducts ?? products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} sortOption={mobileSort} onSortChange={onMobileSortChange} hideSortControl={mobileSortInToolbar} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductRemoved={onProductRemoved} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
       <div className="hidden md:block rounded-xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/50">

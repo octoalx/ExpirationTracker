@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { format } from "date-fns";
+import { expiryLabel, expiryDisplay } from "@/lib/expiry-calendar";
 import { Loader2, Barcode, Package, Calendar, X, Hash } from "lucide-react";
 import toast from "react-hot-toast";
 import { Product } from "@prisma/client";
@@ -25,7 +25,7 @@ export default function EditProductForm({
   const [name, setName] = useState(product.name);
   const [quantity, setQuantity] = useState<number | "">(product.quantity ?? "");
   const [expiryDate, setExpiryDate] = useState(
-    product.expiryDate ? format(new Date(product.expiryDate), "yyyy-MM-dd") : ""
+    expiryLabel(product.expiryDate) ?? ""
   );
   const [isLoading, setIsLoading] = useState(false);
   const [dateInputType, setDateInputType] = useState(product.manufacturingDate ? "manufacture" : "expiry");
@@ -51,6 +51,7 @@ export default function EditProductForm({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          version: product.version,
           name: name.trim(),
           barcode: barcode.trim(),
           expiryDate: dateInputType === "manufacture" ? calculatedExpiry : expiryDate || null,
@@ -140,7 +141,7 @@ export default function EditProductForm({
       {dateInputType === "manufacture" ? <>
         <div><label htmlFor="edit-manufacture">Дата изготовления</label><input id="edit-manufacture" type="date" required value={manufacturingDate} onChange={event => setManufacturingDate(event.target.value)} /></div>
         <div><label htmlFor="edit-duration">Срок хранения</label><div className="entry-duration flex gap-2"><input id="edit-duration" type="number" min="1" step="1" required value={shelfLife} onChange={event => setShelfLife(event.target.value)} /><div className="entry-segment flex-1" role="group" aria-label="Единицы срока">{([["days", "Дни"], ["weeks", "Недели"], ["months", "Месяцы"]] as const).map(([unit, label]) => <button key={unit} type="button" aria-pressed={shelfLifeUnit === unit} onClick={() => setShelfLifeUnit(unit)}>{label}</button>)}</div></div></div>
-        <p role="status">Годен до: {calculatedExpiry ? format(new Date(calculatedExpiry + "T00:00:00"), "dd.MM.yyyy") : "Укажите дату и срок"}</p>
+        <p role="status">Годен до: {calculatedExpiry ? expiryDisplay(calculatedExpiry) : "Укажите дату и срок"}</p>
       </> :
       <div>
         <label htmlFor="edit-expiry" className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">

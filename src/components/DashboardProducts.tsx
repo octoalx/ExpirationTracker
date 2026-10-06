@@ -116,7 +116,7 @@ export function DashboardProducts() {
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "CONSUMED" }),
+        body: JSON.stringify({ status: "ARCHIVED", version: product.version }),
       });
       if (res.ok) updateProduct(await res.json());
     },

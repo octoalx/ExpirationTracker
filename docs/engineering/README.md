@@ -17,6 +17,7 @@ Read additional context only when relevant:
 | Start or verify local work | [Development](development.md) |
 | Prepare a production release | [Release](release.md) |
 | Update the shared scanner reference | [Catalog updates](catalog-updates.md) |
+| Activate or operate the store assistant | [Telegram](telegram.md) |
 | Resume unfinished work | [Active context](../../memory-bank/activeContext.md) |
 | Plan a significant change | [Plan template](../plans/TEMPLATE.md) |
 
@@ -24,7 +25,8 @@ Read additional context only when relevant:
 
 - Use the current Next.js Pages Router and Prisma/SQLite architecture.
 - Replace Telegram Mini App authentication rules with NextAuth session ownership
-  and admin role checks. Telegram here is a notification transport.
+  and admin role checks. Telegram uses explicit account linking and current store
+  membership for notifications and inspection actions.
 - Keep offline tests separate from instrumentation, cron and real integrations.
 - Use Node's built-in test runner for the verification tooling, without adding
   another runtime or imposing model/provider settings on the owner's AI client.

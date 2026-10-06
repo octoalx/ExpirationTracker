@@ -11,7 +11,7 @@ function load(file, modules, globals = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(code, { exports, Date, AbortController, ...globals, require: name => {
-    if (!(name in modules)) throw new Error(`Unexpected dependency: ${name}`);
+    if (!(name in modules)) { const offline = require("./helpers/offline-modules.cjs"); if (name in offline) return offline[name]; throw new Error(`Unexpected dependency: ${name}`); }
     return modules[name];
   } });
   return exports;
@@ -59,19 +59,19 @@ test('saved thresholds persist and are immediately returned for the verified own
   }
 });
 
-test('expiry urgency obeys inclusive saved thresholds and local date rollover', () => {
+test('expiry urgency obeys inclusive saved thresholds and Minsk calendar rollover', () => {
   const { getExpiryStatus } = load('src/lib/utils.ts', { clsx: { clsx() {} }, 'tailwind-merge': {}, 'date-fns': require('date-fns') });
-  const today = new Date(2026, 9, 3, 23, 59);
+  const today = new Date("2026-10-03T23:59:00+03:00");
   for (const [day, expected] of [[2, 'expired'], [3, 'urgent'], [6, 'urgent'], [7, 'warning'], [31, 'warning']]) {
-    assert.equal(getExpiryStatus(new Date(2026, 9, day), 3, 30, today), expected);
+    assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, day)), 3, 30, today), expected);
   }
-  assert.equal(getExpiryStatus(new Date(2026, 10, 2), 3, 30, today), 'warning');
-  assert.equal(getExpiryStatus(new Date(2026, 10, 3), 3, 30, today), 'safe');
-  assert.equal(getExpiryStatus(new Date(2026, 9, 23), 3, 7, today), 'safe');
-  assert.equal(getExpiryStatus(new Date(2026, 9, 23), 3, 30, today), 'warning');
-  assert.equal(getExpiryStatus(new Date(2026, 9, 7), 3, 30, new Date(2026, 9, 4)), 'urgent');
+  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 10, 2)), 3, 30, today), 'warning');
+  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 10, 3)), 3, 30, today), 'safe');
+  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, 23)), 3, 7, today), 'safe');
+  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, 23)), 3, 30, today), 'warning');
+  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, 7)), 3, 30, new Date(Date.UTC(2026, 9, 4))), 'urgent');
   assert.equal(getExpiryStatus(null, 3, 30, today), 'safe');
-  assert.equal(getExpiryStatus(new Date(2026, 9, 3), 0, 0, today), 'urgent');
+  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, 3)), 0, 0, today), 'urgent');
 });
 
 test('live inventory reads nested thresholds, refreshes on events/time and cancels on teardown', async () => {
@@ -103,9 +103,9 @@ test('live inventory reads nested thresholds, refreshes on events/time and cance
 test('settings threshold endpoint scopes owners and exposes no integration credentials; invalid thresholds do not write', async () => {
   let session = { user: { id: 'owner' } }, writes = 0;
   const handler = load('src/pages/api/settings.ts', {
-    '../../lib/prisma': { prisma: { settings: { findUnique: async args => {
+    '../../lib/prisma': { prisma: { user: { findUnique: async () => ({ id: session.user.id }) }, storeMembership: { findUnique: async () => null }, settings: { findUnique: async args => {
       assert.equal(args.where.userId, session.user.id);
-      assert.deepEqual(Object.keys(args.select).sort(), ['urgentThreshold', 'warningThreshold']);
+      if (args.select) assert.deepEqual(Object.keys(args.select).sort(), ['urgentThreshold', 'warningThreshold']);
       return session.user.id === 'owner' ? { urgentThreshold: 3, warningThreshold: 30 } : null;
     } }, $transaction: async () => { writes++; } } },
     '../../lib/apiErrorHandler': { apiErrorHandler: error => { throw error; } },

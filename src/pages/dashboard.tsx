@@ -177,6 +177,7 @@ const Dashboard = () => {
   const [scanError, setScanError] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [canDelete, setCanDelete] = useState(false);
   const scanVersion = useRef(0);
   const scanLock = useRef(false);
   const [isAddModalOpen, setAddModalOpen] = useState(false);
@@ -215,10 +216,29 @@ const Dashboard = () => {
     try {
       const response = await fetch("/api/products");
       if (!response.ok) throw new Error("Не удалось загрузить товары. Повторите попытку.");
-      const data = await response.json(); setProducts(data.products ?? []);
+      const data = await response.json(); setProducts(data.products ?? []); setCanDelete(data.canDelete ?? true);
     } catch (error) { setLoadError(error instanceof Error ? error.message : "Ошибка сети"); }
     finally { setLoading(false); }
   }, []);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.hidden) return;
+      fetch("/api/products").then(async response => {
+        if (response.ok) {
+          const data = await response.json();
+          setProducts(data.products ?? []); setCanDelete(data.canDelete ?? true);
+        }
+      }).catch(() => {});
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (router.query.add === "1") {
+      setAddModalOpen(true);
+      const { add: _add, ...query } = router.query;
+      void router.replace({ pathname: router.pathname, query }, undefined, { shallow: true });
+    }
+  }, [router]);
   useEffect(() => {
     void loadProducts();
   }, [loadProducts]);
@@ -274,11 +294,12 @@ const Dashboard = () => {
 
   const deleteProduct = async (productId: string) => {
     try {
-      const response = await fetch(`/api/products/${productId}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Не удалось удалить товар. Повторите попытку.");
+      const product = products.find(p => p.id === productId);
+      const response = await fetch(`/api/products/${productId}?version=${product?.version ?? 0}`, { method: "DELETE" });
+      if (!response.ok) throw new Error((await response.json()).message ?? "Не удалось удалить товар.");
       setProducts((prev) => prev.filter((p) => p.id !== productId));
       toast.success("Товар удалён");
-    } catch { toast.error("Не удалось удалить товар. Повторите попытку."); }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Не удалось удалить товар."); }
   };
 
   const onProductConsumed = (product: Product) => {
@@ -303,13 +324,16 @@ const Dashboard = () => {
   /* ── Bulk actions ── */
   const handleBulkDelete = useCallback(async () => {
     setBulkBusy(true);
-    await Promise.all(
-      selectedIds.map((id) => fetch(`/api/products/${id}`, { method: "DELETE" }))
-    );
-    setProducts((prev) => prev.filter((p) => !selectedIds.includes(p.id)));
+    const results = await Promise.all(selectedIds.map(async id => {
+      const response = await fetch(`/api/products/${id}?version=${products.find(p => p.id === id)?.version ?? 0}`, { method: "DELETE" });
+      return { id, ok: response.ok };
+    }));
+    const removed = results.filter(r => r.ok).map(r => r.id);
+    if (removed.length !== results.length) toast.error("Некоторые записи не удалены. Проверьте права и обновите список.");
+    setProducts((prev) => prev.filter((p) => !removed.includes(p.id)));
     setSelectedIds([]);
     setBulkBusy(false);
-  }, [selectedIds]);
+  }, [selectedIds, products]);
 
   const handleBulkStatus = useCallback(
     async (status: "ACTIVE" | "ARCHIVED" | "DEFECT") => {
@@ -320,20 +344,20 @@ const Dashboard = () => {
           fetch(`/api/products/${id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status }),
-          }).then((r) => r.json() as Promise<Product>)
+            body: JSON.stringify({ status, version: products.find(p => p.id === id)?.version }),
+          }).then(async r => { const data = await r.json(); if (!r.ok) { toast.error(data.message); return null; } return data as Product; })
         )
       );
       setProducts((prev) =>
         prev.map((p) => {
-          const updated = results.find((r) => r.id === p.id);
+          const updated = results.find((r) => r?.id === p.id);
           return updated ?? p;
         })
       );
       setSelectedIds([]);
       setBulkBusy(false);
     },
-    [selectedIds]
+    [selectedIds, products]
   );
 
   const filteredProducts = products
@@ -572,7 +596,7 @@ const Dashboard = () => {
               Печать
             </Button>
 
-            <Button
+            {canDelete && <Button
               size="sm"
               variant="outline"
               disabled={bulkBusy}
@@ -581,7 +605,7 @@ const Dashboard = () => {
             >
               <Trash2 className="h-3.5 w-3.5" />
               Удалить
-            </Button>
+            </Button>}
 
             <Button
               size="sm"
@@ -655,13 +679,14 @@ const Dashboard = () => {
               }}
               onProductUpdated={updateProduct}
               onProductDelete={(p) => deleteProduct(p.id)}
+              canDelete={canDelete}
               onProductRemoved={(id) => setProducts((prev) => prev.filter((p) => p.id !== id))}
               onProductConsume={onProductConsumed}
               onProductMoveToActive={(p) => {
                 fetch(`/api/products/${p.id}`, {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ status: "ACTIVE" }),
+                  body: JSON.stringify({ status: "ACTIVE", version: p.version }),
                 })
                   .then((r) => r.json())
                   .then((updated) => updateProduct(updated));
@@ -670,7 +695,7 @@ const Dashboard = () => {
                 fetch(`/api/products/${p.id}`, {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ status: "ARCHIVED" }),
+                  body: JSON.stringify({ status: "ARCHIVED", version: p.version }),
                 })
                   .then((r) => r.json())
                   .then((updated) => updateProduct(updated));
@@ -679,7 +704,7 @@ const Dashboard = () => {
                 fetch(`/api/products/${p.id}`, {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ status: "DEFECT" }),
+                  body: JSON.stringify({ status: "DEFECT", version: p.version }),
                 })
                   .then((r) => r.json())
                   .then((updated) => updateProduct(updated));

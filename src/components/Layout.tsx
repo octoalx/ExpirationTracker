@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Package, Settings, LogOut, Shield, BarChart3 } from "lucide-react";
+import { Package, Settings, LogOut, Shield, BarChart3, ClipboardCheck } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -13,6 +13,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   if (router.pathname.startsWith("/auth")) return <>{children}</>;
   const navigation = [
     { name: "Товары", href: "/dashboard", icon: Package },
+    { name: "Обход", href: "/store", icon: ClipboardCheck },
     { name: "Статистика", href: "/stats", icon: BarChart3 },
     { name: "Настройки", href: "/settings", icon: Settings },
     ...(session?.user?.role === "ADMIN" ? [{ name: "Админ", href: "/admin", icon: Shield }] : []),

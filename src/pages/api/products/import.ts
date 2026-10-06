@@ -4,6 +4,8 @@ import { authOptions } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 
 import { validateInventoryProducts } from "../../../lib/inventory-import";
+import { inventoryScope, recordEvent } from "@/lib/server/inventory";
+import { expiredOn } from "@/lib/expiry-calendar";
 
 interface ImportResponse {
   imported: number;
@@ -34,19 +36,27 @@ export default async function handler(
     }
 
     const userId = session.user.id;
-    const created = await prisma.$transaction(
-      products.map((p) =>
-        prisma.product.create({
+    const created = await prisma.$transaction(async tx => {
+      const { membership } = await inventoryScope(tx, userId);
+      const rows = [];
+      for (const p of products) {
+        const expiryDate = p.expiryDate ? new Date(`${p.expiryDate}T00:00:00.000Z`) : null;
+        const product = await tx.product.create({
           data: {
             name: p.name,
             barcode: p.barcode,
             quantity: p.quantity,
-            expiryDate: p.expiryDate ? new Date(`${p.expiryDate}T00:00:00.000Z`) : null,
-            user: { connect: { id: userId } },
+            expiryDate,
+            isExpired: expiredOn(expiryDate),
+            storeId: membership?.storeId ?? null,
+            userId,
           },
-        }),
-      ),
-    );
+        });
+        await recordEvent(tx, { userId, source: "WEB" }, product, "IMPORT", { product });
+        rows.push(product);
+      }
+      return rows;
+    });
 
     return res.status(200).json({
       imported: created.length,

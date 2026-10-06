@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import IntegrationCard from "@/components/IntegrationCard";
+import TelegramConnect from "@/components/TelegramConnect";
+import Link from "next/link";
+import { settingsTabPatch } from "@/lib/settings-draft";
 
 /* ── Glow input ── */
 interface GlowInputProps {
@@ -24,9 +27,10 @@ interface GlowInputProps {
   placeholder?: string;
   inputClassName?: string;
   autoComplete?: string;
+  disabled?: boolean;
 }
 
-function GlowInput({ label, value, onChange, onBlur, type = "text", placeholder, inputClassName, autoComplete }: GlowInputProps) {
+function GlowInput({ label, value, onChange, onBlur, type = "text", placeholder, inputClassName, autoComplete, disabled }: GlowInputProps) {
   const id = useId();
   return (
     <div className="min-w-0">
@@ -37,6 +41,7 @@ function GlowInput({ label, value, onChange, onBlur, type = "text", placeholder,
         id={id}
         type={type}
         autoComplete={autoComplete}
+        disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
@@ -76,6 +81,7 @@ const SettingsPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingEmail, setIsTestingEmail] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [storeRole, setStoreRole] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -86,12 +92,10 @@ const SettingsPage = () => {
   });
 
   const [settings, setSettings] = useState({
-    telegramNotifications: true,
+    telegramNotifications: false,
     emailNotifications: false,
     urgentThreshold: 3 as number | string,
     warningThreshold: 7 as number | string,
-    telegramToken: "",
-    telegramChatId: "",
     smtpHost: "",
     smtpPort: 587,
     smtpUser: "",
@@ -100,43 +104,59 @@ const SettingsPage = () => {
     urgentNotifyTime: "10:00",
     warningNotifyTime: "10:00",
   });
+  const [saved, setSaved] = useState({ user, settings });
+  const tabPatch = (tab: string) => settingsTabPatch(tab, user, settings, saved.user, saved.settings);
+  const tabDirty = (tab: string) => {
+    const patch = tabPatch(tab);
+    return !!(Object.keys(patch.user).length || Object.keys(patch.settings).length ||
+      (tab === "personal" && (newPassword || confirmPassword)));
+  };
 
   useEffect(() => {
     fetch("/api/settings")
       .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
       .then((data) => {
         if (data) {
-          setSettings((prev) => ({ ...prev, ...data.settings }));
-          setUser((prev) => ({ ...prev, ...data.user }));
+          const loadedSettings = { ...settings, ...data.settings, smtpPass: "" };
+          const loadedUser = { name: data.user?.name ?? "", email: data.user?.email ?? "" };
+          setSettings(loadedSettings);
+          setUser(loadedUser);
+          setSaved({ user: loadedUser, settings: loadedSettings });
           setIsLoaded(true);
+          setStoreRole(data.storeRole ?? null);
         }
       }).catch(() => toast.error("Не удалось загрузить настройки. Обновите страницу."));
   }, []);
 
   const handleSave = async () => {
-    if (newPassword !== confirmPassword) { toast.error("Новые пароли не совпадают."); return; }
-    if (newPassword && (newPassword.length < 8 || new TextEncoder().encode(newPassword).length > 72)) {
+    const savingTab = activeTab;
+    const patch = tabPatch(savingTab);
+    if (!tabDirty(savingTab)) return;
+    if (savingTab === "personal" && newPassword !== confirmPassword) { toast.error("Новые пароли не совпадают."); return; }
+    if (savingTab === "personal" && newPassword && (newPassword.length < 8 || new TextEncoder().encode(newPassword).length > 72)) {
       toast.error("Пароль: минимум 8 символов, максимум 72 байта UTF-8."); return;
     }
-    const normalizedSettings = {
-      ...settings,
-      urgentThreshold: Number(settings.urgentThreshold),
-      warningThreshold: Number(settings.warningThreshold),
+    const payload = {
+      ...(Object.keys(patch.user).length ? { user: patch.user } : {}),
+      ...(Object.keys(patch.settings).length ? { settings: patch.settings } : {}),
+      ...(savingTab === "personal" ? { currentPassword, newPassword } : {}),
     };
-    setSettings(normalizedSettings);
     setIsSaving(true);
     try {
-      const cleanUser = { name: user.name, email: user.email };
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: cleanUser, settings: normalizedSettings, currentPassword, newPassword }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         notifySettingsChanged();
-        toast.success("Настройки сохранены!");
-        setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
-        await updateSession();
+        setSaved(prev => ({ user: { ...prev.user, ...patch.user }, settings: { ...prev.settings, ...patch.settings, smtpPass: "" } }));
+        toast.success("Изменения вкладки сохранены!");
+        if (savingTab === "personal") {
+          setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+          await updateSession();
+        }
+        if (savingTab === "integrations") setSettings(prev => ({ ...prev, smtpPass: "" }));
       } else {
         const error = await res.json();
         toast.error(error.message || "Ошибка сохранения");
@@ -211,26 +231,20 @@ const SettingsPage = () => {
             </div>
 
             {/* Telegram */}
-            <IntegrationCard
-              title="Telegram"
-              description="Мгновенные уведомления в мессенджер"
-              icon={<Send className="h-5 w-5 text-white" />}
-              enabled={settings.telegramNotifications}
-              onToggle={(v) => setSettings({ ...settings, telegramNotifications: v })}
-            >
-              <GlowInput
-                label="Bot Token"
-                value={settings.telegramToken || ""}
-                onChange={(v) => setSettings({ ...settings, telegramToken: v })}
-                placeholder="123456:ABC-DEF..."
-              />
-              <GlowInput
-                label="Chat ID"
-                value={settings.telegramChatId || ""}
-                onChange={(v) => setSettings({ ...settings, telegramChatId: v })}
-                placeholder="123456789"
-              />
-            </IntegrationCard>
+            <div className="space-y-4 rounded-xl border p-4">
+              <h3 className="font-semibold">Telegram · помощник для обхода</h3>
+              <TelegramConnect onConnected={() => setSettings(prev => ({ ...prev, telegramNotifications: true }))} />
+              <label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={settings.telegramNotifications} onChange={e => setSettings(prev => ({ ...prev, telegramNotifications: e.target.checked }))} /><span>Личные уведомления в Telegram</span></label>
+              <p className="text-sm text-muted-foreground">Выключение уведомлений сохраняет доступ к боту. Для применения нажмите «Сохранить».</p>
+            </div>
+            <section className="space-y-3 rounded-xl border p-4">
+              <h3 className="font-semibold">Расписание уведомлений</h3>
+              <p className="text-sm text-muted-foreground">Время Минска (Europe/Minsk). Используется для Telegram и email.</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <GlowInput label="Ежедневный отчёт Срочно" type="time" value={settings.urgentNotifyTime} onChange={v => setSettings(prev => ({ ...prev, urgentNotifyTime: v }))} />
+                <GlowInput label="Раннее предупреждение Внимание" type="time" value={settings.warningNotifyTime} onChange={v => setSettings(prev => ({ ...prev, warningNotifyTime: v }))} />
+              </div>
+            </section>
 
             {/* Email */}
             <IntegrationCard
@@ -276,21 +290,6 @@ const SettingsPage = () => {
                 type="email"
                 placeholder="notify@example.com"
               />
-              {/* Notify times */}
-              <div className="grid grid-cols-1 items-end sm:grid-cols-2 gap-3">
-                <GlowInput
-                  label="Время отчёта Срочно"
-                  value={settings.urgentNotifyTime || "10:00"}
-                  onChange={(v) => setSettings({ ...settings, urgentNotifyTime: v })}
-                  type="time"
-                />
-                <GlowInput
-                  label="Время уведомления Внимание"
-                  value={settings.warningNotifyTime || "10:00"}
-                  onChange={(v) => setSettings({ ...settings, warningNotifyTime: v })}
-                  type="time"
-                />
-              </div>
               {/* Action buttons */}
               <div className="flex flex-wrap gap-2 pt-2">
                 <button
@@ -323,6 +322,7 @@ const SettingsPage = () => {
               <h2 className="text-lg font-bold text-foreground">Статусы</h2>
               <p className="text-sm text-muted-foreground">Пороги для срочности товаров</p>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Поля «Срочно» и «Внимание» определяют, какие товары попадают во вкладку «Скоро истекает».</p>
+              {storeRole && <p className="mt-2 text-sm">Для команды действуют общие пороги. <Link href="/store" className="text-blue-700 underline">Управление магазином</Link></p>}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="relative rounded-2xl p-px overflow-hidden">
@@ -337,6 +337,7 @@ const SettingsPage = () => {
                   <GlowInput
                     label="Дней до истечения"
                     value={settings.urgentThreshold}
+                    disabled={!!storeRole}
                     onChange={(v) => setSettings({ ...settings, urgentThreshold: v === "" ? "" : parseInt(v, 10) || 0 })}
                     onBlur={() => setSettings((prev) => ({ ...prev, urgentThreshold: Number(prev.urgentThreshold) }))}
                     type="number"
@@ -355,6 +356,7 @@ const SettingsPage = () => {
                   <GlowInput
                     label="Дней до истечения"
                     value={settings.warningThreshold}
+                    disabled={!!storeRole}
                     onChange={(v) => setSettings({ ...settings, warningThreshold: v === "" ? "" : parseInt(v, 10) || 0 })}
                     onBlur={() => setSettings((prev) => ({ ...prev, warningThreshold: Number(prev.warningThreshold) }))}
                     type="number"
@@ -395,6 +397,7 @@ const SettingsPage = () => {
                 key={tab.id}
                 type="button"
                 aria-pressed={active}
+                disabled={isSaving}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
                   "relative flex min-h-16 flex-col items-center justify-center gap-2 rounded-t-xl px-2 py-3 text-center text-sm font-semibold sm:min-h-12 sm:flex-row",
@@ -405,7 +408,7 @@ const SettingsPage = () => {
                 )}
               >
                 <tab.icon className="h-4 w-4" />
-                <span>{tab.label}</span>
+                <span>{tab.label}{isLoaded && tabDirty(tab.id) && <span aria-label="Есть несохранённые изменения"> *</span>}</span>
                 {active && (
                   <motion.div
                     layoutId="settings-tab-underline"
@@ -430,15 +433,18 @@ const SettingsPage = () => {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
           >
-            {renderContent()}
+            <fieldset disabled={isSaving || !isLoaded} className="min-w-0">
+              {renderContent()}
+            </fieldset>
           </motion.div>
         </AnimatePresence>
 
         {/* Save button */}
         <div className="mt-8 pt-5 border-t border-slate-200/60 dark:border-slate-700/40">
+          <p className="mb-3 text-sm text-muted-foreground">Сохраняются только изменённые поля этой вкладки. * — есть несохранённые изменения.</p>
           <button
             onClick={handleSave}
-            disabled={isSaving || !isLoaded}
+            disabled={isSaving || !isLoaded || !tabDirty(activeTab)}
             className={cn(
               "relative inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white",
               "bg-blue-700 hover:bg-blue-800",
@@ -453,7 +459,7 @@ const SettingsPage = () => {
                 Сохранение…
               </>
             ) : (
-              "Сохранить изменения"
+              "Сохранить эту вкладку"
             )}
           </button>
         </div>

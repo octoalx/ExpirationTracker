@@ -98,7 +98,9 @@ export default function SignIn() {
     });
 
     if (result?.ok) {
-      router.push("/dashboard");
+      const raw = typeof router.query.callbackUrl === "string" ? router.query.callbackUrl : "/dashboard";
+      const target = new URL(raw, window.location.origin);
+      router.push(target.origin === window.location.origin && !target.pathname.startsWith("/auth") ? target.pathname + target.search : "/dashboard");
     } else {
       setError("Неверный логин или пароль");
       setShakeKey((k) => k + 1);

@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 import { logger } from "@/lib/logger";
+import { InventoryError } from "@/lib/server/inventory";
+import { apiFailure } from "@/lib/server/api";
 
 /** DELETE: remove a user | PUT: change a user's role (admin only). */
 export default async function handler(
@@ -21,15 +23,22 @@ export default async function handler(
   if (req.method === "DELETE") {
     try {
       const user = await prisma.user.findUnique({ where: { id: userId as string } });
-      await prisma.user.delete({
-        where: { id: userId as string },
+      await prisma.$transaction(async tx => {
+        const member = await tx.storeMembership.findUnique({ where: { userId: String(userId) } });
+        if (member?.role === "MANAGER" && await tx.storeMembership.count({ where: { storeId: member.storeId, role: "MANAGER" } }) <= 1) throw new InventoryError(409, "Сначала назначьте другого руководителя через администратора.");
+        await tx.product.deleteMany({ where: { userId: String(userId), storeId: null } });
+        await tx.productClaim.deleteMany({ where: { userId: String(userId) } });
+        await tx.telegramButton.deleteMany({ where: { userId: String(userId) } });
+        await tx.telegramWarning.deleteMany({ where: { userId: String(userId) } });
+        await tx.telegramDelivery.updateMany({ where: { userId: String(userId), state: { in: ["QUEUED", "PROCESSING"] } }, data: { state: "CANCELLED" } });
+        await tx.user.delete({ where: { id: String(userId) } });
       });
       logger.info(`Admin ${session.user.email} deleted user ${user?.email || userId}`, {
         adminId: session.user.id, userId, userEmail: user?.email,
       });
       res.status(204).end();
     } catch (error) {
-      apiErrorHandler(error, res);
+      apiFailure(res, error);
     }
   } else if (req.method === "PUT") {
     const { role } = req.body;
@@ -40,6 +49,7 @@ export default async function handler(
       const updatedUser = await prisma.user.update({
         where: { id: userId as string },
         data: { role },
+        select: { id: true, name: true, email: true, role: true },
       });
       logger.info(`Admin ${session.user.email} changed role of ${updatedUser.email} to ${role}`, {
         adminId: session.user.id, userId, newRole: role, userEmail: updatedUser.email,

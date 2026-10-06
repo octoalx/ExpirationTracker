@@ -15,7 +15,7 @@ function load(file, modules) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(code, { exports, Date, Error, require(name) {
-    if (!(name in modules)) throw new Error(`Unexpected dependency: ${name}`);
+    if (!(name in modules)) { const offline = require("./helpers/offline-modules.cjs"); if (name in offline) return offline[name]; throw new Error(`Unexpected dependency: ${name}`); }
     return modules[name];
   } });
   return exports;

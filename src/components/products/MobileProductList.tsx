@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { Product } from "@prisma/client";
-import { format, differenceInDays, startOfDay } from "date-fns";
 import { ArrowUpDown, ChevronDown, Pencil, Archive, AlertTriangle, CheckCircle2, Trash2, ScanBarcode, Circle, type LucideIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn, getExpiryStatus } from "@/lib/utils";
@@ -8,8 +7,10 @@ import { createPendingDeletes, type PendingDeletes } from "@/lib/pending-delete"
 import { resolveSwipe, shouldStartDrag } from "@/lib/swipe-gesture";
 import { DEFAULT_MOBILE_SORT, MOBILE_SORT_OPTIONS, formatDaysLeft, formatExpiredDaysLeft, sortProductsForMobile, type MobileSortOption } from "@/lib/days-left";
 import { getProductActions, type ProductStatusActionKey } from "@/lib/product-status-actions";
+import { expiryDays, expiryDisplay } from "@/lib/expiry-calendar";
 
 interface Props {
+  canDelete?: boolean;
   products: Product[];
   urgentThreshold?: number;
   warningThreshold?: number;
@@ -89,7 +90,7 @@ export default function MobileProductList(props: Props) {
       commit: async (id, { keepalive }) => {
         const product = productsRef.current.find((p) => p.id === id);
         try {
-          const response = await fetch(`/api/products/${id}`, { method: "DELETE", keepalive });
+          const response = await fetch(`/api/products/${id}?version=${product?.version ?? 0}`, { method: "DELETE", keepalive });
           if (!response.ok) throw new Error("DELETE failed");
           const toastId = toastIdsRef.current.get(id);
           if (toastId) {
@@ -252,7 +253,7 @@ export default function MobileProductList(props: Props) {
     <div className="flex items-center justify-between px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><span>Товар</span><span className="pr-8">Годен до</span></div>
     {visibleProducts.map(product => {
       const urgency = getExpiryStatus(product.expiryDate, props.urgentThreshold, props.warningThreshold, props.referenceDate);
-      const days = product.expiryDate ? differenceInDays(startOfDay(new Date(product.expiryDate)), startOfDay(props.referenceDate ?? new Date())) : null;
+      const days = expiryDays(product.expiryDate, props.referenceDate ?? new Date());
       const safeLabel = days === null ? "" : formatDaysLeft(days);
       const label = days === null ? "Срок не указан" : urgency === "expired" ? "Просрочен" : urgency === "safe" ? (safeLabel || "В норме") : urgency === "urgent" ? "Срочно" : "Внимание";
       const daysLabel = days === null
@@ -277,7 +278,7 @@ export default function MobileProductList(props: Props) {
           <div
             className={cn(
               "absolute inset-y-0 right-0 flex justify-end overflow-hidden rounded-r-xl bg-red-600",
-              offset === 0 && "invisible"
+              (offset === 0 || props.canDelete === false) && "invisible"
             )}
             style={{ width: offset < 0 ? Math.abs(offset) + CARD_RADIUS : 0 }}
           >
@@ -299,7 +300,7 @@ export default function MobileProductList(props: Props) {
           <div
             className={cn("relative rounded-xl bg-white", !isDragging && "transition-transform duration-200")}
             style={{ transform: `translateX(${offset}px)`, touchAction: "pan-y" }}
-            onPointerDown={handlePointerDown(product)}
+            onPointerDown={props.canDelete === false ? undefined : handlePointerDown(product)}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
@@ -321,7 +322,7 @@ export default function MobileProductList(props: Props) {
                   <span className="mt-1 block text-sm text-slate-600">{product.quantity == null ? "Количество не указано" : `${product.quantity} шт.`}</span>
                   <span className={cn("mt-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold leading-4", product.status === "ACTIVE" ? "border-blue-200 bg-blue-50 text-blue-800" : product.status === "DEFECT" ? "border-red-200 bg-red-50 text-red-800" : "border-slate-300 bg-slate-100 text-slate-700")}><StatusIcon aria-hidden="true" className="size-3.5 shrink-0" />{product.status === "ACTIVE" ? "Активен" : product.status === "ARCHIVED" ? "Архив" : "Брак"}</span>
                 </span>
-                <span className="w-[112px] shrink-0 self-start text-right"><span className="block text-base tabular-nums text-slate-950">{product.expiryDate ? format(new Date(product.expiryDate), "dd.MM.yyyy") : "—"}</span>
+                <span className="w-[112px] shrink-0 self-start text-right"><span className="block text-base tabular-nums text-slate-950">{expiryDisplay(product.expiryDate)}</span>
                   <span className={cn("mt-1.5 block text-sm leading-5", urgency === "expired" || urgency === "urgent" ? "text-red-700" : urgency === "warning" ? "text-expiry-ink" : "text-slate-600")}><Circle aria-hidden="true" fill="currentColor" strokeWidth={0} className={cn("mr-1.5 inline-block size-2.5 align-baseline", days === null ? "text-slate-400" : urgency === "safe" ? "text-blue-700" : urgency === "expired" || urgency === "urgent" ? "text-red-600" : "text-expiry-marker")} />{label}
                     {daysLabel && <span className="block tabular-nums">{daysLabel}</span>}
                   </span>

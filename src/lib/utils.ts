@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { differenceInDays, startOfDay } from "date-fns"
+import { expiryDays } from "./expiry-calendar"
 
 /** Merge Tailwind CSS class names using clsx + tailwind-merge. */
 export function cn(...inputs: ClassValue[]) {
@@ -24,9 +24,8 @@ export function getExpiryStatus(
   referenceDate: Date = new Date(),
 ): ExpiryStatus {
   if (!expiryDate) return "safe"
-  const now = startOfDay(referenceDate)
-  const expiry = startOfDay(new Date(expiryDate))
-  const daysLeft = differenceInDays(expiry, now)
+  const daysLeft = expiryDays(expiryDate, referenceDate)
+  if (daysLeft === null) return "safe"
 
   if (daysLeft < 0) return "expired"
   if (daysLeft <= urgentThreshold) return "urgent"

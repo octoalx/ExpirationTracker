@@ -1,9 +1,10 @@
-import { differenceInDays, startOfDay } from "date-fns";
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
 import { emailService } from "./emailService";
 import { getEmailTemplate } from "../lib/email-templates/index";
 import type { ExpirationProduct } from "../lib/email-templates/index";
+import { inventoryScope, inventoryThresholds } from "../lib/server/inventory";
+import { expiryDays } from "../lib/expiry-calendar";
 
 type UrgencyLevel = "EXPIRED" | "URGENT" | "WARNING" | "SAFE";
 
@@ -121,18 +122,17 @@ export async function sendDailyUrgentNotifications(userId?: string): Promise<Sen
       continue;
     }
 
-    const urgentThreshold = user.settings.urgentThreshold ?? 3;
-    const warningThreshold = user.settings.warningThreshold ?? 7;
-    const today = startOfDay(new Date());
+    const { urgentThreshold, warningThreshold } = await inventoryThresholds(prisma, user.id);
+    user.products = await prisma.product.findMany({ where: { ...(await inventoryScope(prisma, user.id)).where, status: "ACTIVE" } });
 
     const urgentProducts = user.products
       .filter((p) => {
         if (!p.expiryDate) return false;
-        const daysUntil = differenceInDays(startOfDay(new Date(p.expiryDate)), today);
+        const daysUntil = expiryDays(p.expiryDate)!;
         return daysUntil <= urgentThreshold;
       })
       .map((p) => {
-        const daysUntil = differenceInDays(startOfDay(new Date(p.expiryDate!)), today);
+        const daysUntil = expiryDays(p.expiryDate)!;
         return {
           name: p.name,
           barcode: p.barcode,
@@ -189,13 +189,13 @@ export async function sendWarningNotifications(userId?: string): Promise<SendRes
       continue;
     }
 
-    const warningThreshold = user.settings.warningThreshold ?? 7;
-    const today = startOfDay(new Date());
+    const { warningThreshold } = await inventoryThresholds(prisma, user.id);
+    user.products = await prisma.product.findMany({ where: { ...(await inventoryScope(prisma, user.id)).where, status: "ACTIVE" } });
 
     const warningProducts = user.products
       .filter((p) => {
         if (!p.expiryDate) return false;
-        const daysUntil = differenceInDays(startOfDay(new Date(p.expiryDate)), today);
+        const daysUntil = expiryDays(p.expiryDate)!;
         return daysUntil === warningThreshold;
       })
       .map((p) => ({

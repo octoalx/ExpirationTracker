@@ -1,5 +1,6 @@
 import React, { useState, type FormEvent } from "react";
 import { format, differenceInDays } from "date-fns";
+import { expiryDays } from "@/lib/expiry-calendar";
 import { ru } from "date-fns/locale";
 import {
   CalendarCheck,
@@ -45,7 +46,7 @@ function ProductCard({
   );
   const [isSaving, setIsSaving] = useState(false);
 
-  const daysLeft = product.expiryDate ? differenceInDays(new Date(product.expiryDate), new Date()) : Number.POSITIVE_INFINITY;
+  const daysLeft = expiryDays(product.expiryDate) ?? Number.POSITIVE_INFINITY;
   const isExpired = daysLeft < 0;
 
   const getStatusConfig = () => {
@@ -120,7 +121,7 @@ function ProductCard({
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, barcode: editBarcode, expiryDate: editExpiryDate }),
+        body: JSON.stringify({ name: editName, barcode: editBarcode, expiryDate: editExpiryDate, version: product.version }),
       });
       if (res.ok) {
         const updated: Product = await res.json();
