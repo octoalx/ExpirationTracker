@@ -76,6 +76,14 @@ no candidate manifests or repeated confirmation rituals. Push only when requeste
 Never discard owner changes, rewrite history or force-push without authorization.
 Never commit `.env`, databases, backups, credentials or verification logs.
 
+GitHub `main` is the single source of truth; several agents (local, cloud,
+Factory) work in parallel. Never commit to `main` directly. Start each task
+from a freshly fetched `origin/main` on its own branch (`local/`, `claude/`,
+`factory/`, `sync/` for reconciling) and finish it as one PR; delete the
+branch after merge. Keep local `main` a mirror (`git pull --ff-only`). Line
+endings are LF (`.gitattributes`). Release only a clean commit already in
+`origin/main`: branch -> PR -> merge -> release; `verify:release` enforces it.
+
 A local change does not authorize deployment. Run `deploy.sh`, production
 migrations, remote commands, backup restoration or real email/Telegram sends only
 within an explicitly authorized task. `deploy.sh` pulls main and stops containers;
