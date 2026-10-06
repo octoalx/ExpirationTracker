@@ -42,7 +42,6 @@ import {
   FileSpreadsheet,
   Printer,
   ArrowUpDown,
-  X,
 } from "lucide-react";
 
 /* ── Debounce hook ── */
@@ -498,10 +497,10 @@ const Dashboard = () => {
             />
           ))}
         </div>
-        <div className="!mt-1 flex items-center justify-between gap-2 text-sm">
+        <div className="!mt-1 flex flex-wrap items-center justify-between gap-2 text-sm">
           <label className="flex items-center gap-2 text-slate-600"><ListFilter className="size-4" /><span className="sr-only">Состояние товаров</span><select className="min-h-11 rounded-lg bg-transparent pr-2" aria-label="Состояние товаров" value={["ACTIVE", "ARCHIVED", "DEFECT"].includes(statusFilter) ? statusFilter : "ALL"} onChange={event => { setStatusFilter(event.target.value); }}><option value="ALL">Все состояния</option><option value="ACTIVE">Активные</option><option value="ARCHIVED">Архив</option><option value="DEFECT">Брак</option></select></label>
           <label className="flex items-center gap-2 text-slate-600 md:hidden"><ArrowUpDown aria-hidden="true" className="size-4" /><select className="min-h-11 rounded-lg bg-transparent pr-2" aria-label="Сортировка" value={mobileSort} onChange={event => setMobileSort(event.target.value as MobileSortOption)}>{MOBILE_SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          {(searchTerm || scannedBarcode || statusFilter !== "ALL") && <button className="min-h-11 px-2 text-sm font-semibold text-[#1554b5] hover:text-[#12479a] max-md:-mr-2 max-md:min-w-11 max-md:justify-center max-md:px-2.5 inline-flex items-center" aria-label="Сбросить фильтры" onClick={resetFilters}><span className="max-md:sr-only">Сбросить</span><X aria-hidden="true" className="size-6 md:hidden" /></button>}
+          {(searchTerm || scannedBarcode || statusFilter !== "ALL") && <button type="button" className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900" aria-label="Сбросить фильтры" onClick={resetFilters}>Сбросить</button>}
         </div>
       </div>
 

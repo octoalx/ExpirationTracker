@@ -27,6 +27,14 @@ record-action styles and added keyboard inset rules differ. A specific owner-vis
 regression is not established; clarify the affected screen/action before attributing
 it to browser cache or a deployment rollback.
 
+Owner clarified that the affected cross is the filter reset below search, and the
+date text shifts after picker confirmation. Production browser at 320/390 confirms
+the reset is deliberately an icon-only blue X in committed dashboard code. Replace
+it with a visible neutral text button and allow filter wrapping. Date inputs have
+width containment but no explicit WebKit value alignment; add native date value
+left alignment and stable line height in the shared add/edit form styles. Actual
+iPhone system-picker behavior remains a device check, not a proven cached-build issue.
+
 ## Risks and recovery
 
 Retain current image with rollback tag; take a restricted consistent online SQLite

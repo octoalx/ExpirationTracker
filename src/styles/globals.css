@@ -300,7 +300,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .dialog-surface { top: 50%; left: 50%; transform: translate(-50%, -50%); }
 .product-entry, .product-entry fieldset, .product-entry details { min-width: 0; }
 .product-entry summary { overflow-wrap: anywhere; }
-.product-entry input[type="date"] { min-inline-size: 0; max-width: 100%; }
+.product-entry input[type="date"] {
+  min-inline-size: 0; max-width: 100%; text-align: left; line-height: 1.5;
+  -webkit-appearance: none; appearance: none;
+}
+/* Keep native WebKit date values aligned after the system picker confirms a date. */
+.product-entry input[type="date"]::-webkit-date-and-time-value { min-height: 1.5em; text-align: left; }
+.product-entry input[type="date"]::-webkit-datetime-edit { padding: 0; }
 .product-entry label { display: block; margin-bottom: .5rem; color: #334155; font-size: 14px; font-weight: 550; }
 .product-entry input {
   min-width: 0; width: 100%; min-height: 48px; padding: .75rem .9rem;
