@@ -29,6 +29,7 @@ import {
   Package,
   AlertTriangle,
   XCircle,
+  X,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -502,8 +503,18 @@ const Dashboard = () => {
               placeholder="Название или штрих-код"
               value={searchTerm}
               onChange={(e) => { setScannedBarcode(""); setSearchTerm(e.target.value); }}
-              className="h-12 pl-10 text-base bg-white border-slate-200 focus:border-blue-700"
+              className="h-12 pl-10 pr-10 text-base bg-white border-slate-200 focus:border-blue-700"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                aria-label="Очистить поиск"
+                onClick={(e) => { e.stopPropagation(); setScannedBarcode(""); setSearchTerm(""); setCurrentPage(1); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <X aria-hidden="true" className="size-5" />
+              </button>
+            )}
           </div>
 
           <button type="button" onClick={openScan} className="primary-action w-full md:w-auto"><ScanBarcode className="size-6" />Сканировать товар</button>
@@ -524,7 +535,7 @@ const Dashboard = () => {
         <div className="!mt-1 flex flex-wrap items-center justify-between gap-2 text-sm">
           <label className="flex items-center gap-2 text-slate-600"><ListFilter className="size-4" /><span className="sr-only">Состояние товаров</span><select className="min-h-11 rounded-lg bg-transparent pr-2" aria-label="Состояние товаров" value={["ACTIVE", "ARCHIVED", "DEFECT"].includes(statusFilter) ? statusFilter : "ALL"} onChange={event => { setStatusFilter(event.target.value); }}><option value="ALL">Все состояния</option><option value="ACTIVE">Активные</option><option value="ARCHIVED">Архив</option><option value="DEFECT">Брак</option></select></label>
           <label className="flex items-center gap-2 text-slate-600 md:hidden"><ArrowUpDown aria-hidden="true" className="size-4" /><select className="min-h-11 rounded-lg bg-transparent pr-2" aria-label="Сортировка" value={mobileSort} onChange={event => setMobileSort(event.target.value as MobileSortOption)}>{MOBILE_SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          {(searchTerm || scannedBarcode || statusFilter !== "ALL") && <button type="button" className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900" aria-label="Сбросить фильтры" onClick={resetFilters}>Сбросить</button>}
+          {(searchTerm || scannedBarcode || statusFilter !== "ALL") && <button type="button" className="hidden min-h-11 items-center px-2 text-sm font-semibold text-[#1554b5] hover:text-[#12479a] md:inline-flex" aria-label="Сбросить фильтры" onClick={resetFilters}>Сбросить</button>}
         </div>
       </div>
 
