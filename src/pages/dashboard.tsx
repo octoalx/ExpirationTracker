@@ -510,7 +510,7 @@ const Dashboard = () => {
                 type="button"
                 aria-label="Очистить поиск"
                 onClick={(e) => { e.stopPropagation(); setScannedBarcode(""); setSearchTerm(""); setCurrentPage(1); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-full text-[#1554b5] transition-colors hover:text-[#12479a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <X aria-hidden="true" className="size-5" />
               </button>
