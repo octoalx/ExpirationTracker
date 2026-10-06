@@ -1,5 +1,15 @@
 # Active context
 
+2026-10-06: Committed pending changes as d4909d5 and mobile reset/date alignment
+as f24d84f; deployed exact f24d84f archive to the verified VPS. 62 app tests,
+3 harness tests, context/typecheck, Linux build and network-disabled representative
+snapshot/startup/account-flow rehearsal passed. App healthy; every data table
+except startup SystemLog matches before/after. Backup/rollback retained.
+Blue filter-reset X was introduced in 4543a7f (Oct 5), not lost dialog fixes.
+Production Chromium checks passed for settings/reset and add/edit date geometry;
+actual iPhone picker remains unverified. No push. Details:
+`docs/plans/2026-10-06-settings-deployment.md`.
+
 2026-10-06: Account settings now validate name/email and allow password changes
 with current-password confirmation and new-password repetition. Email conflicts
 roll back profile/settings; session updates reload trusted database profile fields.

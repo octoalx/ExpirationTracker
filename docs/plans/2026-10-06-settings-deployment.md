@@ -49,3 +49,39 @@ Keep Cloudflare Access, nginx/tunnel, timezone and notification scheduling intac
 Fresh local release gate PASS: 62 application tests, 3 harness tests, context and
 TypeScript; zero skips. Diff reviewed. Linux build, isolated rehearsal and
 production checks pending.
+
+## Completed deployment evidence
+
+- Application commits: `d4909d56e564784f869c62a1106e0d3819cf599d`
+  (pending account/import/catalog UI work) and `f24d84fea4e328ca26b342e8753d4a97279b7f7d`
+  (filter reset and native date alignment). No Git push performed.
+- Exact final source archive SHA-256:
+  `44337171655f7923a81aa08611bdfff802621d6db2fe9aa709dde619caa4041b`.
+  Candidate `expirationtracker-release:f24d84f`; deployed image ID
+  `sha256:04c549828ac17aa0d1be2510cd321bfab89a64e5751e2a0854b86bca510a7f3d`.
+  Image revision label identifies the full application commit.
+- Fresh release gate after the mobile changes PASS: 62 app tests, 3 harness tests,
+  context and TypeScript. Linux Docker/Next production build PASS.
+- Restored/sanitized representative SQLite snapshot, normal startup and every-table
+  fingerprint comparison PASS. Network disabled, jobs disabled, fake credentials,
+  integrations cleared. HTTP profile/email/password replacement, old-login denial,
+  new login, trusted session update, ownership, pages and nine assets PASS.
+- Final restricted backup: `backups/pre-f24d84f-final-20261006.db`, taken after
+  stopping only app. App-only replacement, nginx config/reload, sign-in 200,
+  anonymous products/catalog/settings/thresholds 401 PASS. Public HTTPS retains
+  Cloudflare Access redirect 302. App health is healthy.
+- Every production data table except expected startup SystemLog entries has matching
+  fingerprints before/after. User 4, Product 437, CatalogEntry 106, Settings 4,
+  SharedCatalogEntry 444297; SQLite integrity OK. Integration preferences unchanged.
+- Production browser PASS: new profile/password controls present; mobile reset reads
+  "Сбросить" with no SVG icon; add/edit date fields keep x/width/height and left
+  alignment after input and blur at 390/320px. Edit focus can scroll the panel;
+  no records or production profile were saved during browser inspection.
+- The blue reset cross was introduced by `4543a7f` on October 5; its PR changed
+  more than primary colors. Earlier dialog close/position/overflow fixes remain in
+  source and compiled production CSS. This is evidence of a later UI change,
+  not a verified stale-cache or deployment rollback. Actual iPhone system date
+  picker behavior remains unverified; owner should confirm the WebKit alignment fix.
+- Rollback retained as `expirationtracker-rollback:pre-f24d84f-20261006`.
+  Server modified checkout, nginx/tunnel and live storage preserved. Evidence under
+  `/home/Alex/.codex-releases/expirationtracker-f24d84f` (uncommitted logs/snapshots).
