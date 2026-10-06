@@ -48,3 +48,9 @@ Details: `docs/plans/2026-10-06-simple-excel-import.md`.
 ## Catalog upload UI — 2026-10-06
 - Simplified admin catalog copy and replaced native DBF pickers with accessible Russian file-selection controls, selected filenames/sizes and pair count. Limits and parsing statistics remain expandable; import behavior is preserved.
 - Verification: typecheck and 8 catalog DBF/import tests passed; Browser screenshots verified at 390x844 and 1440x1000 with a fake admin session and background jobs disabled. File selection states passed without horizontal overflow or JS errors. Compact spacing keeps the check action above mobile navigation at 390x844. Screenshots: .verification/catalog-ui/. Native iOS Safari and real DBF import were not exercised.
+
+## Mobile account header — 2026-10-06
+- Branch: local/mobile-user-name. Owner selected the second visual concept: brand above a dedicated account row linking to Settings.
+- MobileHeader is integrated into Layout; blank names fall back to email, long identities truncate with complete accessible labels.
+- Verification: fresh TypeScript and diff checks passed; isolated browser checks covered 320/390px overflow, 44px target, keyboard focus, and hiding at 768/1440px. Scoped visual QA passed; evidence remains local in .verification/design-account/.
+- Full authenticated application runtime remains unverified. Owner authorized commit and push; production deployment is outside scope.

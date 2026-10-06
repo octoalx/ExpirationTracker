@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { cn } from "@/lib/utils";
 import BackToTop from "@/components/BackToTop";
+import MobileHeader from "@/components/MobileHeader";
 
 /** Light work-tool shell with persistent thumb navigation and safe-area spacing. */
 export default function Layout({ children }: { children: ReactNode }) {
@@ -27,7 +28,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <p className="truncate px-3 pb-3 text-sm text-slate-600">{session?.user?.name}</p>
       <button className="flex min-h-12 items-center gap-3 px-3 text-sm text-slate-600" onClick={() => void signOut({ callbackUrl: "/auth/signin" })}><LogOut className="size-5" />Выйти</button>
     </aside>
-    <header className="flex min-h-16 items-center px-5 pb-2 pt-5 md:hidden"><Link href="/dashboard">{brand}</Link></header>
+    <MobileHeader user={session?.user} />
     <main className="work-main mx-auto w-full px-4 py-5 md:pl-64 md:pr-8 md:pt-8">{children}</main>
     <nav aria-label="Мобильная навигация" className="phone-nav fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white md:hidden"><div className="flex min-h-16 items-stretch">{navigation.map(item => {
       const active = router.pathname === item.href;
