@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
+import type { ParsedProduct } from "@/lib/excel-parser";
+
 interface ImportExcelModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -20,7 +22,7 @@ interface ImportExcelModalProps {
 interface PreviewData {
   fileType: string;
   fileName: string;
-  products: Array<{ barcode: string; name: string; quantity: number | null }>;
+  products: ParsedProduct[];
 }
 
 type ImportState = "idle" | "previewing" | "uploading" | "success" | "error";
@@ -71,101 +73,16 @@ export default function ImportExcelModal({
     setErrorMessage("");
 
     try {
-      // Parse file on the client for preview
-      const XLSX = await import("xlsx");
-      const buffer = await selectedFile.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const ws = workbook.Sheets[workbook.SheetNames[0]];
-
-      if (!ws) {
+      const { parseExcelFile } = await import("@/lib/excel-parser");
+      const result = parseExcelFile(await selectedFile.arrayBuffer());
+      if (result.errors.length) {
+        setPreview(null);
         setState("error");
-        setErrorMessage("Файл пустой");
+        setErrorMessage(result.errors.join("; "));
         return;
       }
-
-      // Detect file type by structure
-      let fileType: string;
-      let isInventory = false;
-      let products: Array<{ barcode: string; name: string; quantity: number | null }> = [];
-
-      // Check for "Inventory" marker in the first 5 rows
-      for (let r = 0; r < 5; r++) {
-        const cell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
-        if (cell && typeof cell.v === "string" && cell.v.includes("Инвентаризационная опись")) {
-          isInventory = true;
-          break;
-        }
-      }
-      // Also check for header row with "Артикул" + "Наименование"
-      if (!isInventory) {
-        for (let r = 15; r < 22; r++) {
-          const artCell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
-          const nameCell = ws[XLSX.utils.encode_cell({ r, c: 2 })];
-          if (
-            artCell && typeof artCell.v === "string" && artCell.v.includes("Артикул") &&
-            nameCell && typeof nameCell.v === "string" && nameCell.v.includes("Наименование")
-          ) {
-            isInventory = true;
-            break;
-          }
-        }
-      }
-
-      if (isInventory) {
-        fileType = "Инвентаризация";
-        const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-        // Locate header row containing "Артикул"
-        let headerRow = 17;
-        for (let r = 10; r < 25; r++) {
-          const cell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
-          if (cell && typeof cell.v === "string" && cell.v.includes("Артикул")) {
-            headerRow = r;
-            break;
-          }
-        }
-        for (let r = headerRow + 1; r <= range.e.r; r++) {
-          const barcodeCell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
-          const nameCell = ws[XLSX.utils.encode_cell({ r, c: 2 })];
-          const qtyCell = ws[XLSX.utils.encode_cell({ r, c: 3 })];
-          const barcode = barcodeCell ? String(barcodeCell.v).trim() : "";
-          const name = nameCell ? String(nameCell.v).trim() : "";
-          if (!barcode || !name || name.toLowerCase().startsWith("всего")) continue;
-          let quantity: number | null = null;
-          if (qtyCell?.v !== undefined && qtyCell.v !== "") {
-            const parsed = Number(qtyCell.v);
-            if (!isNaN(parsed) && parsed > 0) quantity = Math.round(parsed);
-          }
-          products.push({ barcode, name, quantity });
-        }
-      } else {
-        fileType = "Каталог товаров";
-        const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-        // Map columns by header text
-        let barcodeCol = 3, nameCol = 5, qtyCol = 8;
-        for (let c = range.s.c; c <= Math.min(range.e.c, 40); c++) {
-          const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
-          if (cell && typeof cell.v === "string") {
-            const val = cell.v.trim().toLowerCase();
-            if (val.includes("штрих-код осн")) barcodeCol = c;
-            else if (val === "наименование товара") nameCol = c;
-            else if (val === "доступно") qtyCol = c;
-          }
-        }
-        for (let r = 1; r <= range.e.r; r++) {
-          const barcodeCell = ws[XLSX.utils.encode_cell({ r, c: barcodeCol })];
-          const nameCell = ws[XLSX.utils.encode_cell({ r, c: nameCol })];
-          const qtyCell = ws[XLSX.utils.encode_cell({ r, c: qtyCol })];
-          const barcode = barcodeCell ? String(barcodeCell.v).trim() : "";
-          const name = nameCell ? String(nameCell.v).trim() : "";
-          if (!barcode || !name) continue;
-          let quantity: number | null = null;
-          if (qtyCell?.v !== undefined && qtyCell.v !== "") {
-            const parsed = Number(qtyCell.v);
-            if (!isNaN(parsed) && parsed > 0) quantity = Math.round(parsed);
-          }
-          products.push({ barcode, name, quantity });
-        }
-      }
+      const products = result.products;
+      const fileType = { inventory: "Инвентаризация", catalog: "Каталог товаров", simple: "Простая таблица" }[result.fileType];
 
       if (products.length === 0) {
         setState("error");
@@ -222,11 +139,11 @@ export default function ImportExcelModal({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+            <FileSpreadsheet className="h-5 w-5 text-blue-600" />
             Импорт из Excel
           </DialogTitle>
           <DialogDescription>
-            Загрузите Excel-файл для импорта товаров. Поддерживаются файлы инвентаризации и каталога товаров.
+            Загрузите Excel-файл для импорта товаров. Поддерживаются инвентаризация, каталог и простая таблица: первая строка — заголовки; столбцы — штрих-код, название, дата, срок в месяцах. Если срок пустой, дата означает окончание годности; иначе — изготовление. Даты: ДД.ММ.ГГГГ или дата Excel.
           </DialogDescription>
         </DialogHeader>
 
@@ -235,7 +152,7 @@ export default function ImportExcelModal({
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center hover:border-emerald-400 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 transition-all cursor-pointer"
+            className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all cursor-pointer"
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="h-10 w-10 mx-auto text-slate-400 mb-3" />
@@ -275,7 +192,7 @@ export default function ImportExcelModal({
                   {preview.fileName}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Тип: <span className="font-medium text-emerald-600">{preview.fileType}</span>
+                  Тип: <span className="font-medium text-blue-600">{preview.fileType}</span>
                   {" · "}
                   Найдено товаров: <span className="font-medium">{preview.products.length}</span>
                 </p>
@@ -292,6 +209,7 @@ export default function ImportExcelModal({
                     <th className="px-3 py-2 text-left font-medium text-slate-500">Штрихкод</th>
                     <th className="px-3 py-2 text-left font-medium text-slate-500">Наименование</th>
                     <th className="px-3 py-2 text-right font-medium text-slate-500">Кол-во</th>
+                    <th className="px-3 py-2 text-left font-medium text-slate-500">Годен до</th>
                     <th className="w-8"></th>
                   </tr>
                 </thead>
@@ -307,6 +225,7 @@ export default function ImportExcelModal({
                       <td className="px-3 py-1.5 text-right text-slate-600 dark:text-slate-400">
                         {p.quantity ?? "—"}
                       </td>
+                      <td className="px-3 py-1.5">{p.expiryDate ? p.expiryDate.split("-").reverse().join(".") : "—"}</td>
                       <td className="px-1 py-1.5">
                         <button
                           onClick={() => removeProduct(i)}
@@ -332,7 +251,7 @@ export default function ImportExcelModal({
         {/* Uploading */}
         {state === "uploading" && (
           <div className="flex flex-col items-center py-8 gap-3">
-            <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
+            <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
             <p className="text-sm text-slate-600 dark:text-slate-400">Импортируем товары...</p>
           </div>
         )}
@@ -340,7 +259,7 @@ export default function ImportExcelModal({
         {/* Success */}
         {state === "success" && (
           <div className="flex flex-col items-center py-8 gap-3">
-            <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+            <CheckCircle2 className="h-10 w-10 text-blue-600" />
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Успешно импортировано: {importedCount} товаров
             </p>
@@ -350,13 +269,13 @@ export default function ImportExcelModal({
         {/* Footer */}
         <DialogFooter>
           {state === "previewing" && preview && (
-            <Button onClick={handleImport} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleImport} className="bg-blue-600 hover:bg-blue-700 text-white">
               <Upload className="h-4 w-4 mr-2" />
               Импортировать {preview.products.length} товаров
             </Button>
           )}
           {state === "success" && (
-            <Button onClick={() => handleClose(false)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={() => handleClose(false)} className="bg-blue-600 hover:bg-blue-700 text-white">
               Закрыть
             </Button>
           )}

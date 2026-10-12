@@ -3,6 +3,8 @@ import { sendDailyUrgentNotifications, sendWarningNotifications } from "../servi
 import { prisma } from "./prisma";
 import { createBackup } from "./backupService";
 import { logger } from "./logger";
+import { minskDate } from "./expiry-calendar";
+import { tickTelegram } from "./server/telegram-runtime";
 
 /** Timezone used for all scheduled tasks. */
 const TIMEZONE = "Europe/Minsk";
@@ -20,9 +22,9 @@ function currentTimeMinsk(): string {
 /** Marks active products past their expiry date as expired. */
 async function updateExpiredProducts() {
   try {
-    const now = new Date();
+    const now = new Date(`${minskDate()}T00:00:00.000Z`);
     const result = await prisma.product.updateMany({
-      where: { status: "ACTIVE", expiryDate: { lt: now }, isExpired: false },
+      where: { status: "ACTIVE", deletedAt: null, expiryDate: { lt: now }, isExpired: false },
       data: { isExpired: true },
     });
     if (result.count > 0) logger.info(`Updated ${result.count} expired products`, { context: "Cron" });
@@ -121,7 +123,7 @@ async function runScheduledBackup() {
   for (const s of settings) {
     if (s.backupTime === nowTime) {
       logger.info(`Backup time matched (${nowTime})`, { context: "Cron" });
-      const backupName = createBackup();
+      const backupName = await createBackup();
       if (backupName) {
         logger.info("[Cron] Scheduled backup created", { file: backupName });
       } else {
@@ -138,6 +140,7 @@ async function runScheduledBackup() {
 const minuteTask = cron.schedule(
   "* * * * *",
   () => {
+    void tickTelegram(true);
     updateExpiredProducts().catch((e) => logger.error("[Cron] Error", { error: String(e) }));
     runScheduledNotifications().catch((e) => logger.error("[Cron] Error", { error: String(e) }));
     runScheduledBackup().catch((e) => logger.error("[Cron] Backup error", { error: String(e) }));
@@ -150,4 +153,9 @@ const minuteTask = cron.schedule(
 export function startCronJobs() {
   console.log("[Cron] Starting cron jobs (timezone: " + TIMEZONE + ")...");
   minuteTask.start();
+  const state = globalThis as typeof globalThis & { telegramTimer?: ReturnType<typeof setInterval> };
+  if (!state.telegramTimer) {
+    state.telegramTimer = setInterval(() => { void tickTelegram(); }, 10000);
+    state.telegramTimer.unref();
+  }
 }

@@ -58,3 +58,6 @@ SECURITY_AUDIT.md
 
 # Local verification evidence
 .verification/
+
+# Local source files
+/Copyright Base/

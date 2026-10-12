@@ -18,3 +18,10 @@ docs/
 .clinerules
 .windsurfrules
 .roo/
+
+# Local work artifacts
+Copyright Base/
+backups/
+.verification/
+outputs/
+tsconfig.tsbuildinfo

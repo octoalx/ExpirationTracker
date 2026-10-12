@@ -20,5 +20,5 @@ export default withAuth(
 
 /** Route matcher for protected pages. */
 export const config = {
-  matcher: ["/", "/dashboard/:path*", "/settings/:path*", "/admin/:path*"],
+  matcher: ["/", "/dashboard/:path*", "/settings/:path*", "/store/:path*", "/stats/:path*", "/admin/:path*"],
 };

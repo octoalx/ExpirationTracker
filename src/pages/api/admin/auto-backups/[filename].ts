@@ -6,6 +6,9 @@ import fs from "fs";
 import path from "path";
 import { resolvePrismaDbPath } from "@/lib/prisma";
 import { prisma } from "@/lib/prisma";
+import { suspendTelegram, resumeTelegramRuntime } from "@/lib/server/telegram-runtime";
+import { prepareSnapshot } from "@/lib/server/snapshot-restore";
+import { copySqliteSnapshot } from "@/lib/server/sqlite-snapshot";
 
 /** GET: download backup | POST: restore from backup | DELETE: remove backup (admin only). */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -52,14 +55,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
+      if (!suspendTelegram()) return res.status(409).json({ message: "Telegram завершает действие. Повторите восстановление через минуту." });
       const dbPath = resolvePrismaDbPath();
+      const prepared = prepareSnapshot(backupPath, path.dirname(dbPath));
 
       // Create emergency backup before overwriting the database
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
       const emergencyBackup = path.join(path.dirname(dbPath), `emergency-pre-restore-${timestamp}.db`);
-      fs.copyFileSync(dbPath, emergencyBackup);
-
-      fs.copyFileSync(backupPath, dbPath);
+      await copySqliteSnapshot(dbPath, emergencyBackup);
+      await prisma.$disconnect();
+      try {
+        fs.copyFileSync(prepared, dbPath);
+      } finally { fs.unlinkSync(prepared); }
+      resumeTelegramRuntime();
 
       await prisma.systemLog.create({
         data: {
@@ -80,10 +88,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         emergencyBackup: path.basename(emergencyBackup),
       });
     } catch (error) {
-      console.error("[Restore] Error:", error);
+      resumeTelegramRuntime();
       return res.status(500).json({
         message: "Restore failed",
-        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }

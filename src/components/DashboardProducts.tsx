@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { getExpiryStatus } from "@/lib/utils";
+import { DEFAULT_MOBILE_SORT, type MobileSortOption } from "@/lib/days-left";
 import { exportProductsToExcel } from "@/lib/excel-export";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,6 +57,7 @@ export function DashboardProducts() {
   const [bulkIds, setBulkIds] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [mobileSort, setMobileSort] = useState<MobileSortOption>(DEFAULT_MOBILE_SORT);
 
   /* ── Initial data load ─────────────────────────────────────────────── */
   useEffect(() => {
@@ -114,7 +116,7 @@ export function DashboardProducts() {
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "CONSUMED" }),
+        body: JSON.stringify({ status: "ARCHIVED", version: product.version }),
       });
       if (res.ok) updateProduct(await res.json());
     },
@@ -383,8 +385,11 @@ export function DashboardProducts() {
                 products={products}
                 urgentThreshold={settings?.urgentThreshold}
                 warningThreshold={settings?.warningThreshold}
+                mobileSort={mobileSort}
+                onMobileSortChange={setMobileSort}
                 onProductEdit={handleEdit}
                 onProductDelete={handleDelete}
+                onProductRemoved={deleteProduct}
                 onProductConsume={handleConsume}
                 onSelectionChange={setBulkIds}
                 actionBar={actionBar}

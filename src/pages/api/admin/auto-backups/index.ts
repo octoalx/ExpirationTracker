@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "POST") {
-    const filename = createBackup();
+    const filename = await createBackup();
     if (filename) {
       await prisma.systemLog.create({
         data: {

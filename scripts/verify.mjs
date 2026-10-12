@@ -13,7 +13,11 @@ export function buildChecks(root, profile) {
   const applicationCommand = npmCli && existsSync(npmCli)
     ? [process.execPath, npmCli, 'run', 'test:app']
     : [process.platform === 'win32' ? 'npm.cmd' : 'npm', 'run', 'test:app'];
+  const releaseOnly = profile === 'release'
+    ? [{ name: 'published source', argv: [process.execPath, 'scripts/release-source.mjs'], available: true }]
+    : [];
   return [
+    ...releaseOnly,
     { name: 'context', argv: [process.execPath, 'scripts/check-context.mjs'], available: true },
     { name: 'harness', argv: [process.execPath, '--test', 'tests/harness.test.mjs'], available: true },
     { name: 'typecheck', argv: [process.execPath, compiler, '--noEmit', '--incremental', 'false'], available: existsSync(compiler) },

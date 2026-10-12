@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
+import { minskDate } from "@/lib/expiry-calendar";
 
 /** GET: admin dashboard KPIs (total users, active/expired products, issues). */
 export default async function handler(
@@ -22,11 +23,12 @@ export default async function handler(
   try {
     const totalUsers = await prisma.user.count();
     const activeProducts = await prisma.product.count({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", deletedAt: null },
     });
     const expiredProducts = await prisma.product.count({
       where: {
-        expiryDate: { lte: new Date() },
+        deletedAt: null,
+        expiryDate: { lt: new Date(`${minskDate()}T00:00:00.000Z`) },
         status: "ACTIVE",
       },
     });
