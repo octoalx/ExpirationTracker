@@ -5,8 +5,8 @@ export interface InventoryProduct {
   expiryDate: string | null;
 }
 
-/** With months, the source is a manufacture date; otherwise it is final expiry. UTC avoids timezone shifts. */
-export function expiryFromManufacture(date: string, months: number | null): string {
+/** Date-only arithmetic in UTC avoids host timezone and DST shifts. */
+export function expiryFromManufacture(date: string, months: number | null): string | null {
   const match = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(date);
   if (!match) throw new Error(`Некорректная дата производства: ${date}`);
   const [, dayText, monthText, yearText] = match;
@@ -15,7 +15,7 @@ export function expiryFromManufacture(date: string, months: number | null): stri
   if (year < 1900 || start.getUTCFullYear() !== year || start.getUTCMonth() !== month - 1 || start.getUTCDate() !== day) {
     throw new Error(`Некорректная дата производства: ${date}`);
   }
-  if (months === null) return start.toISOString().slice(0, 10);
+  if (months === null) return null;
   if (!Number.isInteger(months) || months <= 0 || months > 1200) throw new Error("Некорректный срок хранения в месяцах");
   const end = new Date(Date.UTC(year, month - 1 + months + 1, 0));
   end.setUTCDate(Math.min(day, end.getUTCDate()));

@@ -1,12 +1,11 @@
 import React, { useState, type FormEvent } from "react";
 import { format, differenceInDays } from "date-fns";
-import { expiryDays } from "@/lib/expiry-calendar";
 import { ru } from "date-fns/locale";
-import {
-  CalendarCheck,
-  Clock,
-  AlertCircle,
-  CheckCircle,
+import { 
+  CalendarCheck, 
+  Clock, 
+  AlertCircle, 
+  CheckCircle, 
   Trash2,
   Barcode,
   Calendar,
@@ -32,9 +31,9 @@ interface ProductCardProps {
 }
 
 /** Card displaying a single product with status, expiry info, and action buttons. */
-function ProductCard({
-  product,
-  onProductDeleted,
+function ProductCard({ 
+  product, 
+  onProductDeleted, 
   onProductConsumed,
   onProductUpdated
 }: ProductCardProps) {
@@ -46,7 +45,7 @@ function ProductCard({
   );
   const [isSaving, setIsSaving] = useState(false);
 
-  const daysLeft = expiryDays(product.expiryDate) ?? Number.POSITIVE_INFINITY;
+  const daysLeft = product.expiryDate ? differenceInDays(new Date(product.expiryDate), new Date()) : Number.POSITIVE_INFINITY;
   const isExpired = daysLeft < 0;
 
   const getStatusConfig = () => {
@@ -63,37 +62,37 @@ function ProductCard({
     }
     if (daysLeft <= 3) {
       return {
-        stripeColor: "bg-expiry-soft0",
+        stripeColor: "bg-orange-500",
         icon: Clock,
-        iconColor: "text-expiry-ink",
+        iconColor: "text-orange-600",
         statusText: `Осталось ${daysLeft} ${getDaysText(daysLeft)}`,
-        statusColor: "text-expiry-ink"
+        statusColor: "text-orange-600"
       };
     }
     if (daysLeft <= 7) {
       return {
-        stripeColor: "bg-expiry-soft0",
+        stripeColor: "bg-yellow-500",
         icon: Clock,
-        iconColor: "text-expiry-ink",
+        iconColor: "text-yellow-600",
         statusText: `Осталось ${daysLeft} ${getDaysText(daysLeft)}`,
-        statusColor: "text-expiry-ink"
+        statusColor: "text-yellow-600"
       };
     }
     if (daysLeft <= 30) {
       return {
-        stripeColor: "bg-blue-400",
+        stripeColor: "bg-emerald-400",
         icon: CalendarCheck,
-        iconColor: "text-blue-600",
+        iconColor: "text-emerald-600",
         statusText: `Осталось ${daysLeft} ${getDaysText(daysLeft)}`,
-        statusColor: "text-blue-600"
+        statusColor: "text-emerald-600"
       };
     }
     return {
-      stripeColor: "bg-blue-600",
+      stripeColor: "bg-emerald-600",
       icon: CalendarCheck,
-      iconColor: "text-blue-600",
+      iconColor: "text-emerald-600",
       statusText: `Осталось ${daysLeft} ${getDaysText(daysLeft)}`,
-      statusColor: "text-blue-600"
+      statusColor: "text-emerald-600"
     };
   };
 
@@ -121,7 +120,7 @@ function ProductCard({
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, barcode: editBarcode, expiryDate: editExpiryDate, version: product.version }),
+        body: JSON.stringify({ name: editName, barcode: editBarcode, expiryDate: editExpiryDate }),
       });
       if (res.ok) {
         const updated: Product = await res.json();
@@ -144,10 +143,11 @@ function ProductCard({
   return (
     <>
       <div className={cn(
-        "relative bg-white rounded-xl",
-        "border border-slate-200",
+        "relative bg-white/80 backdrop-blur-sm rounded-2xl",
+        "border border-slate-200/60",
         "flex flex-col min-h-[280px] h-full",
         "transition-all duration-300 ease-out",
+        "hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50",
         "overflow-hidden"
       )}>
         {/* Top color stripe indicating urgency */}
@@ -162,7 +162,7 @@ function ProductCard({
             "w-7 h-7 flex items-center justify-center rounded-lg",
             "bg-slate-100 text-slate-400",
             "transition-all duration-200",
-            "hover:bg-blue-50 hover:text-blue-600",
+            "hover:bg-emerald-50 hover:text-emerald-600",
             "active:scale-90"
           )}
         >
@@ -203,10 +203,10 @@ function ProductCard({
               onClick={() => onProductConsumed(product)}
               className={cn(
                 "flex-1 flex items-center justify-center gap-1.5",
-                "bg-blue-50 text-blue-700",
+                "bg-emerald-50 text-emerald-700",
                 "py-2.5 px-3 rounded-xl text-sm font-medium",
                 "transition-all duration-200",
-                "hover:bg-blue-100 hover:shadow-sm",
+                "hover:bg-emerald-100 hover:shadow-sm",
                 "active:scale-95"
               )}
             >
@@ -250,7 +250,7 @@ function ProductCard({
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 required
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
                 placeholder="Название продукта"
               />
             </div>
@@ -265,7 +265,7 @@ function ProductCard({
                 type="text"
                 value={editBarcode}
                 onChange={(e) => setEditBarcode(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all font-mono tracking-wider"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all font-mono tracking-wider"
                 placeholder="Штрих-код"
               />
             </div>
@@ -281,7 +281,7 @@ function ProductCard({
                 value={editExpiryDate}
                 onChange={(e) => setEditExpiryDate(e.target.value)}
                 required
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
               />
             </div>
 
@@ -296,7 +296,7 @@ function ProductCard({
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
                   <span className="flex items-center justify-center gap-2">

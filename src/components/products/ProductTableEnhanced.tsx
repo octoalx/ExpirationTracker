@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback } from "react";
 import { getExpiryStatus, cn } from "@/lib/utils";
-import type { Product } from "@prisma/client";
+import { Product } from "@prisma/client";
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,6 +10,8 @@ import {
   type RowSelectionState,
   type ColumnDef,
 } from "@tanstack/react-table";
+import { format, differenceInDays, startOfDay } from "date-fns";
+import { ru } from "date-fns/locale";
 import {
   CheckCircle2,
   Trash2,
@@ -31,9 +33,6 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import MobileProductList from "./MobileProductList";
-import { expiryDays, expiryLabel, expiryDisplay } from "@/lib/expiry-calendar";
-import type { MobileSortOption } from "@/lib/days-left";
 import { EditableCell } from "./EditableCell";
 
 /* ── Column widths ── */
@@ -48,21 +47,11 @@ const COL_WIDTHS = {
 };
 
 interface ProductTableEnhancedProps {
-  canDelete?: boolean;
   products: Product[];
-  /**
-   * Page slice for the phone list. The dashboard paginates the globally
-   * mobile-sorted list here so sorting is not limited to the desktop page.
-   * Falls back to `products` when omitted.
-   */
-  mobileProducts?: Product[];
   urgentThreshold?: number;
   warningThreshold?: number;
-  referenceDate?: Date;
   onProductEdit?: (product: Product) => void;
   onProductDelete?: (product: Product) => void;
-  /** Called after a deferred mobile delete has been committed to the server. */
-  onProductRemoved?: (productId: string) => void;
   onProductConsume?: (product: Product) => void;
   onProductMoveToActive?: (product: Product) => void;
   onProductArchive?: (product: Product) => void;
@@ -74,11 +63,6 @@ interface ProductTableEnhancedProps {
   sortField?: string;
   sortDesc?: boolean;
   onSortChange?: (field: string) => void;
-  /** Phone-list order; controlled by the dashboard when provided. */
-  mobileSort?: MobileSortOption;
-  onMobileSortChange?: (sort: MobileSortOption) => void;
-  /** The parent renders the phone sort select in its own toolbar. */
-  mobileSortInToolbar?: boolean;
 }
 
 type ExpiryStatus = "expired" | "urgent" | "warning" | "safe";
@@ -98,44 +82,40 @@ const getStatusConfig = (status: ExpiryStatus, daysLeft: number) => {
     case "urgent":
       return {
         icon: Clock,
-        color: "text-red-700",
-        bg: "bg-red-50",
-        border: "border-red-200",
-        label: `Срочно · ${daysLeft} дн.`,
-        stripe: "bg-red-500",
+        color: "text-orange-600",
+        bg: "bg-orange-50",
+        border: "border-orange-200",
+        label: `Осталось ${daysLeft} дн.`,
+        stripe: "bg-orange-500",
       };
     case "warning":
       return {
         icon: Clock,
-        color: "text-expiry-ink",
-        bg: "bg-expiry-soft",
-        border: "border-expiry-border",
-        label: `Внимание · ${daysLeft} дн.`,
-        stripe: "bg-expiry-marker",
+        color: "text-yellow-600",
+        bg: "bg-yellow-50",
+        border: "border-yellow-200",
+        label: `Осталось ${daysLeft} дн.`,
+        stripe: "bg-yellow-500",
       };
     case "safe":
       return {
         icon: CalendarCheck,
-        color: "text-slate-600",
-        bg: "bg-slate-50",
-        border: "border-slate-200",
+        color: "text-emerald-600",
+        bg: "bg-emerald-50",
+        border: "border-emerald-200",
         label: `Осталось ${daysLeft} дн.`,
-        stripe: "bg-slate-400",
+        stripe: "bg-emerald-500",
       };
   }
 };
 
 /** Enhanced product table with inline editing, sorting, and bulk selection. */
 export function ProductTableEnhanced({
-  canDelete = true,
   products,
-  mobileProducts,
   urgentThreshold = 3,
   warningThreshold = 7,
-  referenceDate,
   onProductEdit,
   onProductDelete,
-  onProductRemoved,
   onProductConsume,
   onProductMoveToActive,
   onProductArchive,
@@ -147,9 +127,6 @@ export function ProductTableEnhanced({
   sortField,
   sortDesc,
   onSortChange,
-  mobileSort,
-  onMobileSortChange,
-  mobileSortInToolbar,
 }: ProductTableEnhancedProps) {
   // Convert selectedIds array to rowSelection object for TanStack Table
   const rowSelection = useMemo(() => {
@@ -206,15 +183,12 @@ export function ProductTableEnhanced({
         const res = await fetch(`/api/products/${product.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...updateData, version: product.version }),
+          body: JSON.stringify(updateData),
         });
 
         if (res.ok) {
           const updated = await res.json();
           onProductUpdated?.(updated);
-        } else {
-          const error = await res.json();
-          window.alert(error.message ?? "Не удалось сохранить. Обновите список.");
         }
       } catch (error) {
         console.error("Failed to update product:", error);
@@ -258,7 +232,7 @@ export function ProductTableEnhanced({
           <div
             className={cn(
               "flex items-center gap-1 cursor-pointer select-none",
-              sortField === "name" && "text-blue-600 font-medium"
+              sortField === "name" && "text-emerald-600 font-medium"
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -289,7 +263,7 @@ export function ProductTableEnhanced({
 
           return (
             <div
-              className="font-medium text-slate-900 cursor-pointer hover:text-blue-600 transition-colors"
+              className="font-medium text-slate-900 cursor-pointer hover:text-emerald-600 transition-colors"
               onClick={(e) => copyToClipboard(value, e)}
               onDoubleClick={(e) => {
                 if (clickTimer.current) clearTimeout(clickTimer.current);
@@ -309,7 +283,7 @@ export function ProductTableEnhanced({
           <div
             className={cn(
               "flex items-center gap-1 cursor-pointer select-none",
-              sortField === "quantity" && "text-blue-600 font-medium"
+              sortField === "quantity" && "text-emerald-600 font-medium"
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -345,7 +319,7 @@ export function ProductTableEnhanced({
 
           return (
             <div
-              className="text-sm text-slate-700 cursor-pointer hover:text-blue-600 transition-colors"
+              className="text-sm text-slate-700 cursor-pointer hover:text-emerald-600 transition-colors"
               onClick={(e) => copyToClipboard(String(value ?? ""), e)}
               onDoubleClick={(e) => {
                 if (clickTimer.current) clearTimeout(clickTimer.current);
@@ -365,7 +339,7 @@ export function ProductTableEnhanced({
           <div
             className={cn(
               "flex items-center gap-1 cursor-pointer select-none",
-              sortField === "barcode" && "text-blue-600 font-medium"
+              sortField === "barcode" && "text-emerald-600 font-medium"
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -399,7 +373,7 @@ export function ProductTableEnhanced({
 
           return (
             <div
-              className="flex items-center gap-1.5 text-sm text-slate-500 cursor-pointer hover:text-blue-600 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-slate-500 cursor-pointer hover:text-emerald-600 transition-colors"
               onClick={(e) => copyToClipboard(value || "", e)}
               onDoubleClick={(e) => {
                 if (clickTimer.current) clearTimeout(clickTimer.current);
@@ -420,7 +394,7 @@ export function ProductTableEnhanced({
           <div
             className={cn(
               "flex items-start gap-1 cursor-pointer select-none",
-              sortField === "expiryDate" && "text-blue-600 font-medium"
+              sortField === "expiryDate" && "text-emerald-600 font-medium"
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -439,7 +413,7 @@ export function ProductTableEnhanced({
             editingCell?.columnId === "expiryDate";
           const rawDate = getValue() as string | Date | null;
           const date = rawDate ? new Date(rawDate) : null;
-          const value = expiryLabel(date) ?? "";
+          const value = date ? format(date, "yyyy-MM-dd") : "";
 
           if (isEditing) {
             return (
@@ -461,8 +435,8 @@ export function ProductTableEnhanced({
             </span>;
           }
 
-          const daysLeft = expiryDays(date, referenceDate ?? new Date())!;
-          const status = getExpiryStatus(date, urgentThreshold, warningThreshold, referenceDate);
+          const daysLeft = differenceInDays(startOfDay(date), startOfDay(new Date()));
+          const status = getExpiryStatus(date, urgentThreshold, warningThreshold);
           const config = getStatusConfig(status, daysLeft);
           const StatusIcon = config.icon;
 
@@ -487,7 +461,7 @@ export function ProductTableEnhanced({
                 <span>{config.label}</span>
               </div>
               <span className="text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
-                {expiryDisplay(date)}
+                {format(date, "dd.MM.yyyy", { locale: ru })}
               </span>
             </div>
           );
@@ -501,7 +475,7 @@ export function ProductTableEnhanced({
           <div
             className={cn(
               "flex items-center gap-1 cursor-pointer select-none",
-              sortField === "status" && "text-blue-600 font-medium"
+              sortField === "status" && "text-emerald-600 font-medium"
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -518,9 +492,9 @@ export function ProductTableEnhanced({
           const status = getValue() as string;
 
           const config = {
-            ACTIVE: { label: "Активен", color: "bg-blue-50 text-blue-800" },
+            ACTIVE: { label: "Активен", color: "bg-emerald-100 text-emerald-700" },
             ARCHIVED: { label: "Архив", color: "bg-slate-100 text-slate-600" },
-            DEFECT: { label: "Брак", color: "bg-red-50 text-red-800" },
+            DEFECT: { label: "Брак", color: "bg-amber-100 text-amber-700" },
           }[status] || { label: status, color: "bg-slate-100 text-slate-600" };
 
           return (
@@ -548,7 +522,7 @@ export function ProductTableEnhanced({
                 variant="ghost"
                 size="sm"
                 onClick={() => onProductEdit?.(product)}
-                className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50/50"
+                className="h-8 w-8 p-0 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50/50"
                 title="Редактировать"
               >
                 <Pencil className="h-4 w-4" />
@@ -562,8 +536,8 @@ export function ProductTableEnhanced({
                 className={cn(
                   "h-8 w-8 p-0 transition-colors",
                   product.status === "ACTIVE"
-                    ? "text-blue-600 bg-blue-50 hover:bg-blue-100"
-                    : "text-slate-400 hover:text-blue-600 hover:bg-blue-50/50"
+                    ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100"
+                    : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50/50"
                 )}
                 title="В Активные"
               >
@@ -603,7 +577,7 @@ export function ProductTableEnhanced({
               </Button>
 
               {/* Delete */}
-              {canDelete && <Button
+              <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onProductDelete?.(product)}
@@ -611,7 +585,7 @@ export function ProductTableEnhanced({
                 title="Удалить"
               >
                 <Trash2 className="h-4 w-4" />
-              </Button>}
+              </Button>
             </div>
           );
         },
@@ -623,7 +597,6 @@ export function ProductTableEnhanced({
       handleCellEdit,
       copyToClipboard,
       onProductDelete,
-      canDelete,
       onProductConsume,
       onProductEdit,
       onProductMoveToActive,
@@ -632,7 +605,6 @@ export function ProductTableEnhanced({
       onProductUpdated,
       urgentThreshold,
       warningThreshold,
-      referenceDate,
     ]
   );
 
@@ -667,7 +639,7 @@ export function ProductTableEnhanced({
     <div className="space-y-4">
       {copyTooltip && (
         <div
-          className="fixed z-50 pointer-events-none px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-blue-700 text-xs font-medium flex items-center gap-1.5 animate-fade-out"
+          className="fixed z-50 pointer-events-none px-3 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-700 text-xs font-medium flex items-center gap-1.5 shadow-lg animate-fade-out"
           style={{ left: copyTooltip.x, top: copyTooltip.y - 36, transform: "translateX(-200%)" }}
         >
           <Check className="h-3.5 w-3.5" /> Скопировано
@@ -675,8 +647,7 @@ export function ProductTableEnhanced({
       )}
       {actionBar}
 
-      <div className="md:hidden"><MobileProductList canDelete={canDelete} products={mobileProducts ?? products} urgentThreshold={urgentThreshold} warningThreshold={warningThreshold} referenceDate={referenceDate} sortOption={mobileSort} onSortChange={onMobileSortChange} hideSortControl={mobileSortInToolbar} onProductEdit={onProductEdit} onProductDelete={onProductDelete} onProductRemoved={onProductRemoved} onProductArchive={onProductArchive} onProductDefect={onProductDefect} onProductMoveToActive={onProductMoveToActive} /></div>
-      <div className="hidden md:block rounded-xl border border-slate-200 overflow-x-auto">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/50">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -711,7 +682,7 @@ export function ProductTableEnhanced({
                 key={row.id}
                 className={cn(
                   "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors",
-                  row.getIsSelected() && "bg-blue-50/50 dark:bg-blue-900/20"
+                  row.getIsSelected() && "bg-emerald-50/50 dark:bg-emerald-900/20"
                 )}
               >
                 {row.getVisibleCells().map((cell) => (

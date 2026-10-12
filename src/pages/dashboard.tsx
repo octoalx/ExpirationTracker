@@ -1,16 +1,10 @@
-import { watchInventorySettings } from "@/lib/inventory-settings";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import type { Product } from "@prisma/client";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Product } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { getExpiryStatus, cn } from "../lib/utils";
 import { exportProductsToExcel } from "../lib/excel-export";
 import { motion, AnimatePresence } from "framer-motion";
-import BarcodeCamera from "../components/BarcodeCamera";
-import { findScannedProducts } from "@/lib/product-scan";
-import { interactionFeedback } from "@/lib/interaction-feedback";
-import { DEFAULT_MOBILE_SORT, MOBILE_SORT_OPTIONS, mobileSortForStatusFilter, sortProductsForMobile, type MobileSortOption } from "@/lib/days-left";
-import toast from "react-hot-toast";
 import AddProductForm from "../components/AddProductForm";
 import EditProductForm from "../components/EditProductForm";
 import ImportExcelModal from "../components/ImportExcelModal";
@@ -25,11 +19,9 @@ import {
 } from "@/components/ui/dialog";
 import {
   Plus,
-  ScanBarcode,
   Package,
   AlertTriangle,
   XCircle,
-  X,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -42,8 +34,24 @@ import {
   ListFilter,
   FileSpreadsheet,
   Printer,
-  ArrowUpDown,
 } from "lucide-react";
+
+/* ── Typing animation hook ── */
+/** Hook that displays text character-by-character at a given speed. */
+function useTypingText(text: string, speed = 60) {
+  const [displayed, setDisplayed] = useState("");
+  useEffect(() => {
+    setDisplayed("");
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) clearInterval(id);
+    }, speed);
+    return () => clearInterval(id);
+  }, [text, speed]);
+  return displayed;
+}
 
 /* ── Debounce hook ── */
 /** Returns a debounced copy of the value, updating after `delay` ms of inactivity. */
@@ -70,16 +78,56 @@ function Chip({ label, active, onClick }: ChipProps) {
     <button
       type="button"
       onClick={onClick}
-      aria-pressed={active}
       className={cn(
-        "relative min-h-11 shrink-0 border-b-2 px-2 py-2 text-sm font-medium transition-colors duration-150",
+        "relative rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-200",
         active
-          ? "text-blue-700 border-blue-700"
-          : "text-slate-600 border-transparent hover:text-blue-700",
+          ? "text-white"
+          : "text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700",
       )}
     >
+      {active && (
+        <motion.span
+          layoutId="chip-active"
+          className="absolute inset-0 rounded-full bg-emerald-600"
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        />
+      )}
       <span className="relative z-10">{label}</span>
     </button>
+  );
+}
+
+/* ── Stat card ── */
+interface StatCardProps {
+  title: string;
+  value: number;
+  icon: React.ElementType;
+  color: string;
+  borderGradient: string;
+}
+
+function StatCard({ title, value, icon: Icon, color, borderGradient }: StatCardProps) {
+  return (
+    <motion.div
+      whileHover={{ scale: 1.04, y: -2 }}
+      transition={{ type: "spring", stiffness: 400, damping: 20 }}
+      className="relative rounded-2xl p-px overflow-hidden"
+    >
+      <div className={cn("absolute inset-0 rounded-2xl bg-linear-to-br opacity-60", borderGradient)} />
+      <div className="relative rounded-2xl bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {title}
+            </p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
+          </div>
+          <div className={cn("rounded-xl p-2.5", color)}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -98,24 +146,24 @@ interface PaginationProps {
 function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onItemsPerPageChange }: PaginationProps) {
   if (totalPages <= 1) return null;
 
-  const pages = Array.from({ length: Math.min(5, totalPages) }, (_, index) => Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + index);
+  const pages: number[] = [];
+  for (let i = 1; i <= totalPages; i++) pages.push(i);
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-1 pt-4">
+    <div className="flex items-center justify-center gap-1 pt-4">
       <button
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage === 1}
-        aria-label="Предыдущая страница"
-        className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
+        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
       >
-        <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+        <ChevronLeft className="h-4 w-4" />
       </button>
       {pages.map((page) => (
         <button
           key={page}
           onClick={() => onPageChange(page)}
           className={cn(
-            "relative min-h-11 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-200",
+            "relative rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200",
             currentPage === page
               ? "text-white"
               : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800",
@@ -124,7 +172,7 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
           {currentPage === page && (
             <motion.span
               layoutId="page-pill"
-              className="absolute inset-0 rounded-lg bg-blue-600"
+              className="absolute inset-0 rounded-lg bg-emerald-600"
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
             />
           )}
@@ -134,20 +182,18 @@ function Pagination({ currentPage, totalPages, onPageChange, itemsPerPage, onIte
       <button
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
         disabled={currentPage === totalPages}
-        aria-label="Следующая страница"
-        className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
+        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition-colors"
       >
         <ChevronRight className="h-4 w-4" />
       </button>
 
       {/* Items per page selector */}
-      <div className="flex w-full items-center justify-center gap-2 pt-2 md:ml-4 md:w-auto md:border-l md:border-slate-200 md:pl-4 md:pt-0 dark:md:border-slate-700">
+      <div className="flex items-center gap-2 ml-4 pl-4 border-l border-slate-200 dark:border-slate-700">
         <span className="text-sm text-slate-500">На странице:</span>
         <select
           value={itemsPerPage}
-          aria-label="Товаров на странице"
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          className="text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          className="text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
         >
           {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
             <option key={opt} value={opt}>{opt}</option>
@@ -168,19 +214,6 @@ const Dashboard = () => {
     urgentThreshold: number;
     warningThreshold: number;
   } | null>(null);
-  const [referenceDate, setReferenceDate] = useState(() => new Date());
-  const [scanOpen, setScanOpen] = useState(false);
-  const [scanCameraOpen, setScanCameraOpen] = useState(false);
-  const [scanCode, setScanCode] = useState("");
-  const [scannedBarcode, setScannedBarcode] = useState("");
-  const [initialBarcode, setInitialBarcode] = useState("");
-  const [scanBusy, setScanBusy] = useState(false);
-  const [scanError, setScanError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [canDelete, setCanDelete] = useState(false);
-  const scanVersion = useRef(0);
-  const scanLock = useRef(false);
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
@@ -191,94 +224,33 @@ const Dashboard = () => {
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [sortField, setSortField] = useState<"name" | "barcode" | "expiryDate" | "quantity" | "status" | "createdAt">("createdAt");
   const [sortDesc, setSortDesc] = useState(true);
-  const [mobileSort, setMobileSort] = useState<MobileSortOption>(DEFAULT_MOBILE_SORT);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const openedEditId = useRef<string | null>(null);
-  useEffect(() => {
-    const editId = typeof router.query.edit === "string" ? router.query.edit : null;
-    if (!editId) { openedEditId.current = null; return; }
-    if (openedEditId.current === editId) return;
-    const product = products.find(item => item.id === editId);
-    if (product) {
-      openedEditId.current = editId;
-      setEditingProduct(product);
-      setEditModalOpen(true);
-      const { edit: _edit, ...query } = router.query;
-      void router.replace({ pathname: router.pathname, query }, undefined, { shallow: true, scroll: false });
-    }
-  }, [router, products]);
 
+  /* ── Data fetching ── */
+  useEffect(() => {
+    fetch(`/api/products`)
+      .then((res) => res.json())
+      .then((data) => setProducts(data.products || []));
 
-  const loadProducts = useCallback(async () => {
-    setLoading(true); setLoadError("");
-    try {
-      const response = await fetch("/api/products");
-      if (!response.ok) throw new Error("Не удалось загрузить товары. Повторите попытку.");
-      const data = await response.json(); setProducts(data.products ?? []); setCanDelete(data.canDelete ?? true);
-    } catch (error) { setLoadError(error instanceof Error ? error.message : "Ошибка сети"); }
-    finally { setLoading(false); }
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => setSettings(data));
   }, []);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (document.hidden) return;
-      fetch("/api/products").then(async response => {
-        if (response.ok) {
-          const data = await response.json();
-          setProducts(data.products ?? []); setCanDelete(data.canDelete ?? true);
-        }
-      }).catch(() => {});
-    }, 10000);
-    return () => clearInterval(timer);
-  }, []);
-  useEffect(() => {
-    if (router.query.add === "1") {
-      setAddModalOpen(true);
-      const { add: _add, ...query } = router.query;
-      void router.replace({ pathname: router.pathname, query }, undefined, { shallow: true });
-    }
-  }, [router]);
-  useEffect(() => {
-    void loadProducts();
-  }, [loadProducts]);
-  useEffect(() => watchInventorySettings((next, now) => { setSettings(next); setReferenceDate(now); }, setReferenceDate), []);
 
-  const closeScan = useCallback(() => {
-    scanVersion.current++; scanLock.current = false;
-    setScanOpen(false); setScanCameraOpen(false); setScanBusy(false);
-  }, []);
-  const resolveScan = useCallback(async (rawCode: string) => {
-    const code = rawCode.trim();
-    if (!/^\d{8,14}$/.test(code)) { setScanError("Введите штрих-код из 8–14 цифр."); return; }
-    if (scanLock.current) return;
-    scanLock.current = true;
-    const version = ++scanVersion.current;
-    setScanCode(code); setScanCameraOpen(false); setScanBusy(true); setScanError("");
-    try {
-      const response = await fetch("/api/products");
-      if (!response.ok) throw new Error("Не удалось проверить товары. Повторите поиск — код сохранён.");
-      const data = await response.json();
-      if (version !== scanVersion.current) return;
-      const inventory: Product[] = data.products ?? [];
-      setProducts(inventory); setLoading(false); setLoadError("");
-      closeScan(); interactionFeedback("scan");
-      if (findScannedProducts(inventory, code).length) {
-        setSearchTerm(""); setScannedBarcode(code); setStatusFilter("ALL"); setCurrentPage(1);
-        toast.success("Товар найден. Показаны все записи по штрих-коду.");
-      } else {
-        setInitialBarcode(code); setAddModalOpen(true);
-      }
-    } catch (error) {
-      if (version === scanVersion.current) setScanError(error instanceof Error ? error.message : "Ошибка сети. Повторите поиск.");
-    } finally {
-      if (version === scanVersion.current) { scanLock.current = false; setScanBusy(false); }
-    }
-  }, [closeScan]);
-  const closeCamera = useCallback(() => setScanCameraOpen(false), []);
-  const openScan = () => { setScanError(""); setScanCode(""); setScanOpen(true); setScanCameraOpen(true); };
-  const openAdd = () => { setInitialBarcode(""); setAddModalOpen(true); };
+  /* ── Greeting ── */
+  const getTimeOfDay = () => {
+    const h = new Date().getHours();
+    if (h < 6) return "Доброй ночи";
+    if (h < 12) return "Доброе утро";
+    if (h < 18) return "Добрый день";
+    return "Добрый вечер";
+  };
+
+  const greeting = `${getTimeOfDay()}, ${session?.user?.name || "Гость"}!`;
+  const typedGreeting = useTypingText(greeting);
 
   const updateProduct = (updatedProduct: Product) => {
     setProducts((prev) =>
@@ -289,18 +261,11 @@ const Dashboard = () => {
   const addProduct = (product: Product) => {
     setProducts((prev) => [...prev, product]);
     setAddModalOpen(false);
-    setScannedBarcode(product.barcode ?? "");
-    setSearchTerm(""); setStatusFilter("ALL"); setCurrentPage(1);
   };
 
   const deleteProduct = async (productId: string) => {
-    try {
-      const product = products.find(p => p.id === productId);
-      const response = await fetch(`/api/products/${productId}?version=${product?.version ?? 0}`, { method: "DELETE" });
-      if (!response.ok) throw new Error((await response.json()).message ?? "Не удалось удалить товар.");
-      setProducts((prev) => prev.filter((p) => p.id !== productId));
-      toast.success("Товар удалён");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Не удалось удалить товар."); }
+    await fetch(`/api/products/${productId}`, { method: "DELETE" });
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
   };
 
   const onProductConsumed = (product: Product) => {
@@ -313,7 +278,6 @@ const Dashboard = () => {
 
   const resetFilters = () => {
     setSearchTerm("");
-    setScannedBarcode("");
     setStatusFilter("ALL");
     setCurrentPage(1);
     setItemsPerPage(DEFAULT_ITEMS_PER_PAGE);
@@ -325,16 +289,13 @@ const Dashboard = () => {
   /* ── Bulk actions ── */
   const handleBulkDelete = useCallback(async () => {
     setBulkBusy(true);
-    const results = await Promise.all(selectedIds.map(async id => {
-      const response = await fetch(`/api/products/${id}?version=${products.find(p => p.id === id)?.version ?? 0}`, { method: "DELETE" });
-      return { id, ok: response.ok };
-    }));
-    const removed = results.filter(r => r.ok).map(r => r.id);
-    if (removed.length !== results.length) toast.error("Некоторые записи не удалены. Проверьте права и обновите список.");
-    setProducts((prev) => prev.filter((p) => !removed.includes(p.id)));
+    await Promise.all(
+      selectedIds.map((id) => fetch(`/api/products/${id}`, { method: "DELETE" }))
+    );
+    setProducts((prev) => prev.filter((p) => !selectedIds.includes(p.id)));
     setSelectedIds([]);
     setBulkBusy(false);
-  }, [selectedIds, products]);
+  }, [selectedIds]);
 
   const handleBulkStatus = useCallback(
     async (status: "ACTIVE" | "ARCHIVED" | "DEFECT") => {
@@ -345,25 +306,24 @@ const Dashboard = () => {
           fetch(`/api/products/${id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status, version: products.find(p => p.id === id)?.version }),
-          }).then(async r => { const data = await r.json(); if (!r.ok) { toast.error(data.message); return null; } return data as Product; })
+            body: JSON.stringify({ status }),
+          }).then((r) => r.json() as Promise<Product>)
         )
       );
       setProducts((prev) =>
         prev.map((p) => {
-          const updated = results.find((r) => r?.id === p.id);
+          const updated = results.find((r) => r.id === p.id);
           return updated ?? p;
         })
       );
       setSelectedIds([]);
       setBulkBusy(false);
     },
-    [selectedIds, products]
+    [selectedIds]
   );
 
   const filteredProducts = products
     .filter((p) => {
-      if (scannedBarcode && p.barcode !== scannedBarcode) return false;
       // Text search (debounced)
       const searchLower = debouncedSearchTerm.toLowerCase();
       const nameMatch = p.name.toLowerCase().includes(searchLower);
@@ -375,10 +335,8 @@ const Dashboard = () => {
 
       // Status filter
       if (statusFilter !== "ALL") {
-        if (statusFilter === "EXPIRED" || statusFilter === "SOON") {
-          const urgency = getExpiryStatus(p.expiryDate, settings?.urgentThreshold, settings?.warningThreshold, referenceDate);
-          if (p.status !== "ACTIVE" || !p.expiryDate) return false;
-          if (statusFilter === "EXPIRED" ? urgency !== "expired" : urgency !== "urgent" && urgency !== "warning") return false;
+        if (statusFilter === "EXPIRED") {
+          if (!p.expiryDate || p.status !== "ACTIVE" || new Date(p.expiryDate) >= new Date()) return false;
         } else if (p.status !== statusFilter) {
           return false;
         }
@@ -425,13 +383,7 @@ const Dashboard = () => {
   // Reset to first page when filters or sort change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, scannedBarcode, statusFilter, sortField, mobileSort, itemsPerPage]);
-
-  // Expiry tabs start with the closest expiry dates; the user can still pick
-  // another mobile order afterwards without it being overwritten.
-  useEffect(() => {
-    setMobileSort(mobileSortForStatusFilter(statusFilter));
-  }, [statusFilter]);
+  }, [searchTerm, statusFilter, sortField]);
 
   const handleBulkPrint = useCallback(() => {
     const selected = filteredProducts.filter((p) => selectedIds.includes(p.id));
@@ -445,15 +397,6 @@ const Dashboard = () => {
     currentPage * itemsPerPage,
   );
 
-  // The phone list sorts the whole filtered set globally (not only the visible
-  // page) so "soonest/latest" always leads with the real global extreme, while
-  // products missing an expiry date stay at the very end across pages.
-  const mobileSortedProducts = sortProductsForMobile(filteredProducts, mobileSort, referenceDate);
-  const mobilePaginatedProducts = mobileSortedProducts.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
-
   /* ── Quick stats ── */
   const stats = useMemo(() => {
     const total = products.length;
@@ -462,36 +405,76 @@ const Dashboard = () => {
         p.expiryDate,
         settings?.urgentThreshold,
         settings?.warningThreshold,
-        referenceDate,
       );
-      return p.status === "ACTIVE" && (s === "urgent" || s === "warning");
+      return s === "urgent" || s === "warning";
     }).length;
     const expired = products.filter(
-      (p) => p.status === "ACTIVE" &&
+      (p) =>
         getExpiryStatus(
           p.expiryDate,
           settings?.urgentThreshold,
           settings?.warningThreshold,
-          referenceDate,
         ) === "expired",
     ).length;
     return { total, expiringSoon, expired };
-  }, [products, settings, referenceDate]);
+  }, [products, settings]);
 
   /* ── Status chip options ── */
   const statusChips = [
     { label: "Все", value: "ALL" },
-    { label: "Скоро истекает", value: "SOON" },
-    { label: "Просрочено", value: "EXPIRED" },
+    { label: "Активные", value: "ACTIVE" },
+    { label: "Просроченные", value: "EXPIRED" },
+    { label: "Архив", value: "ARCHIVED" },
+    { label: "Брак", value: "DEFECT" },
   ];
 
   const content = (
-    <div className="inventory-page mx-auto flex w-full max-w-7xl flex-col gap-4 md:gap-5">
-      <header className="flex items-center justify-between gap-3">
-        <h1 className="flex items-center gap-3 work-page-title">Товары <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-base font-medium tabular-nums text-slate-600">{products.length}</span></h1>
-        <Button variant="outline" onClick={openAdd} className="min-h-11 gap-2"><Plus className="size-4" /><span>Добавить</span></Button>
-      </header>
-      <div className="hidden gap-6 text-sm text-slate-600 md:flex"><span>Всего: {stats.total}</span><span>Скоро истекает: {stats.expiringSoon}</span><span>Просрочено: {stats.expired}</span></div>
+    <div className="mx-auto flex w-full flex-col gap-6 p-2">
+      {/* Hero greeting */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        suppressHydrationWarning
+      >
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground" suppressHydrationWarning>
+          {typedGreeting}
+          <span className="inline-block w-0.5 h-6 ml-1 bg-emerald-500 animate-[pulse_1s_steps(2)_infinite] align-middle" />
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground" suppressHydrationWarning>
+          {filteredProducts.length} товаров · Сегодня{" "}
+          {new Date().toLocaleDateString("ru-RU", {
+            day: "numeric",
+            month: "long",
+          })}
+        </p>
+      </motion.div>
+
+      {/* Stats cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          title="Всего товаров"
+          value={stats.total}
+          icon={Package}
+          color="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400"
+          borderGradient="from-blue-400 to-cyan-400"
+        />
+        <StatCard
+          title="Скоро истекает"
+          value={stats.expiringSoon}
+          icon={AlertTriangle}
+          color="bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400"
+          borderGradient="from-amber-400 to-orange-400"
+        />
+        <StatCard
+          title="Просрочено"
+          value={stats.expired}
+          icon={XCircle}
+          color="bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400"
+          borderGradient="from-red-400 to-rose-500"
+        />
+      </div>
+
       {/* Toolbar: search + filters */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
@@ -499,30 +482,31 @@ const Dashboard = () => {
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              aria-label="Поиск товаров"
-              placeholder="Название или штрих-код"
+              aria-label="Search"
+              placeholder="Поиск по названию и штрих-коду ..."
               value={searchTerm}
-              onChange={(e) => { setScannedBarcode(""); setSearchTerm(e.target.value); }}
-              className="h-12 pl-10 pr-10 text-base bg-white border-slate-200 focus:border-blue-700"
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-emerald-200 dark:border-emerald-800 focus:border-emerald-500"
             />
-            {searchTerm && (
-              <button
-                type="button"
-                aria-label="Очистить поиск"
-                onClick={(e) => { e.stopPropagation(); setScannedBarcode(""); setSearchTerm(""); setCurrentPage(1); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-full text-[#1554b5] transition-colors hover:text-[#12479a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-              >
-                <X aria-hidden="true" className="size-5" />
-              </button>
-            )}
           </div>
 
-          <button type="button" onClick={openScan} className="primary-action w-full md:w-auto"><ScanBarcode className="size-6" />Сканировать товар</button>
+          <Button variant="outline" size="sm" onClick={resetFilters}>
+            Сбросить
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={() => setAddModalOpen(true)}
+            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <Plus className="h-4 w-4" />
+            Добавить товар
+          </Button>
         </div>
 
-        {scannedBarcode && <div role="status" className="scan-result flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-900"><span>Штрих-код <strong className="tabular-nums">{scannedBarcode}</strong> · Найдено: {filteredProducts.length}</span><button className="min-h-11 font-medium underline underline-offset-4" onClick={resetFilters}>Все товары</button></div>}
         {/* Status filter chips */}
-        <div className="flex items-center gap-1 border-b border-slate-200 !mt-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <ListFilter className="h-4 w-4 text-slate-400 shrink-0" />
           {statusChips.map((c) => (
             <Chip
               key={c.value}
@@ -531,11 +515,6 @@ const Dashboard = () => {
               onClick={() => setStatusFilter(c.value)}
             />
           ))}
-        </div>
-        <div className="!mt-1 flex flex-wrap items-center justify-between gap-2 text-sm">
-          <label className="flex items-center gap-2 text-slate-600"><ListFilter className="size-4" /><span className="sr-only">Состояние товаров</span><select className="min-h-11 rounded-lg bg-transparent pr-2" aria-label="Состояние товаров" value={["ACTIVE", "ARCHIVED", "DEFECT"].includes(statusFilter) ? statusFilter : "ALL"} onChange={event => { setStatusFilter(event.target.value); }}><option value="ALL">Все состояния</option><option value="ACTIVE">Активные</option><option value="ARCHIVED">Архив</option><option value="DEFECT">Брак</option></select></label>
-          <label className="flex items-center gap-2 text-slate-600 md:hidden"><ArrowUpDown aria-hidden="true" className="size-4" /><select className="min-h-11 rounded-lg bg-transparent pr-2" aria-label="Сортировка" value={mobileSort} onChange={event => setMobileSort(event.target.value as MobileSortOption)}>{MOBILE_SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          {(searchTerm || scannedBarcode || statusFilter !== "ALL") && <button type="button" className="hidden min-h-11 items-center px-2 text-sm font-semibold text-[#1554b5] hover:text-[#12479a] md:inline-flex" aria-label="Сбросить фильтры" onClick={resetFilters}>Сбросить</button>}
         </div>
       </div>
 
@@ -546,10 +525,10 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="hidden flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 md:flex bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm px-4 py-3 shadow-lg"
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm px-4 py-3 shadow-lg"
           >
             <span className="text-sm font-medium text-slate-600 dark:text-slate-300 mr-2">
-              Выбрано: <span className="text-blue-600 font-bold">{selectedIds.length}</span>
+              Выбрано: <span className="text-emerald-600 font-bold">{selectedIds.length}</span>
             </span>
 
             <Button
@@ -557,7 +536,7 @@ const Dashboard = () => {
               variant="outline"
               disabled={bulkBusy}
               onClick={() => handleBulkStatus("ACTIVE")}
-              className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+              className="gap-1.5 text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
             >
               {bulkBusy ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -607,7 +586,7 @@ const Dashboard = () => {
               Печать
             </Button>
 
-            {canDelete && <Button
+            <Button
               size="sm"
               variant="outline"
               disabled={bulkBusy}
@@ -616,7 +595,7 @@ const Dashboard = () => {
             >
               <Trash2 className="h-3.5 w-3.5" />
               Удалить
-            </Button>}
+            </Button>
 
             <Button
               size="sm"
@@ -631,11 +610,9 @@ const Dashboard = () => {
         )}
       </AnimatePresence>
 
-      {loadError && <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{loadError}<button className="ml-3 min-h-11 underline" onClick={() => void loadProducts()}>Повторить</button></div>}
-      {loading && <p role="status" className="flex items-center gap-2 py-8 text-slate-600"><Loader2 className="size-5 animate-spin" />Загружаем товары…</p>}
       {/* Content */}
       <AnimatePresence mode="wait">
-        {loading || loadError ? null : filteredProducts.length === 0 ? (
+        {filteredProducts.length === 0 ? (
           <motion.div
             key="empty"
             initial={{ opacity: 0 }}
@@ -645,11 +622,11 @@ const Dashboard = () => {
           >
             <PackageOpen className="size-12 opacity-40" />
             <h3 className="text-lg font-semibold">Товары не найдены</h3>
-            <p className="text-sm">Измените фильтры или добавьте товар, чтобы начать.</p>
+            <p className="text-sm">Добавьте первый товар, чтобы начать.</p>
             <Button
               size="sm"
-              onClick={openAdd}
-              className="mt-2 gap-1.5 bg-blue-700 hover:bg-blue-800 text-white"
+              onClick={() => setAddModalOpen(true)}
+              className="mt-2 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               <Plus className="h-4 w-4" />
               Добавить товар
@@ -666,16 +643,11 @@ const Dashboard = () => {
           >
             <ProductTableEnhanced
               products={paginatedProducts}
-              mobileProducts={mobilePaginatedProducts}
               urgentThreshold={settings?.urgentThreshold}
               warningThreshold={settings?.warningThreshold}
-              referenceDate={referenceDate}
               selectedIds={selectedIds}
               sortField={sortField}
               sortDesc={sortDesc}
-              mobileSort={mobileSort}
-              onMobileSortChange={setMobileSort}
-              mobileSortInToolbar
               onSortChange={(field) => {
                 if (sortField === field) {
                   setSortDesc(!sortDesc);
@@ -690,14 +662,12 @@ const Dashboard = () => {
               }}
               onProductUpdated={updateProduct}
               onProductDelete={(p) => deleteProduct(p.id)}
-              canDelete={canDelete}
-              onProductRemoved={(id) => setProducts((prev) => prev.filter((p) => p.id !== id))}
               onProductConsume={onProductConsumed}
               onProductMoveToActive={(p) => {
                 fetch(`/api/products/${p.id}`, {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ status: "ACTIVE", version: p.version }),
+                  body: JSON.stringify({ status: "ACTIVE" }),
                 })
                   .then((r) => r.json())
                   .then((updated) => updateProduct(updated));
@@ -706,7 +676,7 @@ const Dashboard = () => {
                 fetch(`/api/products/${p.id}`, {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ status: "ARCHIVED", version: p.version }),
+                  body: JSON.stringify({ status: "ARCHIVED" }),
                 })
                   .then((r) => r.json())
                   .then((updated) => updateProduct(updated));
@@ -715,7 +685,7 @@ const Dashboard = () => {
                 fetch(`/api/products/${p.id}`, {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ status: "DEFECT", version: p.version }),
+                  body: JSON.stringify({ status: "DEFECT" }),
                 })
                   .then((r) => r.json())
                   .then((updated) => updateProduct(updated));
@@ -735,43 +705,26 @@ const Dashboard = () => {
         onItemsPerPageChange={setItemsPerPage}
       />
 
-      <Dialog open={scanOpen} onOpenChange={open => { if (!open) closeScan(); }}>
-        <DialogContent className="work-panel product-dialog sm:max-w-lg max-h-[90dvh] overflow-y-auto" aria-describedby="scan-description" onOpenAutoFocus={event => { if (window.matchMedia("(max-width: 767px)").matches) event.preventDefault(); }}>
-          <DialogHeader><DialogTitle>Сканировать товар</DialogTitle></DialogHeader>
-          <p id="scan-description" className="text-sm text-slate-600">Найдём записи по штрих-коду. Если товара нет в списке, откроем добавление.</p>
-          {scanCameraOpen && <BarcodeCamera onDetected={resolveScan} onClose={closeCamera} />}
-          {!scanCameraOpen && !scanBusy && <button className="entry-link min-h-11 text-blue-700" onClick={() => setScanCameraOpen(true)}>Открыть камеру</button>}
-          <form className="product-entry space-y-3" onSubmit={event => { event.preventDefault(); void resolveScan(scanCode); }}>
-            <label htmlFor="scan-code">Или введите штрих-код</label><input id="scan-code" inputMode="numeric" value={scanCode} onChange={event => setScanCode(event.target.value)} disabled={scanBusy} />
-            {scanError && <p role="alert" className="text-sm text-red-800">{scanError}</p>}
-            <button disabled={scanBusy || !scanCode.trim()} className="primary-action w-full">{scanBusy ? <><Loader2 className="size-5 animate-spin" />Проверяем товары…</> : "Найти товар"}</button>
-          </form>
-        </DialogContent>
-      </Dialog>
       {/* Add product dialog */}
       <Dialog open={isAddModalOpen} onOpenChange={setAddModalOpen}>
-        <DialogContent className="work-panel product-dialog sm:max-w-lg max-h-[90dvh] overflow-y-auto" aria-describedby={undefined} onOpenAutoFocus={event => { event.preventDefault(); if (!window.matchMedia("(max-width: 767px)").matches) document.getElementById(initialBarcode ? "add-expiry" : "add-barcode")?.focus(); }}>
+        <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Добавить товар</DialogTitle>
           </DialogHeader>
 
-          <details>
-          <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-slate-700">Добавить несколько товаров из файла</summary>
-          <p className="mb-3 text-sm text-slate-600">Загрузите список из Excel вместо ручного ввода каждого товара.</p>
           <Button
             variant="outline"
             onClick={() => {
               setAddModalOpen(false);
               setIsImportOpen(true);
             }}
-            className="flex items-center justify-center gap-2 w-full h-[46px] border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
+            className="flex items-center justify-center gap-2 w-full h-[46px] border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
           >
-            <FileSpreadsheet className="size-5! text-blue-600 shrink-0"/>
+            <FileSpreadsheet className="size-5! text-emerald-600 shrink-0"/>
             Импорт из Excel
           </Button>
-          </details>
 
-          <AddProductForm onProductAdded={addProduct} initialBarcode={initialBarcode} />
+          <AddProductForm onProductAdded={addProduct} />
         </DialogContent>
       </Dialog>
 
@@ -788,7 +741,7 @@ const Dashboard = () => {
 
       {/* Edit product dialog */}
       <Dialog open={isEditModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="work-panel product-dialog sm:max-w-md max-h-[90dvh] overflow-y-auto" onOpenAutoFocus={event => event.preventDefault()}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Редактировать товар</DialogTitle>
           </DialogHeader>

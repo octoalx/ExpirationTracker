@@ -10,21 +10,14 @@ test("month arithmetic clamps month ends and handles leap years", () => {
   assert.throws(() => expiryFromManufacture("31.2.2025", 18));
 });
 
-test("OLD rows are excluded; missing shelf life preserves the final expiry date", () => {
+test("OLD rows are excluded; missing shelf life produces null expiry, not quantity", () => {
   const result = parseLegacyInventory("12345678\tA\tOLD\t7.3.2025\t18\n0123456789012\tB\t\t7.3.2025\t18\n12345679\tC\t\t28.1.2027\t");
   assert.equal(result.excluded, 1);
   assert.equal(result.missingShelfLife, 1);
   assert.deepEqual(result.products, [
     { barcode: "0123456789012", name: "B", quantity: null, expiryDate: "2026-09-07" },
-    { barcode: "12345679", name: "C", quantity: null, expiryDate: "2027-01-28" },
+    { barcode: "12345679", name: "C", quantity: null, expiryDate: null },
   ]);
-});
-
-test("dates without months are final expiry dates and remain calendar validated", () => {
-  assert.equal(expiryFromManufacture("29.2.2024", null), "2024-02-29");
-  assert.equal(expiryFromManufacture("28.1.2027", null), "2027-01-28");
-  assert.throws(() => expiryFromManufacture("31.2.2025", null));
-  assert.throws(() => expiryFromManufacture("29.2.2025", null));
 });
 
 test("invalid source dates, shelf life and row shape reject import", () => {

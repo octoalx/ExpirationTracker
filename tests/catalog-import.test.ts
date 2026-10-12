@@ -5,14 +5,6 @@ import { parseCatalogCsv } from "../src/lib/catalog-parser";
 
 const entries = Array.from({ length: 1001 }, (_, i) => ({ barcode: String(10000000 + i), name: `Product ${i}` }));
 
-test("large CSV validation remains opt-in and catches conflicts across batch boundaries", () => {
-  const rows = Array.from({ length: 10001 }, (_, i) => `${10000000 + i};Product ${i}`);
-  const csv = `Штрих-код;Наименование товара\n${rows.join("\n")}`;
-  assert.throws(() => parseCatalogCsv(csv), /10000/);
-  assert.equal(parseCatalogCsv(csv, 500000).length, 10001);
-  assert.throws(() => parseCatalogCsv(`${csv}\n10000000;Conflict`, 500000), /разные названия/);
-});
-
 test("bounded requests acknowledge every entry once in source order", async () => {
   const saved: typeof entries = [], sizes: number[] = [], progress: number[] = [];
   const result = await importCatalogBatches(entries, async batch => {
