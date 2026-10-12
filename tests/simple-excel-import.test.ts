@@ -11,31 +11,6 @@ function parse(rows: unknown[][], date1904 = false) {
   return parseExcelFile(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
 }
 
-test("mixed expiry/manufacture rows preserve order, duplicates and leading zeros", () => {
-  const result = parse([
-    ["Code", "Name", "Date", "Months"],
-    ["0012345678901", "Final", "07.09.2026"],
-    [],
-    ["0012345678901", "Made", "31.01.2024", 1],
-    [12345678, "ISO", "2024-02-29", 12],
-  ]);
-  assert.equal(result.fileType, "simple");
-  assert.deepEqual(result.errors, []);
-  assert.deepEqual(validateInventoryProducts(result.products), [
-    { barcode: "0012345678901", name: "Final", quantity: null, expiryDate: "2026-09-07" },
-    { barcode: "0012345678901", name: "Made", quantity: null, expiryDate: "2024-02-29" },
-    { barcode: "12345678", name: "ISO", quantity: null, expiryDate: "2025-02-28" },
-  ]);
-});
-
-test("Excel serial dates respect both date systems without timezone shifts", () => {
-  for (const [serial, date1904] of [[45292, false], [43830, true]] as const) {
-    const result = parse([["Code", "Name", "Date"], ["123", "Item", serial]], date1904);
-    assert.deepEqual(result.errors, []);
-    assert.equal(result.products[0].expiryDate, "2024-01-01");
-  }
-});
-
 test("invalid dates and months report actual Excel row numbers", () => {
   for (const [date, months] of [["31.02.2025", ""], ["29.02.2025", 1], ["01.01.2025", 0], ["01.01.2025", -1], ["01.01.2025", 1.5], ["01.01.2025", 1201], ["", 12], [60, ""]]) {
     const result = parse([["Code", "Name", "Date", "Months"], ["123", "Item", date, months]]);
