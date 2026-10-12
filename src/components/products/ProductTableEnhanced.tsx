@@ -411,8 +411,9 @@ export function ProductTableEnhanced({
           const isEditing =
             editingCell?.rowId === row.id &&
             editingCell?.columnId === "expiryDate";
-          const date = new Date(getValue() as string);
-          const value = format(date, "yyyy-MM-dd");
+          const rawDate = getValue() as string | Date | null;
+          const date = rawDate ? new Date(rawDate) : null;
+          const value = date ? format(date, "yyyy-MM-dd") : "";
 
           if (isEditing) {
             return (
@@ -425,6 +426,13 @@ export function ProductTableEnhanced({
                 onCancel={() => setEditingCell(null)}
               />
             );
+          }
+
+          if (!date) {
+            return <span title="Двойной клик для редактирования" className="text-slate-400 cursor-pointer"
+              onDoubleClick={(e) => { e.stopPropagation(); setEditingCell({ rowId: row.id, columnId: "expiryDate" }); }}>
+              Срок не указан
+            </span>;
           }
 
           const daysLeft = differenceInDays(startOfDay(date), startOfDay(new Date()));

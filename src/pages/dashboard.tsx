@@ -336,7 +336,7 @@ const Dashboard = () => {
       // Status filter
       if (statusFilter !== "ALL") {
         if (statusFilter === "EXPIRED") {
-          if (p.status !== "ACTIVE" || new Date(p.expiryDate) >= new Date()) return false;
+          if (!p.expiryDate || p.status !== "ACTIVE" || new Date(p.expiryDate) >= new Date()) return false;
         } else if (p.status !== statusFilter) {
           return false;
         }
@@ -358,8 +358,8 @@ const Dashboard = () => {
           bVal = b.barcode?.toLowerCase() || "";
           break;
         case "expiryDate":
-          aVal = new Date(a.expiryDate).getTime();
-          bVal = new Date(b.expiryDate).getTime();
+          aVal = a.expiryDate ? new Date(a.expiryDate).getTime() : Number.POSITIVE_INFINITY;
+          bVal = b.expiryDate ? new Date(b.expiryDate).getTime() : Number.POSITIVE_INFINITY;
           break;
         case "quantity":
           aVal = a.quantity ?? 0;
@@ -402,7 +402,7 @@ const Dashboard = () => {
     const total = products.length;
     const expiringSoon = products.filter((p) => {
       const s = getExpiryStatus(
-        new Date(p.expiryDate),
+        p.expiryDate,
         settings?.urgentThreshold,
         settings?.warningThreshold,
       );
@@ -411,7 +411,7 @@ const Dashboard = () => {
     const expired = products.filter(
       (p) =>
         getExpiryStatus(
-          new Date(p.expiryDate),
+          p.expiryDate,
           settings?.urgentThreshold,
           settings?.warningThreshold,
         ) === "expired",
@@ -707,7 +707,7 @@ const Dashboard = () => {
 
       {/* Add product dialog */}
       <Dialog open={isAddModalOpen} onOpenChange={setAddModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Добавить товар</DialogTitle>
           </DialogHeader>

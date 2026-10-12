@@ -1,7 +1,8 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
 import { addDays, addMonths, addWeeks, format } from "date-fns";
 import { Loader2, Barcode, Package, Calendar, Factory, Hash } from "lucide-react";
 import toast from "react-hot-toast";
+import BarcodeCamera from "./BarcodeCamera";
 
 interface AddProductFormProps {
   onProductAdded: (product: Record<string, unknown>) => void;
@@ -25,6 +26,34 @@ export default function AddProductForm({
   const [manufacturingDate, setManufacturingDate] = useState("");
   const [shelfLife, setShelfLife] = useState("");
   const [shelfLifeUnit, setShelfLifeUnit] = useState<ShelfLifeUnit>("months");
+  const [catalogMessage, setCatalogMessage] = useState("");
+  const [isLookingUp, setLookingUp] = useState(false);
+  const barcodeVersion = useRef(0);
+  const [cameraOpen, setCameraOpen] = useState(false);
+
+  const lookupBarcode = useCallback(async (code: string) => {
+    const version = barcodeVersion.current;
+    setLookingUp(true);
+    setCatalogMessage("");
+    try {
+      const response = await fetch(`/api/catalog?barcode=${encodeURIComponent(code.trim())}`);
+      const data = await response.json();
+      if (version !== barcodeVersion.current) return;
+      if (!response.ok) throw new Error(data.error || "Ошибка поиска");
+      setName(data.name);
+      setCatalogMessage("Товар найден. Укажите срок и количество, затем добавьте товар.");
+    } catch (error) {
+      if (version === barcodeVersion.current) setCatalogMessage(error instanceof Error ? error.message : "Ошибка сети");
+    } finally { setLookingUp(false); }
+  }, []);
+  const closeCamera = useCallback(() => setCameraOpen(false), []);
+  const onDetected = useCallback((code: string) => {
+    barcodeVersion.current++;
+    setBarcode(code);
+    setName("");
+    setCameraOpen(false);
+    void lookupBarcode(code);
+  }, [lookupBarcode]);
 
   // Auto-calculate expiry date from manufacturing date + shelf life
   useEffect(() => {
@@ -45,6 +74,8 @@ export default function AddProductForm({
   }, [dateInputType, manufacturingDate, shelfLife, shelfLifeUnit]);
 
   const resetForm = () => {
+    barcodeVersion.current++;
+    setCatalogMessage("");
     setBarcode(initialBarcode);
     setName("");
     setQuantity("");
@@ -94,10 +125,21 @@ export default function AddProductForm({
         <input
           type="text"
           value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
+          onChange={(e) => { barcodeVersion.current++; setBarcode(e.target.value); setCatalogMessage(""); }}
+          aria-label="Штрих-код"
           className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
           placeholder="Например: 4601234567890"
         />
+        <button type="button" disabled={isLookingUp || !barcode.trim()} onClick={() => void lookupBarcode(barcode)}
+          className="mt-2 rounded-lg border border-emerald-300 px-3 py-2 text-sm text-emerald-700 disabled:opacity-50">
+          {isLookingUp ? "Поиск…" : "Найти в каталоге"}
+        </button>
+        <button type="button" disabled={isLookingUp || cameraOpen} onClick={() => setCameraOpen(true)}
+          className="mt-2 ml-2 rounded-lg border border-emerald-300 px-3 py-2 text-sm text-emerald-700 disabled:opacity-50">
+          Сканировать камерой
+        </button>
+        {cameraOpen && <BarcodeCamera onDetected={onDetected} onClose={closeCamera} />}
+        <p role="status" className="mt-2 text-sm text-slate-600">{catalogMessage}</p>
       </div>
 
       {/* Product name */}
@@ -179,8 +221,8 @@ export default function AddProductForm({
             type="date"
             value={expiryDate}
             onChange={(e) => setExpiryDate(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
             required
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
           />
         </div>
       ) : (
@@ -258,7 +300,7 @@ export default function AddProductForm({
       {/* Submit button */}
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || isLookingUp || cameraOpen}
         className="w-full bg-linear-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-semibold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isLoading ? (

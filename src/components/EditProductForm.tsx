@@ -22,7 +22,7 @@ export default function EditProductForm({
   const [name, setName] = useState(product.name);
   const [quantity, setQuantity] = useState<number | "">(product.quantity ?? "");
   const [expiryDate, setExpiryDate] = useState(
-    format(product.expiryDate, "yyyy-MM-dd")
+    product.expiryDate ? format(new Date(product.expiryDate), "yyyy-MM-dd") : ""
   );
   const [isLoading, setIsLoading] = useState(false);
 

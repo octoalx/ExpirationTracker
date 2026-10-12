@@ -18,10 +18,11 @@ export type ExpiryStatus = "expired" | "urgent" | "warning" | "safe"
  * @returns Expiry status: `expired`, `urgent`, `warning`, or `safe`.
  */
 export function getExpiryStatus(
-  expiryDate: Date,
+  expiryDate: Date | string | null,
   urgentThreshold = 3,
   warningThreshold = 7,
 ): ExpiryStatus {
+  if (!expiryDate) return "safe"
   const now = startOfDay(new Date())
   const expiry = startOfDay(new Date(expiryDate))
   const daysLeft = differenceInDays(expiry, now)

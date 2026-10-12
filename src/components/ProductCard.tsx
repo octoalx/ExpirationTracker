@@ -41,14 +41,16 @@ function ProductCard({
   const [editName, setEditName] = useState(product.name);
   const [editBarcode, setEditBarcode] = useState(product.barcode);
   const [editExpiryDate, setEditExpiryDate] = useState(
-    format(new Date(product.expiryDate), "yyyy-MM-dd")
+    product.expiryDate ? format(new Date(product.expiryDate), "yyyy-MM-dd") : ""
   );
   const [isSaving, setIsSaving] = useState(false);
 
-  const daysLeft = differenceInDays(new Date(product.expiryDate), new Date());
+  const daysLeft = product.expiryDate ? differenceInDays(new Date(product.expiryDate), new Date()) : Number.POSITIVE_INFINITY;
   const isExpired = daysLeft < 0;
 
   const getStatusConfig = () => {
+    if (!product.expiryDate) return { stripeColor: "bg-slate-300", icon: Calendar,
+      iconColor: "text-slate-400", statusText: "Срок не указан", statusColor: "text-slate-500" };
     if (isExpired) {
       return {
         stripeColor: "bg-red-500",
@@ -107,7 +109,7 @@ function ProductCard({
   const openEdit = () => {
     setEditName(product.name);
     setEditBarcode(product.barcode);
-    setEditExpiryDate(format(new Date(product.expiryDate), "yyyy-MM-dd"));
+    setEditExpiryDate(product.expiryDate ? format(new Date(product.expiryDate), "yyyy-MM-dd") : "");
     setIsEditOpen(true);
   };
 
@@ -178,7 +180,7 @@ function ProductCard({
             </div>
             <div className="flex items-center gap-1 text-xs text-slate-400 font-medium whitespace-nowrap">
               <Calendar className="w-3 h-3" />
-              {format(new Date(product.expiryDate), "dd.MM.yyyy", { locale: ru })}
+              {product.expiryDate ? format(new Date(product.expiryDate), "dd.MM.yyyy", { locale: ru }) : "—"}
             </div>
           </div>
 
