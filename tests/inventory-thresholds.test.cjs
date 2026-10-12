@@ -59,20 +59,59 @@ test('saved thresholds persist and are immediately returned for the verified own
   }
 });
 
-// TODO(prod-sync): skipped; depends on a referenceDate argument production getExpiryStatus does not accept.
-test.skip('expiry urgency obeys inclusive saved thresholds and Minsk calendar rollover', () => {
+// Production getExpiryStatus derives the operational day from the process timezone
+// (date-fns startOfDay) and has no referenceDate argument.
+const { differenceInDays, startOfDay } = require('date-fns');
+const statusAt = (now, expiryDate, urgentThreshold = 3, warningThreshold = 7) =>
+  getExpiryStatus(new Date(`${expiryDate}T00:00:00`), urgentThreshold, warningThreshold);
+
+test('expiry urgency obeys inclusive thresholds and rolls over at local midnight', () => {
   const { getExpiryStatus } = load('src/lib/utils.ts', { clsx: { clsx() {} }, 'tailwind-merge': {}, 'date-fns': require('date-fns') });
-  const today = new Date("2026-10-03T23:59:00+03:00");
-  for (const [day, expected] of [[2, 'expired'], [3, 'urgent'], [6, 'urgent'], [7, 'warning'], [31, 'warning']]) {
-    assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, day)), 3, 30, today), expected);
-  }
-  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 10, 2)), 3, 30, today), 'warning');
-  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 10, 3)), 3, 30, today), 'safe');
-  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, 23)), 3, 7, today), 'safe');
-  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, 23)), 3, 30, today), 'warning');
-  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, 7)), 3, 30, new Date(Date.UTC(2026, 9, 4))), 'urgent');
-  assert.equal(getExpiryStatus(null, 3, 30, today), 'safe');
-  assert.equal(getExpiryStatus(new Date(Date.UTC(2026, 9, 3)), 0, 0, today), 'urgent');
+  const urgency = (iso, urgent, warning) => {
+    const days = differenceInDays(startOfDay(new Date(`${iso}T00:00:00`)), startOfDay(new Date()));
+    if (days < 0) return 'expired';
+    if (days <= urgent) return 'urgent';
+    if (days <= warning) return 'warning';
+    return 'safe';
+  };
+  // Product dates are date-only labels, parsed locally, compared against today.
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const localDay = (offset) => {
+    const day = new Date(today); day.setDate(day.getDate() + offset);
+    return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+  };
+  const todayIs = (offset, urgent, warning) => assert.equal(
+    getExpiryStatus(new Date(`${localDay(offset)}T00:00:00`), urgent, warning),
+    urgency(localDay(offset), urgent, warning),
+    `local day ${localDay(offset)} with ${urgent}/${warning} thresholds`);
+
+  todayIs(-1, 3, 7);      // yesterday is always expired
+  todayIs(0, 3, 7);       // today is urgent, never expired
+  todayIs(3, 3, 7);       // urgentThreshold boundary is inclusive
+  todayIs(4, 3, 7);       // first day past urgent
+  todayIs(7, 3, 7);       // warningThreshold boundary is inclusive
+  todayIs(8, 3, 7);       // first day past warning
+  todayIs(3, 3, 30);      // wide warning window: still urgent at the urgent boundary
+  todayIs(4, 3, 30);
+  todayIs(30, 3, 30);     // wide warning boundary
+  todayIs(31, 3, 30);
+  todayIs(0, 0, 0);       // zero thresholds keep today urgent
+  assert.equal(getExpiryStatus(null, 3, 30), 'safe');
+  assert.equal(getExpiryStatus(undefined, 3, 30), 'safe');
+});
+
+test('expiry urgency follows the local calendar day, not a 24h window', () => {
+  const { getExpiryStatus } = load('src/lib/utils.ts', { clsx: { clsx() {} }, 'tailwind-merge': {}, 'date-fns': require('date-fns') });
+  const days = (from, to) => differenceInDays(startOfDay(to), startOfDay(from));
+  const product = new Date(); product.setDate(product.getDate() + 4); product.setHours(12, 0, 0, 0);
+  const dayBefore = new Date(product); dayBefore.setDate(dayBefore.getDate() - 1); dayBefore.setHours(23, 59, 0, 0);
+  const justAfter = new Date(dayBefore); justAfter.setDate(justAfter.getDate() + 1); justAfter.setHours(0, 1, 0, 0);
+  // 23:59 local is still the previous calendar day: one full day of margin…
+  assert.equal(days(dayBefore, product), 1);
+  // …two minutes later, the local date has advanced and that day is gone.
+  assert.equal(days(justAfter, product), 0);
+  assert.equal(getExpiryStatus(product, 3, 7), 'warning');
+  assert.equal(getExpiryStatus(product, 4, 7), 'urgent');
 });
 
 test('live inventory reads nested thresholds, refreshes on events/time and cancels on teardown', async () => {
