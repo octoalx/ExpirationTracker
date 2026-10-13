@@ -12,17 +12,25 @@
 # Usage (on the production host, from the repository directory):
 #   bash scripts/release-backup.sh [label]
 #
+# The CD workflow streams this file over stdin (`bash -s`) instead of relying on
+# it existing in the host's checkout: on the first deploy the host tree is still
+# an older revision with no scripts/ directory, while the backup runs before the
+# checkout. Streaming also guarantees the snapshot logic is the one from the
+# revision being deployed. Because stdin delivery leaves BASH_SOURCE unset, the
+# workspace and the label are taken from the environment when present:
+#   EXPITRACK_REPO_DIR, BACKUP_LABEL
+#
 # Prints "BACKUP_FILE=<name>" and "BACKUP_SIZE=<bytes>" on success so a caller
 # (the CD workflow, or a human) can parse the result without reading the log.
 # Exit code is non-zero when no usable snapshot was produced, which must stop a
 # deployment before it starts.
 set -euo pipefail
 
-LABEL="${1:-manual}"
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="${EXPITRACK_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}"
 cd "$REPO_DIR"
 
 # Keep the name filesystem- and shell-safe; the label comes from a workflow input.
+LABEL="${BACKUP_LABEL:-${1:-manual}}"
 LABEL="$(printf '%s' "$LABEL" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-40)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 NAME="expitrack-pre-deploy-${STAMP}-${LABEL}.db"
@@ -50,7 +58,10 @@ NODE
 
 # The backup lands in /app/backups, which docker-compose.yml mounts from ./backups,
 # so it is visible on the host at ./backups/<name> without a docker cp step.
-docker compose exec -T app node -e "$CMD" "/app/backups/${NAME}"
+# `< /dev/null` on every container exec: this script must never consume the stdin
+# it may have been loaded from, or it truncates itself mid-run (see the CD notes
+# on delivering helpers over stdin).
+docker compose exec -T app node -e "$CMD" "/app/backups/${NAME}" < /dev/null
 
 HOST_PATH="./backups/${NAME}"
 if [ ! -s "$HOST_PATH" ]; then
@@ -68,7 +79,7 @@ try {
   db.close();
   console.log(row.integrity_check);
 } catch (err) { console.log("ERROR: " + String(err)); process.exit(1); }
-' "/app/backups/${NAME}" | tr -d '\r')"
+' "/app/backups/${NAME}" < /dev/null | tr -d '\r')"
 
 if [ "$INTEGRITY" != "ok" ]; then
   echo "ERROR: integrity_check on the snapshot returned '${INTEGRITY}'." >&2

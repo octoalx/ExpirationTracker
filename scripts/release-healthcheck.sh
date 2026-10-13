@@ -15,6 +15,13 @@
 # still serving the old build". Pass an empty string to skip that assertion when
 # running the script as a standalone check.
 #
+# The CD workflow streams this file over stdin (`bash -s`) rather than calling it
+# from the host's checkout: a rollback can target an older revision that never
+# contained this script, and the check must still be available to judge whether
+# the rollback worked. Stdin delivery leaves BASH_SOURCE unset, so the arguments
+# are also read from the environment:
+#   EXPITRACK_REPO_DIR, EXPECTED_REVISION, HEALTHCHECK_PUBLIC_URL
+#
 # Exit code 0 means healthy. Any non-zero exit must trigger a rollback.
 #
 # On accepted HTTP codes: the public host sits behind Cloudflare Access and the
@@ -23,10 +30,10 @@
 # all means the release is broken.
 set -euo pipefail
 
-EXPECTED="${1:-}"
-PUBLIC_URL="${2:-https://expiry.axnode.xyz}"
+EXPECTED="${EXPECTED_REVISION:-${1:-}}"
+PUBLIC_URL="${HEALTHCHECK_PUBLIC_URL:-${2:-https://expiry.axnode.xyz}}"
 LOCAL_URL="http://localhost:8881"
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="${EXPITRACK_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}"
 cd "$REPO_DIR"
 
 fail() { echo "HEALTHCHECK FAILED: $*" >&2; exit 1; }
