@@ -32,25 +32,43 @@ export function getBackupPath(): string {
  * Creates a backup of the SQLite database file.
  * Automatically cleans up old backups exceeding {@link MAX_BACKUPS}.
  *
+ * The snapshot is written to a temporary path first and only renamed into its
+ * final name once SQLite reports the online backup complete. An interrupted or
+ * failed backup therefore never leaves a partial `expitrack-backup-*.db` that
+ * looks like a usable backup; the temp file is removed on failure. Interrupting
+ * the process mid-snapshot (container recreation during a deploy) cannot leave a
+ * half-written file behind either, because the final name is only assigned by an
+ * atomic rename of a complete file.
+ *
  * @returns The backup filename on success, or `null` on failure.
  */
 export async function createBackup(): Promise<string | null> {
+  ensureBackupDir();
+  const dbPath = resolvePrismaDbPath();
+  const timestamp = getTimestamp();
+  const backupName = `expitrack-backup-${timestamp}.db`;
+  const backupPath = path.join(BACKUP_DIR, backupName);
+  const tempPath = `${backupPath}.partial`;
+
   try {
-    ensureBackupDir();
-    const dbPath = resolvePrismaDbPath();
-    const timestamp = getTimestamp();
-    const backupName = `expitrack-backup-${timestamp}.db`;
-    const backupPath = path.join(BACKUP_DIR, backupName);
-
-    await copySqliteSnapshot(dbPath, backupPath);
-    cleanupOldBackups();
-
-    console.log(`[Backup] Created: ${backupName}`);
-    return backupName;
+    // copySqliteSnapshot uses SQLite's online backup API and captures committed
+    // WAL data; never fs.copyFile here, which would silently miss the WAL.
+    await copySqliteSnapshot(dbPath, tempPath);
+    fs.renameSync(tempPath, backupPath);
   } catch (err) {
+    // Leave no debris: a failed snapshot must not look like a good backup.
+    try {
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    } catch (cleanupErr) {
+      logger.error("[Backup] Could not remove partial snapshot", { error: String(cleanupErr), path: tempPath });
+    }
     logger.error("[Backup] Error creating backup", { error: String(err) });
     return null;
   }
+
+  cleanupOldBackups();
+  console.log(`[Backup] Created: ${backupName}`);
+  return backupName;
 }
 
 /** Removes the oldest backup files when total count exceeds {@link MAX_BACKUPS}. */
