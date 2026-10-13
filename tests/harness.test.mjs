@@ -1,12 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { checkContext } from '../scripts/check-context.mjs';
 import { runVerification } from '../scripts/verify.mjs';
 import { checkReleaseSource } from '../scripts/release-source.mjs';
+import { checkDeployWorkflow, WORKFLOW_PATH } from '../scripts/deploy-workflow.mjs';
 import { spawnSync } from 'node:child_process';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'expitrack-harness-'));
@@ -60,6 +64,76 @@ function gitRepos(t) {
   git(work, 'add', '-A'); git(work, 'commit', '-qm', 'base'); git(work, 'push', '-q', 'origin', 'HEAD:main');
   return { work, git };
 }
+
+function deployFixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'expitrack-cd-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, '.github/workflows'), { recursive: true });
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  for (const script of ['release-backup.sh', 'release-healthcheck.sh']) {
+    writeFileSync(join(root, 'scripts', script), '#!/usr/bin/env bash\n');
+  }
+  const source = readFileSync(join(REPO_ROOT, WORKFLOW_PATH), 'utf8');
+  writeFileSync(join(root, WORKFLOW_PATH), source);
+  return { root, source, write: (text) => writeFileSync(join(root, WORKFLOW_PATH), text) };
+}
+
+test('CD workflow keeps manual delivery, the environment gate and ordered safety steps', (t) => {
+  const { root, source, write } = deployFixture(t);
+  assert.deepEqual(checkDeployWorkflow(root), [], 'the committed deploy workflow must pass its own safety check');
+
+  // A push trigger would deploy without the owner's explicit command.
+  write(source.replace('workflow_dispatch:', 'push:'));
+  assert.match(checkDeployWorkflow(root).join(), /workflow_dispatch is missing/);
+
+  // Without the protected environment there is no approval gate.
+  write(source.replace('name: production', 'name: staging'));
+  assert.match(checkDeployWorkflow(root).join(), /"production" environment/);
+
+  // The SSH key must never be an inline value.
+  write(source.replace('secrets.PROD_SSH_KEY', "'-----BEGIN'"));
+  assert.match(checkDeployWorkflow(root).join(), /PROD_SSH_KEY secret/);
+
+  // A rollback that is not conditional on failure could undo a good release.
+  write(source.replace('if: ${{ failure() && inputs.dry_run == false && steps.previous.outputs.previous != \'\' }}',
+    'if: ${{ always() }}'));
+  assert.match(checkDeployWorkflow(root).join(), /conditional on failure\(\)/);
+});
+
+test('deploy workflow check rejects a backup taken after the deploy', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'expitrack-cd-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, '.github/workflows'), { recursive: true });
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  for (const script of ['release-backup.sh', 'release-healthcheck.sh']) {
+    writeFileSync(join(root, 'scripts', script), '#!/usr/bin/env bash\n');
+  }
+  // Minimal workflow with the steps in the unsafe order: rebuilding before the
+  // database has been captured would make the backup useless.
+  writeFileSync(join(root, WORKFLOW_PATH), [
+    'name: Deploy production',
+    'on:',
+    '  workflow_dispatch:',
+    'jobs:',
+    '  deploy:',
+    '    environment:',
+    '      name: production',
+    '    steps:',
+    '      - name: Deploy the revision',
+    '        run: bash scripts/release-healthcheck.sh',
+    '      - name: Back up the production database',
+    '        run: bash scripts/release-backup.sh',
+    '      - name: Health check the deployed revision',
+    '        run: bash scripts/release-healthcheck.sh',
+    '      - name: Roll back to the previous revision',
+    '        if: ${{ failure() }}',
+    '        run: bash scripts/release-healthcheck.sh',
+  ].join('\n') + '\n');
+  assert.match(checkDeployWorkflow(root).join(), /Backup must run before the deploy/);
+  // A missing script is reported even when the workflow references it.
+  rmSync(join(root, 'scripts/release-backup.sh'));
+  assert.match(checkDeployWorkflow(root).join(), /release-backup\.sh, which does not exist/);
+});
 
 test('release source must be committed and already on GitHub main', (t) => {
   const { work, git } = gitRepos(t);

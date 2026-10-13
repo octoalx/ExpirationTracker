@@ -30,6 +30,9 @@ data/
 # Build artifacts
 *.tsbuildinfo
 
+# Revision currently deployed by the CD workflow; written on the production host.
+.release-version
+
 # IDE & OS
 .vscode/
 .idea/

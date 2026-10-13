@@ -1,0 +1,333 @@
+name: Deploy production
+
+# Continuous delivery for ExpirationTracker production.
+#
+# Delivery is manual by design: this workflow has no push/schedule trigger, so a
+# merge to main never deploys anything. A release starts only when the owner runs
+# it from the Actions UI (or `gh workflow run`) and approves the `production`
+# environment gate, which is configured with a required reviewer.
+#
+# Sequence, with a rollback on any failure after the backup succeeded:
+#   preflight -> backup -> deploy -> health check -> [rollback -> health check]
+#
+# Contract references: AGENTS.md ("Git and production"), docs/engineering/release.md.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git revision to deploy; must already be merged into main'
+        required: true
+        default: 'main'
+        type: string
+      dry_run:
+        description: 'Prepare and verify only: back up and check SSH, do not build or restart'
+        required: true
+        default: false
+        type: boolean
+      allow_dirty:
+        description: 'Deploy even if the production working tree has uncommitted changes'
+        required: true
+        default: false
+        type: boolean
+
+# Never let two releases overlap on the same host.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Required reviewers on this environment are the authorization gate: the job
+    # stays in "Waiting" until the owner approves it.
+    environment:
+      name: production
+      url: https://expiry.axnode.xyz
+    env:
+      SSH_HOST: ${{ vars.PROD_SSH_HOST || '146.103.42.228' }}
+      SSH_PORT: ${{ vars.PROD_SSH_PORT || '34657' }}
+      SSH_USER: ${{ vars.PROD_SSH_USER || 'Alex' }}
+      SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+      REMOTE_DIR: ${{ vars.PROD_REMOTE_DIR || '/home/Alex/ExpirationTracker' }}
+      # Pinned ed25519 host key of the production host, recorded on 2026-10-13.
+      # A mismatch stops the deploy instead of silently trusting a changed host.
+      HOST_KEY_FINGERPRINT: ${{ vars.PROD_HOST_KEY_FINGERPRINT || 'SHA256:M2GPi3L1rFKFttfszMzEoM3/dK9eyU4waFhJ9N4j6u0' }}
+      PUBLIC_URL: https://expiry.axnode.xyz
+      DRY_RUN: ${{ inputs.dry_run }}
+      ALLOW_DIRTY: ${{ inputs.allow_dirty && '1' || '0' }}
+      TARGET_REF: ${{ inputs.ref }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Resolve and validate the revision to deploy
+        id: target
+        run: |
+          set -euo pipefail
+          # Resolve the requested ref to an immutable SHA. Deploying a moving name
+          # such as "main" would make the run unreproducible and the rollback
+          # target ambiguous.
+          SHA="$(git rev-parse --verify 'HEAD^{commit}')"
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "::error::Ref '$TARGET_REF' ($SHA) is not contained in origin/main."
+            echo "Release only a commit already merged into main (AGENTS.md)."
+            exit 1
+          fi
+          SHORT="$(git rev-parse --short=12 "$SHA")"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "short=$SHORT" >> "$GITHUB_OUTPUT"
+          echo "Deploying $SHORT ($SHA) from '$TARGET_REF'"
+
+      - name: Install SSH key
+        run: |
+          set -euo pipefail
+          if [ -z "${SSH_KEY:-}" ]; then
+            echo "::error::Repository secret PROD_SSH_KEY is empty or missing."
+            exit 1
+          fi
+          install -m 700 -d "$HOME/.ssh"
+          # The key is written to a private temp file and never echoed. Host key
+          # checking uses a pinned fingerprint below, not StrictHostKeyChecking=no.
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+      - name: Pin the production host key
+        run: |
+          set -euo pipefail
+          # Recorded when the CLI's host key was confirmed; a changed key means the
+          # connection is not the host we expect and the deploy must stop.
+          EXPECTED="$HOST_KEY_FINGERPRINT"
+          mkdir -p "$HOME/.ssh"
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" > "$HOME/.ssh/known_hosts" 2>/dev/null
+          if [ -n "$EXPECTED" ]; then
+            ACTUAL="$(ssh-keygen -lf "$HOME/.ssh/known_hosts" | awk '{print $2}' | sort -u | tr '\n' ',')"
+            case "$ACTUAL" in
+              *"$EXPECTED"*) echo "Host key fingerprint matches the pinned value." ;;
+              *) echo "::error::Host key fingerprint mismatch for $SSH_HOST:$SSH_PORT"; exit 1 ;;
+            esac
+          else
+            echo "::warning::No pinned host key fingerprint; trusting the freshly scanned key."
+          fi
+
+      - name: Probe SSH access and remote preconditions
+        id: probe
+        run: |
+          set -euo pipefail
+          # The remote script is delivered over stdin rather than as an inline quoted
+          # argument: a nested heredoc keeps single quotes, $ and backticks intact
+          # without a layer of escaping that is easy to get wrong.
+          ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes \
+            -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" \
+            "REMOTE_DIR='$REMOTE_DIR' ALLOW_DIRTY='$ALLOW_DIRTY' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$REMOTE_DIR" || { echo "ERROR: workspace $REMOTE_DIR is missing"; exit 1; }
+          test -f .env || { echo "ERROR: .env is missing; refusing to deploy"; exit 1; }
+          command -v docker >/dev/null || { echo "ERROR: docker not available"; exit 1; }
+          docker compose version >/dev/null || { echo "ERROR: docker compose not available"; exit 1; }
+          git rev-parse --is-inside-work-tree >/dev/null
+          echo "remote HEAD: $(git rev-parse HEAD 2>/dev/null || echo none)"
+          echo "current .release-version: $(cat .release-version 2>/dev/null || echo none)"
+
+          # This host was deployed by hand for weeks, so its working tree carries CRLF
+          # line endings while the repository is LF-only. That churn must not be mistaken
+          # for uncommitted work, and it must not hide real uncommitted work either.
+          # Refusing here is the difference between stopping and silently overwriting
+          # edits that nobody committed.
+          git config core.autocrlf false
+          RAW=$(git status --porcelain --ignore-submodules 2>/dev/null | grep -v '^?? release-0afaa25' | wc -l)
+          # --numstat, not --name-only: with --ignore-cr-at-eol, --name-only still lists
+          # every file whose line endings differ (145 of them here) and is useless for
+          # telling real edits from EOL churn. --numstat applies the ignore rules to the
+          # comparison, so it reports the handful of files that actually differ.
+          REAL=$(git diff --ignore-cr-at-eol --numstat 2>/dev/null | grep -v 'tsbuildinfo' | wc -l)
+          echo "dirty entries (raw, includes line-ending churn): $RAW"
+          echo "files differing beyond line endings: $REAL"
+          if [ "$REAL" -gt 0 ]; then
+            echo '--- files with real differences ---'
+            git diff --ignore-cr-at-eol --numstat 2>/dev/null | grep -v 'tsbuildinfo'
+            if [ "$ALLOW_DIRTY" = "1" ]; then
+              echo 'allow_dirty is enabled: real differences present, continuing as requested.'
+            else
+              echo 'ERROR: the production working tree contains changes that are not in Git.'
+              echo 'Deploying would overwrite them. Review the files above and commit them,'
+              echo 'or re-run with allow_dirty enabled once the diff is confirmed disposable.'
+              exit 1
+            fi
+          fi
+          REMOTE
+
+      - name: Record the rollback target
+        id: previous
+        run: |
+          set -euo pipefail
+          # Primary rollback source: the revision actually running now, recorded on the
+          # host at the last successful deploy. Fallback: the host working tree HEAD,
+          # for hosts whose last deploy was the older manual deploy.sh.
+          PREV="$(ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "cd '$REMOTE_DIR' && (cat .release-version 2>/dev/null || git rev-parse HEAD 2>/dev/null || echo '')" | tr -d '\r')"
+          echo "previous=$PREV" >> "$GITHUB_OUTPUT"
+          if [ -n "$PREV" ]; then
+            echo "Rollback target: $PREV"
+          else
+            echo "::warning::No previous revision known; automatic rollback will not be possible."
+          fi
+
+      - name: Back up the production database
+        id: backup
+        run: |
+          set -euo pipefail
+          # Must succeed before anything is rebuilt. scripts/release-backup.sh takes a
+          # consistent snapshot through SQLite's backup API (the DB runs in WAL mode)
+          # and verifies it with integrity_check.
+          OUT="$(ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "cd '$REMOTE_DIR' && bash scripts/release-backup.sh '${{ steps.target.outputs.short }}'")"
+          echo "$OUT"
+          LINE="$(printf '%s\n' "$OUT" | grep '^BACKUP_FILE=' | tail -1 || true)"
+          if [ -z "$LINE" ]; then
+            echo "::error::Backup did not report a file; stopping before any change is made."
+            exit 1
+          fi
+          echo "file=${LINE#BACKUP_FILE=}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy the revision
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          set -euo pipefail
+          # deploy.sh runs `git pull origin main`, which would discard the pinned
+          # revision, so the CD path applies the exact SHA itself and reuses only what
+          # deploy.sh really does: rebuild the image and restart the stack.
+          ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "REMOTE_DIR='$REMOTE_DIR' SHA='${{ steps.target.outputs.sha }}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$REMOTE_DIR"
+          git fetch --quiet origin
+          # core.autocrlf=false keeps the checkout LF-only even though the existing
+          # files are CRLF; without it every file shows as modified forever.
+          git config core.autocrlf false
+          git checkout --quiet --force --detach "$SHA"
+          # Recorded before the build so the health check can assert the promoted
+          # revision and a later rollback knows what was running.
+          printf '%s\n' "$SHA" > .release-version
+          docker compose build
+          docker compose up -d
+          REMOTE
+
+      - name: Wait for the app to become healthy
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          set -euo pipefail
+          # First-boot migrations and the Next.js server need time; poll instead of
+          # sleeping a fixed amount, and surface container logs on failure. State is
+          # read with `docker inspect`, not `docker compose ps`: compose renders a
+          # padded table whose column widths vary between invocations, so matching on
+          # that text can report a healthy container as unhealthy.
+          for attempt in $(seq 1 36); do
+            STATE="$(ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+              "cd '$REMOTE_DIR' && docker inspect --format '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \$(docker compose ps -q app 2>/dev/null) 2>/dev/null || echo missing" | tr -d '\r')"
+            echo "attempt ${attempt}/36: ${STATE:-no app container}"
+            case "$STATE" in
+              "running/healthy") break ;;
+            esac
+            if [ "$attempt" -eq 36 ]; then
+              echo "::warning::App did not report healthy in time; collecting logs."
+              ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+                "cd '$REMOTE_DIR' && docker compose logs --tail=80 app" || true
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Health check the deployed revision
+        id: health
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "cd '$REMOTE_DIR' && bash scripts/release-healthcheck.sh '${{ steps.target.outputs.sha }}' '$PUBLIC_URL'"
+
+      - name: Report a successful deployment
+        if: ${{ inputs.dry_run == false && success() }}
+        run: |
+          {
+            echo "## Deployment succeeded"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Revision | \`${{ steps.target.outputs.short }}\` |"
+            echo "| Previous | \`${{ steps.previous.outputs.previous }}\` |"
+            echo "| Database backup | \`${{ steps.backup.outputs.file }}\` |"
+            echo "| URL | $PUBLIC_URL |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report the dry run
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          {
+            echo "## Dry run completed"
+            echo ""
+            echo "SSH, workspace, .env, docker compose and the database backup were verified."
+            echo "Nothing was rebuilt or restarted; production still runs \`${{ steps.previous.outputs.previous }}\`."
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Would deploy | \`${{ steps.target.outputs.short }}\` |"
+            echo "| Backup | \`${{ steps.backup.outputs.file }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Roll back to the previous revision
+        id: rollback
+        if: ${{ failure() && inputs.dry_run == false && steps.previous.outputs.previous != '' }}
+        run: |
+          set -euo pipefail
+          PREV='${{ steps.previous.outputs.previous }}'
+          echo "::warning::Deployment failed; rolling back to $PREV"
+          ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "REMOTE_DIR='$REMOTE_DIR' PREV='$PREV' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$REMOTE_DIR"
+          git config core.autocrlf false
+          git checkout --quiet --force --detach "$PREV"
+          printf '%s\n' "$PREV" > .release-version
+          docker compose build
+          docker compose up -d
+          REMOTE
+          ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "cd '$REMOTE_DIR' && bash scripts/release-healthcheck.sh '$PREV' '$PUBLIC_URL'"
+
+      - name: Report a completed rollback
+        if: ${{ failure() && steps.rollback.outcome == 'success' }}
+        run: |
+          {
+            echo "## Deployment failed, rollback succeeded"
+            echo ""
+            echo "Production is serving \`${{ steps.previous.outputs.previous }}\` again."
+            echo "Database snapshot kept at \`${{ steps.backup.outputs.file }}\`."
+            echo ""
+            echo "The database was **not** modified: this project's migrations are additive,"
+            echo "and restoring a snapshot is a separate, explicit operation."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report a failed rollback
+        if: ${{ failure() && inputs.dry_run == false && steps.rollback.outcome != 'success' }}
+        run: |
+          {
+            echo "## ATTENTION: deployment failed and rollback did not succeed"
+            echo ""
+            echo "Production needs a human. Host: \`$SSH_USER@$SSH_HOST:$SSH_PORT\`,"
+            echo "workspace \`$REMOTE_DIR\`."
+            echo ""
+            echo "Database snapshot from before this attempt: \`${{ steps.backup.outputs.file }}\`"
+            echo "in \`$REMOTE_DIR/backups\`."
+            echo ""
+            echo "Recovery: \`cd $REMOTE_DIR && git checkout --detach ${{ steps.previous.outputs.previous }}\`"
+            echo "then \`docker compose build && docker compose up -d && docker compose logs --tail=100 app\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::Rollback failed; manual intervention required."

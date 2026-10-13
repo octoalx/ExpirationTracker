@@ -89,6 +89,10 @@ migrations, remote commands, backup restoration or real email/Telegram sends onl
 within an explicitly authorized task. `deploy.sh` pulls main and stops containers;
 review the exact revision and backup/recovery plan before using it.
 
+`.github/workflows/deploy-production.yml` releases only when the owner starts it
+manually and approves the `production` environment; it never deploys on a push.
+Describe deployment as done only after the workflow's health check passes.
+
 ## Completion
 
 Report the outcome, significant files, executed checks with results, and remaining
