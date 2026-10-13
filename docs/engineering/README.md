@@ -15,7 +15,7 @@ Read additional context only when relevant:
 | Need | Context |
 | --- | --- |
 | Start or verify local work | [Development](development.md) |
-| Prepare a production release | [Release](release.md) |
+| Prepare or run a production release | [Release](release.md) |
 | Update the shared scanner reference | [Catalog updates](catalog-updates.md) |
 | Activate or operate the store assistant | [Telegram](telegram.md) |
 | Resume unfinished work | [Active context](../../memory-bank/activeContext.md) |

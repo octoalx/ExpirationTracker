@@ -1,6 +1,16 @@
 # Active context
 
-Updated: 2026-10-02
+Updated: 2026-10-13
+2026-10-13: Continuous delivery for production added on branch `local/cd-production`.
+`workflow_dispatch`-only workflow with a `production` environment gate; sequence is
+preflight -> backup -> deploy -> health check -> automatic rollback on failure.
+Backup and health check live in `scripts/release-backup.sh` and
+`scripts/release-healthcheck.sh`; `scripts/deploy-workflow.mjs` asserts the safety
+properties in `test:harness`. Both scripts were exercised against the live host and
+the host was restored to its prior state. Production is NOT deployed by this change:
+the first run needs the owner's explicit command. Report and next steps:
+`docs/plans/2026-10-13-cd-production.md`.
+
 2026-10-06: Settings now save changed fields from the active tab, retain other
 tab drafts and mark unsaved tabs. API accepts partial updates; disabled email
 accepts incomplete recipient/port drafts, enabling validates retained values.
