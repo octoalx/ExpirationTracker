@@ -1,6 +1,16 @@
 # Active context
 
 Updated: 2026-10-13
+2026-10-13: CD dry run now passes; first real deploy still pending. The first dry
+run failed because the backup step ran `bash scripts/release-backup.sh` from the
+host tree, which on a first deploy is an older revision without that script. PR #12
+(`7cd06f3`, merged `4d014c6`) delivers both helpers from the runner checkout to
+`/tmp` on the host, so no step depends on the host carrying CD's own tooling. Dry
+run 38361289000 succeeded: backup `expitrack-pre-deploy-20261013T103654Z-4d014c6cea40.db`
+(98 MB, integrity ok), would deploy `4d014c6cea40`, rollback target `ded6d715`,
+11 real dirty files so `allow_dirty` is still required. Host unchanged by the dry
+run. Report: `docs/plans/2026-10-13-cd-helper-delivery.md`.
+
 2026-10-13: Continuous delivery for production added on branch `local/cd-production`.
 `workflow_dispatch`-only workflow with a `production` environment gate; sequence is
 preflight -> backup -> deploy -> health check -> automatic rollback on failure.
@@ -52,6 +62,12 @@ Initial catalog and phone-camera lookup deployed to https://expiry.axnode.xyz at
 VPS: Alex@146.103.42.228:34657. Repository: /home/Alex/ExpirationTracker. Dockerized Cloudflare tunnel routes to nginx; local nginx port 8881. Email OTP Access protects the public domain.
 
 ## Invariants and next verification
+
+**First real CD deploy not done yet.** A dry run now passes (see 2026-10-13 above).
+The real deploy needs `allow_dirty: true` because the host tree still differs from
+`main` by 11 files; after the first successful deploy `.release-version` exists and
+the tree matches HEAD, so `allow_dirty` is no longer needed. A real rollback has
+never been executed — only its logic is unit-tested.
 
 Private APIs derive ownership from verified sessions. Preserve barcode strings and optional expiry/quantity. Do not repeat inventory import unless additional batches are intended. Camera requires explicit start and HTTPS; tracks stop on close or page hiding. Production actions require task-specific authorization. Check camera scanning on the owner's phone.
 2026-10-06: Committed pending changes as d4909d5 and mobile reset/date alignment
