@@ -184,11 +184,21 @@ jobs:
         id: backup
         run: |
           set -euo pipefail
-          # Must succeed before anything is rebuilt. scripts/release-backup.sh takes a
-          # consistent snapshot through SQLite's backup API (the DB runs in WAL mode)
-          # and verifies it with integrity_check.
+          # Must succeed before anything is rebuilt, so it must not depend on the
+          # host already having the helper: on the first deploy the host tree is an
+          # older revision with no scripts/ directory, and the checkout that brings
+          # them runs later. The helper is therefore sent from this checkout.
+          #
+          # It is written to a file on the host and run from there, NOT piped into
+          # `bash -s`. A script fed on stdin shares that stream with its own
+          # commands' stdin, so the first command that reads input (here
+          # `docker compose exec -T`) swallows the rest of the script: the snapshot
+          # was taken, then the script stopped silently, exited 0 and never printed
+          # BACKUP_FILE. Running from a file cannot be truncated that way.
+          HELPER="/tmp/expitrack-release-backup.sh"
           OUT="$(ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
-            "cd '$REMOTE_DIR' && bash scripts/release-backup.sh '${{ steps.target.outputs.short }}'")"
+            "cd '$REMOTE_DIR' && cat > $HELPER && EXPITRACK_REPO_DIR='$REMOTE_DIR' BACKUP_LABEL='${{ steps.target.outputs.short }}' bash $HELPER; rc=\$?; rm -f $HELPER; exit \$rc" \
+            < scripts/release-backup.sh)"
           echo "$OUT"
           LINE="$(printf '%s\n' "$OUT" | grep '^BACKUP_FILE=' | tail -1 || true)"
           if [ -z "$LINE" ]; then
@@ -250,8 +260,14 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         run: |
           set -euo pipefail
+          # Sent from this checkout, and run from a file for the same reason as the
+          # backup: the check must exist even when the revision being judged does
+          # not contain it, and a stdin-fed script can be truncated by its own
+          # commands reading input.
+          HELPER="/tmp/expitrack-release-healthcheck.sh"
           ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
-            "cd '$REMOTE_DIR' && bash scripts/release-healthcheck.sh '${{ steps.target.outputs.sha }}' '$PUBLIC_URL'"
+            "cd '$REMOTE_DIR' && cat > $HELPER && EXPITRACK_REPO_DIR='$REMOTE_DIR' EXPECTED_REVISION='${{ steps.target.outputs.sha }}' HEALTHCHECK_PUBLIC_URL='$PUBLIC_URL' bash $HELPER; rc=\$?; rm -f $HELPER; exit \$rc" \
+            < scripts/release-healthcheck.sh
 
       - name: Report a successful deployment
         if: ${{ inputs.dry_run == false && success() }}
@@ -268,18 +284,28 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report the dry run
-        if: ${{ inputs.dry_run == true }}
+        # always(): a failed dry run must say so on the summary page rather than
+        # leaving the reader to infer it from a red run with no explanation, which
+        # is exactly what happened on this workflow's first ever run.
+        if: ${{ always() && inputs.dry_run == true }}
         run: |
           {
-            echo "## Dry run completed"
-            echo ""
-            echo "SSH, workspace, .env, docker compose and the database backup were verified."
-            echo "Nothing was rebuilt or restarted; production still runs \`${{ steps.previous.outputs.previous }}\`."
-            echo ""
-            echo "| Field | Value |"
-            echo "| --- | --- |"
-            echo "| Would deploy | \`${{ steps.target.outputs.short }}\` |"
-            echo "| Backup | \`${{ steps.backup.outputs.file }}\` |"
+            if [ "${{ job.status }}" = "success" ]; then
+              echo "## Dry run succeeded - nothing was deployed"
+              echo ""
+              echo "SSH, workspace, \`.env\`, docker compose and the database backup were verified."
+              echo "Nothing was rebuilt or restarted; production still runs \`${{ steps.previous.outputs.previous }}\`."
+              echo ""
+              echo "| Field | Value |"
+              echo "| --- | --- |"
+              echo "| Would deploy | \`${{ steps.target.outputs.short }}\` |"
+              echo "| Backup | \`${{ steps.backup.outputs.file }}\` |"
+            else
+              echo "## Dry run failed - nothing was deployed"
+              echo ""
+              echo "Production is untouched: a dry run never rebuilds or restarts the stack."
+              echo "The failing step above holds the reason; fix it, then re-run."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Roll back to the previous revision
@@ -299,8 +325,13 @@ jobs:
           docker compose build
           docker compose up -d
           REMOTE
+          # Sent from this checkout: the rollback target may be an older revision
+          # that never had this script, and the check still has to judge whether the
+          # rollback worked.
+          HELPER="/tmp/expitrack-release-healthcheck.sh"
           ssh -i "$HOME/.ssh/deploy_key" -p "$SSH_PORT" -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
-            "cd '$REMOTE_DIR' && bash scripts/release-healthcheck.sh '$PREV' '$PUBLIC_URL'"
+            "cd '$REMOTE_DIR' && cat > $HELPER && EXPITRACK_REPO_DIR='$REMOTE_DIR' EXPECTED_REVISION='$PREV' HEALTHCHECK_PUBLIC_URL='$PUBLIC_URL' bash $HELPER; rc=\$?; rm -f $HELPER; exit \$rc" \
+            < scripts/release-healthcheck.sh
 
       - name: Report a completed rollback
         if: ${{ failure() && steps.rollback.outcome == 'success' }}

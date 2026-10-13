@@ -123,6 +123,35 @@ owner's explicit command. `notificationService.ts` and
 `tests/catalog-api.test.cjs` differ between the host tree and `main`; in both cases
 `main` is newer, so the first CD run will move production forward by that content.
 
+## Follow-up: the first run could not take a backup
+
+The first manual run (2026-10-13, dry run) failed at the backup step with exit 127:
+`bash: scripts/release-backup.sh: No such file or directory`. The workflow called the
+helper from the host's checkout, but on the first deploy the host tree is still the
+older revision that has no `scripts/` directory, while the checkout that brings them
+runs later in the same job. The backup step is deliberately first and fail-closed, so
+it blocked the deploy correctly - but no usable backup was produced, and the first
+deploy could therefore never succeed.
+
+Fix: the helpers are sent from the checkout being deployed instead of being read from
+the host, so they exist regardless of the host tree state and always match the
+revision under test. Two details matter:
+
+- They are written to a file on the host and run from there, **not** piped into
+  `bash -s`. A script fed on stdin shares that stream with its own commands' stdin, so
+  the first command that reads input (`docker compose exec -T`) consumes the remainder
+  of the script: the snapshot was taken, the script then stopped silently, exited 0 and
+  never printed `BACKUP_FILE`. The workflow would have reported "Backup did not report
+  a file" while a 98 MB snapshot sat on disk. This was caught by running the real
+  helper against the live host before the fix shipped.
+- Every container `exec` in the backup helper redirects `< /dev/null`, so the helper
+  can never consume the stdin it was loaded from.
+
+Verified against the live host with its tree still lacking `scripts/`: the backup
+reported `BACKUP_FILE`, the health check passed with the expected revision and failed
+with a wrong one, the temporary helper was removed afterwards, and the host was left
+at its baseline (23 backups, no `.release-version`).
+
 ## Result and handoff
 
 The workflow, both helper scripts and the structural check are implemented and
