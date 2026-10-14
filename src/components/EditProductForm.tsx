@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { format } from "date-fns";
+import { expiryLabel, expiryDisplay } from "@/lib/expiry-calendar";
 import { Loader2, Barcode, Package, Calendar, X, Hash } from "lucide-react";
 import toast from "react-hot-toast";
 import { Product } from "@prisma/client";
+import { calculateExpiryDate, type ShelfLifeUnit } from "@/lib/shelf-life";
+import { useKeyboardInset } from "@/lib/keyboard-inset";
 
 interface EditProductFormProps {
   product: Product;
@@ -18,13 +20,19 @@ export default function EditProductForm({
   onProductUpdated,
   onCancel,
 }: EditProductFormProps) {
+  useKeyboardInset();
   const [barcode, setBarcode] = useState(product.barcode || "");
   const [name, setName] = useState(product.name);
   const [quantity, setQuantity] = useState<number | "">(product.quantity ?? "");
   const [expiryDate, setExpiryDate] = useState(
-    product.expiryDate ? format(new Date(product.expiryDate), "yyyy-MM-dd") : ""
+    expiryLabel(product.expiryDate) ?? ""
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [dateInputType, setDateInputType] = useState(product.manufacturingDate ? "manufacture" : "expiry");
+  const [manufacturingDate, setManufacturingDate] = useState(product.manufacturingDate ?? "");
+  const [shelfLife, setShelfLife] = useState(String(product.shelfLife ?? ""));
+  const [shelfLifeUnit, setShelfLifeUnit] = useState<ShelfLifeUnit>((product.shelfLifeUnit as ShelfLifeUnit) || "months");
+  const calculatedExpiry = calculateExpiryDate(manufacturingDate, shelfLife, shelfLifeUnit);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -32,8 +40,8 @@ export default function EditProductForm({
       toast.error("Введите название продукта");
       return;
     }
-    if (!expiryDate) {
-      toast.error("Введите срок годности");
+    if (dateInputType === "manufacture" && !calculatedExpiry) {
+      toast.error("Укажите дату изготовления и положительный целый срок хранения.");
       return;
     }
 
@@ -43,9 +51,13 @@ export default function EditProductForm({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          version: product.version,
           name: name.trim(),
-          barcode: barcode.trim() || null,
-          expiryDate: new Date(expiryDate).toISOString(),
+          barcode: barcode.trim(),
+          expiryDate: dateInputType === "manufacture" ? calculatedExpiry : expiryDate || null,
+          manufacturingDate: dateInputType === "manufacture" ? manufacturingDate : null,
+          shelfLife: dateInputType === "manufacture" ? Number(shelfLife) : null,
+          shelfLifeUnit: dateInputType === "manufacture" ? shelfLifeUnit : null,
           quantity: quantity === "" ? null : quantity,
         }),
       });
@@ -67,33 +79,35 @@ export default function EditProductForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="product-entry min-w-0 space-y-6">
       {/* Barcode */}
       <div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+        <label htmlFor="edit-barcode" className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Barcode size={14} />
           Штрих-код
         </label>
         <input
+          id="edit-barcode"
           type="text"
           value={barcode}
           onChange={(e) => setBarcode(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
           placeholder="Например: 4601234567890"
         />
       </div>
 
       {/* Product name */}
       <div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+        <label htmlFor="edit-name" className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Package size={14} />
           Название продукта
         </label>
         <input
+          id="edit-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
           placeholder="Введите название"
           required
         />
@@ -101,11 +115,12 @@ export default function EditProductForm({
 
       {/* Quantity */}
       <div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+        <label htmlFor="edit-quantity" className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Hash size={14} />
           Количество <span className="text-slate-400 font-normal normal-case">(опционально)</span>
         </label>
         <input
+          id="edit-quantity"
           type="number"
           min="1"
           value={quantity}
@@ -113,25 +128,34 @@ export default function EditProductForm({
             const val = e.target.value;
             setQuantity(val === "" ? "" : parseInt(val, 10));
           }}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
           placeholder="Например: 5"
         />
       </div>
 
       {/* Expiry date */}
+      <div className="entry-segment" role="group" aria-label="Способ указания срока">
+        <button type="button" aria-pressed={dateInputType === "expiry"} onClick={() => setDateInputType("expiry")}>Годен до</button>
+        <button type="button" aria-pressed={dateInputType === "manufacture"} onClick={() => setDateInputType("manufacture")}>Изготовлен</button>
+      </div>
+      {dateInputType === "manufacture" ? <>
+        <div><label htmlFor="edit-manufacture">Дата изготовления</label><input id="edit-manufacture" type="date" required value={manufacturingDate} onChange={event => setManufacturingDate(event.target.value)} /></div>
+        <div><label htmlFor="edit-duration">Срок хранения</label><div className="entry-duration flex gap-2"><input id="edit-duration" type="number" min="1" step="1" required value={shelfLife} onChange={event => setShelfLife(event.target.value)} /><div className="entry-segment flex-1" role="group" aria-label="Единицы срока">{([["days", "Дни"], ["weeks", "Недели"], ["months", "Месяцы"]] as const).map(([unit, label]) => <button key={unit} type="button" aria-pressed={shelfLifeUnit === unit} onClick={() => setShelfLifeUnit(unit)}>{label}</button>)}</div></div></div>
+        <p role="status">Годен до: {calculatedExpiry ? expiryDisplay(calculatedExpiry) : "Укажите дату и срок"}</p>
+      </> :
       <div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+        <label htmlFor="edit-expiry" className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           <Calendar size={14} />
-          Срок годности
+          Срок годности (необязательно)
         </label>
         <input
+          id="edit-expiry"
           type="date"
           value={expiryDate}
           onChange={(e) => setExpiryDate(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
-          required
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
         />
-      </div>
+      </div>}
 
       {/* Separator */}
       <div className="border-t border-slate-100 my-4" />
@@ -152,7 +176,7 @@ export default function EditProductForm({
         <button
           type="submit"
           disabled={isLoading}
-          className="flex-1 bg-linear-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-semibold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex-1 bg-[#1554b5] hover:bg-[#12479a] text-white font-semibold py-3.5 rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">

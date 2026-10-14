@@ -252,7 +252,7 @@ export default function MobileProductList(props: Props) {
     </div>}
     <div className="flex items-center justify-between px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><span>Товар</span><span className="pr-8">Годен до</span></div>
     {visibleProducts.map(product => {
-      const urgency = getExpiryStatus(product.expiryDate, props.urgentThreshold, props.warningThreshold);
+      const urgency = getExpiryStatus(product.expiryDate, props.urgentThreshold, props.warningThreshold, props.referenceDate);
       const days = expiryDays(product.expiryDate, props.referenceDate ?? new Date());
       const safeLabel = days === null ? "" : formatDaysLeft(days);
       const label = days === null ? "Срок не указан" : urgency === "expired" ? "Просрочен" : urgency === "safe" ? (safeLabel || "В норме") : urgency === "urgent" ? "Срочно" : "Внимание";

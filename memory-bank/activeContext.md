@@ -31,6 +31,24 @@ Facts worth not rediscovering:
 - Node 22 is required for local checks (Node 26 breaks `better-sqlite3`): use
   `bash .verification/run-verify-release.sh`.
 
+## Mobile interface restored (2026-10-14)
+
+The mobile-first inventory screen had been removed by `28719b8` (PR #7, the
+production-aligned sync) and was restored on branch `local/restore-mobile-inventory`
+from `dc07476`. Cause and evidence: `docs/plans/2026-10-14-restore-mobile-inventory.md`.
+
+- The regression was markup, not styling: `src/styles/globals.css` is byte-identical
+  between `dc07476` and `HEAD`, so every mobile rule survived as dead CSS while the
+  components that applied it were replaced.
+- `MobileProductList.tsx` had no importer at `HEAD`; the dashboard rendered the
+  desktop table at every width.
+- `tests/inventory-thresholds.test.cjs` had to be restored too: its `HEAD` version
+  (rewritten by `c657690`, PR #10) documented the post-regression
+  `getExpiryStatus` signature with no `referenceDate`.
+- Local `node_modules/better-sqlite3` is ABI 137 (Node 24), so the full suite runs
+  under Node 24, not Node 22. Under Node 22 the 34 database tests fail with
+  `ERR_DLOPEN_FAILED` before any assertion.
+
 ## Open threads
 
 1. `.release-version` is written before the image build, so the marker can claim a
