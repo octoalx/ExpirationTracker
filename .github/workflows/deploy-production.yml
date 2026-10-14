@@ -142,17 +142,22 @@ jobs:
           # Refusing here is the difference between stopping and silently overwriting
           # edits that nobody committed.
           git config core.autocrlf false
-          RAW=$(git status --porcelain --ignore-submodules 2>/dev/null | grep -v '^?? release-0afaa25' | wc -l)
+          # `|| true` on both pipelines is load-bearing: `grep -v` exits 1 when it
+          # matches nothing, which is exactly the CLEAN case, and under `set -e` that
+          # abort would kill the step before it printed anything. That bug made the
+          # probe fail only when the working tree was clean - the opposite of intent,
+          # and it blocked a real deploy on 2026-10-14.
+          RAW=$(git status --porcelain --ignore-submodules 2>/dev/null | grep -v '^?? release-0afaa25' | wc -l || true)
           # --numstat, not --name-only: with --ignore-cr-at-eol, --name-only still lists
           # every file whose line endings differ (145 of them here) and is useless for
           # telling real edits from EOL churn. --numstat applies the ignore rules to the
           # comparison, so it reports the handful of files that actually differ.
-          REAL=$(git diff --ignore-cr-at-eol --numstat 2>/dev/null | grep -v 'tsbuildinfo' | wc -l)
+          REAL=$(git diff --ignore-cr-at-eol --numstat 2>/dev/null | grep -v 'tsbuildinfo' | wc -l || true)
           echo "dirty entries (raw, includes line-ending churn): $RAW"
           echo "files differing beyond line endings: $REAL"
           if [ "$REAL" -gt 0 ]; then
             echo '--- files with real differences ---'
-            git diff --ignore-cr-at-eol --numstat 2>/dev/null | grep -v 'tsbuildinfo'
+            git diff --ignore-cr-at-eol --numstat 2>/dev/null | grep -v 'tsbuildinfo' || true
             if [ "$ALLOW_DIRTY" = "1" ]; then
               echo 'allow_dirty is enabled: real differences present, continuing as requested.'
             else
