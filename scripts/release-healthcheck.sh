@@ -78,12 +78,54 @@ else
   echo "no expected revision supplied; skipping version assertion"
 fi
 
-echo "--- 3/4 local endpoint (through nginx) ---"
+echo "--- 4/6 database answers and is in WAL mode ---"
+# The check that would have caught the 2026-10-13 incident, where login failed with
+# Prisma P1008 while the container reported healthy and both endpoints answered.
+#
+# What was proven by reproducing it (see docs/plans/2026-10-13-cd-production.md):
+# a leftover rollback journal alone is HARMLESS - reads still work. The failure
+# needs journal_mode=delete AND a writer holding a lock, because in delete mode a
+# writer takes a whole-database lock and every reader then blocks until it times
+# out. WAL is what makes readers and the writer independent, so journal_mode is
+# the property actually worth asserting. A database that answers queries but is
+# not in WAL is one interruption away from wedging every request.
+#
+# The query runs inside the app container so it uses the same driver and database
+# path the application does; `timeout` stops a wedged database hanging the check.
+DBCHECK="$(docker compose exec -T app timeout 30 node -e '
+const Database = require("better-sqlite3");
+const path = process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/^file:/, "") : "/app/data/dev.db";
+const db = new Database(path, { readonly: true, fileMustExist: true, timeout: 10000 });
+const integrity = db.prepare("PRAGMA integrity_check").get().integrity_check;
+const users = db.prepare("SELECT count(*) AS n FROM User").get().n;
+const products = db.prepare("SELECT count(*) AS n FROM Product").get().n;
+const mode = db.pragma("journal_mode", { simple: true });
+db.close();
+console.log(JSON.stringify({ integrity, users, products, mode }));
+' 2>&1 | tr -d '\r' | tail -1 || true)"
+
+echo "dbcheck: ${DBCHECK:-<no output>}"
+case "$DBCHECK" in
+  *'"integrity":"ok"'*) ;;
+  *) fail "database did not answer a readable integrity_check (got: ${DBCHECK:-no output})" ;;
+esac
+# A database with no users cannot authenticate anyone; an empty catalog means the
+# wrong file was mounted. Both are release-breaking, so they are asserted.
+DB_USERS="$(printf '%s' "$DBCHECK" | sed -n 's/.*"users":\([0-9]*\).*/\1/p')"
+DB_PRODUCTS="$(printf '%s' "$DBCHECK" | sed -n 's/.*"products":\([0-9]*\).*/\1/p')"
+DB_MODE="$(printf '%s' "$DBCHECK" | sed -n 's/.*"mode":"\([a-z]*\)".*/\1/p')"
+[ "${DB_USERS:-0}" -ge 1 ] || fail "database reports ${DB_USERS:-0} users; the application could not authenticate anyone"
+echo "database: integrity=ok users=${DB_USERS} products=${DB_PRODUCTS} journal_mode=${DB_MODE:-unknown}"
+# Asserted, not warned: in delete mode a concurrent writer blocks every reader,
+# which is exactly how a healthy-looking deploy broke sign-in.
+[ "$DB_MODE" = "wal" ] || fail "journal_mode is '${DB_MODE:-unknown}', expected 'wal'; a concurrent writer would block all reads (the 2026-10-13 sign-in failure)"
+
+echo "--- 5/6 local endpoint (through nginx) ---"
 # Through nginx, so the app/upstream wiring is exercised, not just the app port.
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$LOCAL_URL/" || echo '000')"
 check_code "GET ${LOCAL_URL}/" "$CODE"
 
-echo "--- 4/4 public endpoint ---"
+echo "--- 6/6 public endpoint ---"
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$PUBLIC_URL" || echo '000')"
 check_code "GET ${PUBLIC_URL}" "$CODE"
 
