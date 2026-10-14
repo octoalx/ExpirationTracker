@@ -37,3 +37,16 @@ jobs:
         run: npm run typecheck
       - name: Application tests
         run: npm run test:app
+      - name: Production build
+        # Type checking and unit tests do NOT exercise webpack's module resolution,
+        # so a server-only native dependency imported into a bundle that is also
+        # compiled for the edge runtime passes everything above and then fails in
+        # the deploy build. That is exactly how the "Can't resolve 'fs'" failure
+        # reached production on 2026-10-14. Building here moves that discovery from
+        # a deploy to a pull request.
+        run: npm run build
+        env:
+          # The build must not open a database or start background jobs.
+          DATABASE_URL: file:./ci-placeholder.db
+          DISABLE_BACKGROUND_JOBS: "true"
+          NEXT_TELEMETRY_DISABLED: "1"
