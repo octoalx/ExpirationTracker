@@ -213,6 +213,7 @@ jobs:
           echo "file=${LINE#BACKUP_FILE=}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy the revision
+        id: deploy
         if: ${{ inputs.dry_run == false }}
         run: |
           set -euo pipefail
@@ -315,7 +316,13 @@ jobs:
 
       - name: Roll back to the previous revision
         id: rollback
-        if: ${{ failure() && inputs.dry_run == false && steps.previous.outputs.previous != '' }}
+        # `steps.deploy.outcome == 'failure'` is load-bearing: without it, a failure
+        # BEFORE the deploy began (the probe refusing a dirty tree, a missing backup)
+        # also counts as `failure()` and the run announces a rollback. There is
+        # nothing to roll back at that point - production was never touched - and on
+        # 2026-10-14 that produced the alarming and false summary "Rollback failed;
+        # manual intervention required" for a deploy that had not started.
+        if: ${{ failure() && inputs.dry_run == false && steps.deploy.outcome == 'failure' && steps.previous.outputs.previous != '' }}
         run: |
           set -euo pipefail
           PREV='${{ steps.previous.outputs.previous }}'
@@ -367,3 +374,18 @@ jobs:
             echo "then \`docker compose build && docker compose up -d && docker compose logs --tail=100 app\`."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "::error::Rollback failed; manual intervention required."
+
+      - name: Report a failure before the deploy started
+        # A run can fail in preflight (dirty working tree, missing .env, no database
+        # backup) without ever touching production. Say that plainly instead of
+        # letting the absence of a rollback read as a broken rollback.
+        if: ${{ failure() && inputs.dry_run == false && steps.deploy.outcome != 'failure' }}
+        run: |
+          {
+            echo "## Deployment did not start - production is unchanged"
+            echo ""
+            echo "The run failed before the deploy step. Nothing was rebuilt, restarted"
+            echo "or rolled back; production keeps serving the revision it had."
+            echo ""
+            echo "Check the failing step above, fix it, then re-run the workflow."
+          } >> "$GITHUB_STEP_SUMMARY"

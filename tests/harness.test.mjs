@@ -94,10 +94,20 @@ test('CD workflow keeps manual delivery, the environment gate and ordered safety
   write(source.replace('secrets.PROD_SSH_KEY', "'-----BEGIN'"));
   assert.match(checkDeployWorkflow(root).join(), /PROD_SSH_KEY secret/);
 
-  // A rollback that is not conditional on failure could undo a good release.
-  write(source.replace('if: ${{ failure() && inputs.dry_run == false && steps.previous.outputs.previous != \'\' }}',
-    'if: ${{ always() }}'));
+  // A rollback that is unconditional, or allowed during a dry run, could undo a good
+  // release; one that ignores whether the deploy ran announces a rollback that never
+  // happened. Each property is asserted separately so a regression names itself.
+  const rollbackIf = source.match(/^\s+if: \$\{\{ failure\(\).*$/m)?.[0].trim() ?? '';
+  assert.ok(rollbackIf, 'the workflow must have a failure-conditioned rollback step');
+
+  write(source.replace(rollbackIf, 'if: ${{ always() }}'));
   assert.match(checkDeployWorkflow(root).join(), /conditional on failure\(\)/);
+
+  write(source.replace(rollbackIf, "if: ${{ failure() && steps.deploy.outcome == 'failure' }}"));
+  assert.match(checkDeployWorkflow(root).join(), /must not run during a dry run/);
+
+  write(source.replace(rollbackIf, "if: ${{ failure() && inputs.dry_run == false && steps.previous.outputs.previous != '' }}"));
+  assert.match(checkDeployWorkflow(root).join(), /must require that the deploy step itself failed/);
 });
 
 test('deploy workflow check rejects a backup taken after the deploy', (t) => {

@@ -76,13 +76,30 @@ export function checkDeployWorkflow(root = ROOT) {
     problems.push('Health check must run after the deploy');
   }
 
-  // The rollback step must be conditional on a prior failure and must not fire
-  // during a dry run, otherwise a successful deploy could be rolled back.
+  // The rollback step must be conditional on a prior failure, must not fire during a
+  // dry run, and must require that the deploy actually started - otherwise a
+  // preflight failure (dirty tree, missing backup) announces a rollback that never
+  // happened. Read the condition from the step itself rather than a fixed-size slice
+  // of text: comments above the step shift any byte window and make the check lie.
   if (rollbackAt !== -1) {
-    const rollbackStep = text.slice(rollbackAt, rollbackAt + 400);
-    if (!/if:\s*\$\{\{\s*failure\(\)/.test(rollbackStep)) {
+    const rollbackStep = text.slice(rollbackAt, text.indexOf('\n      - name:', rollbackAt + 1) === -1
+      ? text.length
+      : text.indexOf('\n      - name:', rollbackAt + 1));
+    const condition = rollbackStep.match(/^\s+if:\s*(.+)$/m)?.[1] ?? '';
+    if (!/failure\(\)/.test(condition)) {
       problems.push('Rollback step must be conditional on failure()');
     }
+    if (!/inputs\.dry_run\s*==\s*false/.test(condition)) {
+      problems.push('Rollback step must not run during a dry run');
+    }
+    if (!/steps\.deploy\.outcome\s*==\s*'failure'/.test(condition)) {
+      problems.push('Rollback step must require that the deploy step itself failed, so a preflight failure does not announce a rollback');
+    }
+  }
+  // A failure before the deploy started must be reported as such: production is
+  // untouched and there is nothing to roll back.
+  if (!/Report a failure before the deploy started/.test(text)) {
+    problems.push('Workflow must report a pre-deploy failure as "nothing was deployed"');
   }
 
   for (const script of ['scripts/release-backup.sh', 'scripts/release-healthcheck.sh']) {
