@@ -19,6 +19,32 @@ test("invalid dates and months report actual Excel row numbers", () => {
   }
 });
 
+test("simple table keeps the final expiry date when months are empty", () => {
+  const result = parse([
+    ["Code", "Name", "Date", "Months"],
+    ["0012345678901", "Expires on", "07.09.2026", ""],
+    ["0012345678902", "Made", "31.01.2024", 1],
+    ["0012345678903", "ISO expiry", "2024-02-29", ""],
+    ["0012345678904", "ISO made", "2024-02-29", 12],
+  ]);
+  assert.equal(result.fileType, "simple");
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(validateInventoryProducts(result.products), [
+    { barcode: "0012345678901", name: "Expires on", quantity: null, expiryDate: "2026-09-07" },
+    { barcode: "0012345678902", name: "Made", quantity: null, expiryDate: "2024-02-29" },
+    { barcode: "0012345678903", name: "ISO expiry", quantity: null, expiryDate: "2024-02-29" },
+    { barcode: "0012345678904", name: "ISO made", quantity: null, expiryDate: "2025-02-28" },
+  ]);
+});
+
+test("simple table still rejects impossible dates without months", () => {
+  for (const date of ["31.02.2025", "29.02.2025", "01/03/2025", "01.03.2025 00:00:00"]) {
+    const result = parse([["Code", "Name", "Date", "Months"], ["123", "Item", date, ""]]);
+    assert.equal(result.products.length, 0);
+    assert.match(result.errors[0], /^Строка 2:/);
+  }
+});
+
 test("legacy catalog and inventory still preserve quantities and unknown expiry", () => {
   const catalog = parse([["Штрих-код", "", "", "", "", "Наименование товара", "", "", "Доступно"], ["123", "", "", "", "", "Item", "", "", 5]]);
   assert.equal(catalog.fileType, "catalog");

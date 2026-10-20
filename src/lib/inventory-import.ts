@@ -5,16 +5,40 @@ export interface InventoryProduct {
   expiryDate: string | null;
 }
 
-/** Date-only arithmetic in UTC avoids host timezone and DST shifts. */
-export function expiryFromManufacture(date: string, months: number | null): string | null {
+interface CalendarDate {
+  date: Date;
+  day: number;
+  month: number;
+  year: number;
+}
+
+/**
+ * Parses a DD.MM.YYYY calendar date in UTC and rejects impossible days.
+ * Date-only arithmetic in UTC avoids host timezone and DST shifts.
+ */
+function parseCalendarDate(date: string, message: string): CalendarDate {
   const match = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(date);
-  if (!match) throw new Error(`Некорректная дата производства: ${date}`);
+  if (!match) throw new Error(`${message}: ${date}`);
   const [, dayText, monthText, yearText] = match;
   const day = Number(dayText), month = Number(monthText), year = Number(yearText);
-  const start = new Date(Date.UTC(year, month - 1, day));
-  if (year < 1900 || start.getUTCFullYear() !== year || start.getUTCMonth() !== month - 1 || start.getUTCDate() !== day) {
-    throw new Error(`Некорректная дата производства: ${date}`);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (year < 1900 || parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    throw new Error(`${message}: ${date}`);
   }
+  return { date: parsed, day, month, year };
+}
+
+/**
+ * A source date without a shelf life is the final expiry date itself.
+ * Used by the simple Excel table, where an empty months cell means "expires on".
+ */
+export function finalExpiryDate(date: string): string {
+  return parseCalendarDate(date, "Некорректная дата").date.toISOString().slice(0, 10);
+}
+
+/** Date-only arithmetic in UTC avoids host timezone and DST shifts. */
+export function expiryFromManufacture(date: string, months: number | null): string | null {
+  const { day, month, year } = parseCalendarDate(date, "Некорректная дата производства");
   if (months === null) return null;
   if (!Number.isInteger(months) || months <= 0 || months > 1200) throw new Error("Некорректный срок хранения в месяцах");
   const end = new Date(Date.UTC(year, month - 1 + months + 1, 0));
