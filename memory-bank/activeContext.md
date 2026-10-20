@@ -49,6 +49,21 @@ from `dc07476`. Cause and evidence: `docs/plans/2026-10-14-restore-mobile-invent
   under Node 24, not Node 22. Under Node 22 the 34 database tests fail with
   `ERR_DLOPEN_FAILED` before any assertion.
 
+## Simple Excel import keeps final expiry dates (2026-10-20)
+
+Branch `local/fix-simple-import-final-expiry`. The simple Excel table (barcode,
+name, date, optional months) dropped the expiry date for rows without a shelf
+life, because `28719b8` made `expiryFromManufacture` return `null` for a
+missing shelf life. That null is correct for the legacy tab-separated format
+and wrong for the Excel table, where an empty months cell means the date is
+already the final expiry.
+
+- `inventory-import.ts` gains `finalExpiryDate`; calendar validation moved into
+  a shared `parseCalendarDate` helper. `expiryFromManufacture` is unchanged.
+- `excel-parser.ts` uses `finalExpiryDate` for empty months and
+  `expiryFromManufacture` otherwise.
+- Cause and evidence: `docs/plans/2026-10-20-simple-import-final-expiry.md`.
+
 ## Open threads
 
 1. `.release-version` is written before the image build, so the marker can claim a
@@ -57,6 +72,9 @@ from `dc07476`. Cause and evidence: `docs/plans/2026-10-14-restore-mobile-invent
 2. Feature checks removed during the production sync are restored one feature at a
    time, never in bulk.
 3. Browser UI and the native iOS date picker remain unverified.
+4. The import dialog accepts a fixed four-column table; a fifth column makes the
+   file unrecognized, and one invalid row rejects the whole file.
+5. Excel import is create-only, so a repeated upload creates duplicates.
 
 ## Operational context
 

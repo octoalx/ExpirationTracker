@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { expiryFromManufacture } from "./inventory-import";
+import { expiryFromManufacture, finalExpiryDate } from "./inventory-import";
 
 export interface ParsedProduct {
   barcode: string;
@@ -190,7 +190,11 @@ function parseSimple(ws: XLSX.WorkSheet, date1904: boolean): { products: ParsedP
         const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText);
         if (iso) sourceDate = `${iso[3]}.${iso[2]}.${iso[1]}`;
       }
-      const expiryDate = expiryFromManufacture(sourceDate, monthsText ? Number(monthsText) : null);
+      // An empty months cell means the date is already the final expiry date;
+      // a positive whole number of months means the date is a manufacture date.
+      const expiryDate = monthsText
+        ? expiryFromManufacture(sourceDate, Number(monthsText))
+        : finalExpiryDate(sourceDate);
       products.push({ barcode, name, quantity: null, expiryDate });
     } catch (error) {
       errors.push(`Строка ${r + 1}: ${error instanceof Error ? error.message : "Некорректные данные"}`);
