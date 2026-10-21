@@ -84,11 +84,13 @@ to.
   `20261022000000_product_store_required`). That migration may only be deployed
   **after** the owner-approved purge: it refuses a row without a department, and
   the deploy applies migrations at startup.
-- The purge is prepared but not executed: `scripts/purge-departments.mjs` keeps
-  `admin@localhost` and the shared barcode catalog and removes every other row. It
-  is authorized to run on production only after the owner sees its dry-run
-  inventory and says yes. Owner decisions and the full verification list are in
-  `docs/plans/2026-10-21-brief-department-purge.md`.
+- The production purge ran on 2026-10-21 with the owner's explicit approval:
+  `scripts/purge-departments.mjs` kept `admin@localhost` and the shared barcode
+  catalog (444 297 rows) and removed every other account, department, membership,
+  product and queue row. It wrote a verified pre-purge snapshot to `/app/backups`
+  first and recorded the filename in a `SystemLog` row, so rollback is a restore of
+  that file rather than a reverse script. Owner decisions and the verification list
+  are in `docs/plans/2026-10-21-brief-department-purge.md`.
 
 ## Open threads
 
