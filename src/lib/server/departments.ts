@@ -36,6 +36,18 @@ export function passwordValue(password: unknown) {
   return password;
 }
 
+/**
+ * Department thresholds as the manager's form submits them: whole days, never
+ * negative, and "Внимание" never earlier than "Срочно".
+ */
+export function thresholdsValue(input: { urgentThreshold?: unknown; warningThreshold?: unknown }) {
+  const urgent = input.urgentThreshold, warning = input.warningThreshold;
+  if (!Number.isSafeInteger(urgent) || !Number.isSafeInteger(warning) || (urgent as number) < 0 || (warning as number) < (urgent as number)) {
+    throw new InventoryError(400, "Проверьте пороги «Срочно» и «Внимание»: целые дни, «Внимание» не меньше «Срочно».");
+  }
+  return { urgentThreshold: urgent as number, warningThreshold: warning as number };
+}
+
 /** Name, email and password of a manager-issued account. */
 export function accountCredentials(input: { name?: unknown; email?: unknown; password?: unknown }) {
   const name = typeof input.name === "string" ? input.name.trim() : "";
@@ -187,6 +199,38 @@ export async function renameDepartment(db: PrismaClient, input: { storeId?: unkn
   const updated = await db.store.updateMany({ where: { id: storeId }, data: { name } });
   if (!updated.count) throw new InventoryError(404, "Отдел не найден.");
   return { id: storeId, name };
+}
+
+/**
+ * The manager renames their own department. A support visit may not: the
+ * administrator configures departments from the admin panel, where the change is
+ * recorded, not from inside someone else's department.
+ */
+export async function renameOwnDepartment(db: PrismaClient, managerId: string, name: unknown) {
+  const title = departmentName(name);
+  return db.$transaction(async tx => {
+    const manager = await requireManager(tx, managerId);
+    await tx.store.update({ where: { id: manager.storeId }, data: { name: title } });
+    return { id: manager.storeId, name: title };
+  });
+}
+
+/**
+ * Thresholds are a department-wide setting, so the manager owns them. Saving them
+ * drops the cached Telegram warnings of every member, because the next scheduled
+ * run must judge each row by the new numbers.
+ */
+export async function saveDepartmentThresholds(db: PrismaClient, managerId: string, input: { urgentThreshold?: unknown; warningThreshold?: unknown }) {
+  const thresholds = thresholdsValue(input);
+  return db.$transaction(async tx => {
+    const manager = await requireManager(tx, managerId);
+    const user = await tx.user.findUnique({ where: { id: managerId }, select: { role: true } });
+    if (user?.role === "ADMIN") throw new InventoryError(403, "Временный доступ не меняет настройки отдела.");
+    const store = await tx.store.update({ where: { id: manager.storeId }, data: thresholds });
+    const members = await tx.storeMembership.findMany({ where: { storeId: manager.storeId }, select: { userId: true } });
+    await tx.telegramWarning.deleteMany({ where: { userId: { in: members.map(member => member.userId) } } });
+    return store;
+  });
 }
 
 /**

@@ -9,15 +9,22 @@ const MIN_PASSWORD = 8;
  * The department team. Hiring, password resets and revocations belong to the
  * manager; every member works the same table, so the team list is read-only here
  * for employees.
+ * `variant="settings"` is the same panel inside the settings card: the layout and
+ * the heading come from the page, the department name becomes editable, and the
+ * thresholds are saved through the department endpoint instead of being posted as
+ * personal settings.
  */
-export default function StoreTeam({ data, refresh, currentUserId }: { data: any; refresh: () => void; currentUserId?: string }) {
+export default function StoreTeam({ data, refresh, currentUserId, variant = "page" }:
+  { data: any; refresh: () => void; currentUserId?: string; variant?: "page" | "settings" }) {
   const [draft, setDraft] = useState({ name: "", email: "", password: "" });
   const [urgent, setUrgent] = useState(String(data.store.urgentThreshold));
   const [warning, setWarning] = useState(String(data.store.warningThreshold));
+  const [name, setName] = useState<string>(data.store.name);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const manager = data.role === "MANAGER";
+  const inSettings = variant === "settings";
 
   const request = async (url: string, method: string, body: object, success = "Сохранено.") => {
     setBusy(true); setError(""); setMessage("");
@@ -38,9 +45,28 @@ export default function StoreTeam({ data, refresh, currentUserId }: { data: any;
     await request(`/api/store/members/${member.userId}/password`, "POST", { password }, "Пароль изменён. Передайте сотруднику новый пароль.");
   };
 
-  return <section className="work-surface space-y-5 p-4 sm:p-6">
-    <h2 className="text-lg font-semibold">Команда · {data.store.name}</h2>
-    <p className="text-sm text-muted-foreground">Таблица у отдела одна, её ведут все сотрудники. Учётные записи сотрудников создаёт и отзывает руководитель.</p>
+  return <section className={inSettings ? "space-y-5" : "work-surface space-y-5 p-4 sm:p-6"}>
+    {inSettings
+      ? <div>
+        <h2 className="text-lg font-bold text-foreground">Команда · {data.store.name}</h2>
+        <p className="text-sm text-muted-foreground">Сотрудники отдела, их доступ и общие пороги</p>
+        <p className="mt-2 text-sm text-muted-foreground">{manager
+          ? "Здесь вы добавляете сотрудников: каждый получает свой email-логин и пароль."
+          : "Учётные записи сотрудников создаёт и отзывает руководитель отдела. Список ниже — только для просмотра."}</p>
+      </div>
+      : <h2 className="text-lg font-semibold">Команда · {data.store.name}</h2>}
+    {!inSettings && <p className="text-sm text-muted-foreground">Таблица у отдела одна, её ведут все сотрудники. Учётные записи сотрудников создаёт и отзывает руководитель.</p>}
+    {manager && inSettings && <form className="flex flex-wrap items-end gap-2 rounded-xl border p-3" onSubmit={async e => {
+      e.preventDefault();
+      const title = name.trim();
+      if (!title || title === data.store.name) return;
+      if (await request("/api/store/members", "PUT", { name: title }, "Название отдела сохранено.")) setName(title);
+    }}>
+      <label className="min-w-48 flex-1 space-y-1"><span className="text-sm font-semibold text-muted-foreground">Название отдела</span>
+        <Input required maxLength={100} value={name} onChange={e => setName(e.target.value)} />
+      </label>
+      <Button variant="outline" disabled={busy || !name.trim() || name.trim() === data.store.name}>Переименовать отдел</Button>
+    </form>}
     <ul className="divide-y">{data.members.map((member: any) => <li key={member.userId} className="flex flex-wrap items-center justify-between gap-2 py-3">
       <div className="min-w-0 break-all">
         <p className="font-medium">{member.user.name ?? "Сотрудник"}{member.userId === currentUserId ? " · это вы" : ""}</p>
