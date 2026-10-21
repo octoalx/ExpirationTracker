@@ -3,9 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require('typescript');
+const bcrypt = require('bcryptjs');
 const { storeFixture } = require('./helpers/disposable.ts');
 const offline = require('./helpers/offline-modules.cjs');
 const inventory = require('../src/lib/server/inventory.ts');
+const departments = require('../src/lib/server/departments.ts');
 const errors = require('../src/lib/server/errors.ts');
 
 function load(file, modules, globals = {}) {
@@ -26,11 +28,11 @@ async function fixture(t) {
     '@/lib/auth': { authOptions: {} }, '../../../lib/auth': { authOptions: {} }, '../../lib/auth': { authOptions: {} },
     '@/lib/prisma': { prisma: db }, '../../../lib/prisma': { prisma: db }, '../../lib/prisma': { prisma: db },
     '@/lib/server/api': api, '@/lib/product-dates': require('../src/lib/product-dates.ts'),
+    '@/lib/server/departments': departments,
     '../../../lib/inventory-import': require('../src/lib/inventory-import.ts'),
     '@/lib/apiErrorHandler': errors, '../../../lib/apiErrorHandler': { apiErrorHandler: errors.apiFailure },
     '../../lib/apiErrorHandler': { apiErrorHandler: (error, res) => errors.apiFailure(res, error) },
     '../../lib/logger': { logger: { info() {} } }, '@/lib/logger': { logger: { info() {} } },
-    '@/lib/server/store-transfer': require('../src/lib/server/store-transfer.ts'),
     '@/lib/server/telegram-link': require('../src/lib/server/telegram-link.ts'),
     '@/lib/server/telegram-bot': require('../src/lib/server/telegram-bot.ts'),
     '@/lib/server/telegram-runtime': { tickTelegram: async () => {}, suspendTelegram: () => true, resumeTelegramRuntime() {} },
@@ -44,37 +46,47 @@ async function fixture(t) {
   return { db, call, login(id, role = 'USER') { session = id ? { user: { id, role, name: id, email: `${id}@example.invalid` } } : null; } };
 }
 
-test('store/product APIs use session membership, reject stale changes and protect manager-only removal', async t => {
+test('product APIs require a department membership and let any member work the shared table', async t => {
   const { db, call, login } = await fixture(t);
   const products = 'src/pages/api/products/index.ts', edit = 'src/pages/api/products/[productId].ts';
   assert.equal((await call(products, 'GET')).code, 401);
+  // An account without a department has no table at all, even as the administrator.
+  login('stranger', 'ADMIN');
+  assert.equal((await call(products, 'GET')).code, 403);
+  assert.equal((await call(products, 'POST', { name: 'No department', barcode: '0123456789012' })).code, 403);
+  assert.equal((await call('src/pages/api/store/worklist.ts', 'GET')).code, 403);
+  assert.equal(await db.product.count(), 0);
   login('employee');
   const created = await call(products, 'POST', { name: 'Shared', barcode: '0123456789012', expiryDate: null, userId: 'outsider', storeId: 'forged' });
   assert.equal(created.code, 201); assert.equal(created.data.storeId, 'main'); assert.equal(created.data.userId, 'employee');
   const id = created.data.id;
-  assert.equal((await call(products, 'GET')).data.canDelete, false);
+  // Deletion is a membership right now, not a manager privilege.
+  assert.equal((await call(products, 'GET')).data.canDelete, true);
   assert.equal((await call(edit, 'PATCH', { name: 'Missing version' }, { productId: id })).code, 409);
   assert.equal((await call(edit, 'PATCH', { name: 'Changed', version: 0 }, { productId: id })).code, 200);
   assert.equal((await call(edit, 'PATCH', { name: 'Stale', version: 0 }, { productId: id })).code, 409);
   assert.equal((await call(edit, 'PUT', { status: 'FORGED', version: 1 }, { productId: id })).code, 400);
-  assert.equal((await call(edit, 'DELETE', {}, { productId: id, version: '1' })).code, 403);
-  login('outsider'); assert.equal((await call(edit, 'PATCH', { name: 'Intruder', version: 1 }, { productId: id })).code, 404);
-  assert.equal((await call(products, 'GET', {}, { userId: 'employee' })).data.products.length, 0);
-  login('manager'); assert.equal((await call(products, 'GET')).data.products.length, 1);
+  // A member of another department never reaches the row.
+  login('outsider');
+  assert.equal((await call(edit, 'PATCH', { name: 'Intruder', version: 1 }, { productId: id })).code, 404);
+  assert.equal((await call(edit, 'DELETE', {}, { productId: id, version: '1' })).code, 404);
+  assert.equal((await call(products, 'GET')).data.products.length, 0);
+  login('employee');
   assert.equal((await call(edit, 'DELETE', {}, { productId: id, version: '1' })).code, 204);
   assert.equal((await call(products, 'GET')).data.products.length, 0);
   assert.ok((await db.product.findUniqueOrThrow({ where: { id } })).deletedAt);
   assert.equal(await db.productEvent.count(), 3);
 });
 
-test('email uses shared inventory and thresholds while preserving exact warning day and personal isolation', async t => {
+test('email reports cover the caller department only and skip accounts without one', async t => {
   const { db } = await storeFixture(t), summaries = [], sent = [];
-  for (const id of ['employee', 'outsider']) await db.settings.update({ where: { userId: id }, data: {
+  for (const id of ['employee', 'outsider', 'stranger']) await db.settings.update({ where: { userId: id }, data: {
     emailNotifications: true, smtpHost: 'offline.invalid', smtpUser: 'offline', smtpPass: 'offline', urgentThreshold: 0, warningThreshold: 10,
   } });
+  await db.settings.update({ where: { userId: 'outsider' }, data: { urgentThreshold: 0, warningThreshold: 10 } });
   for (const [id, expiryDate, storeId, userId] of [
     ['urgent', '2026-10-07', 'main', 'manager'], ['exact', '2026-10-13', 'main', 'manager'],
-    ['late-warning', '2026-10-11', 'main', 'employee'], ['private', '2026-10-06', null, 'outsider'],
+    ['foreign', '2026-10-07', 'second', 'outsider'], ['orphan', '2026-10-06', null, 'stranger'],
   ]) await db.product.create({ data: { id, name: id, barcode: '01234567', expiryDate: new Date(expiryDate), storeId, userId } });
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : ['2026-10-06T10:00:00+03:00'])); } }
   const service = load('src/services/notificationService.ts', {
@@ -86,27 +98,62 @@ test('email uses shared inventory and thresholds while preserving exact warning 
   }, { Date: Clock });
   await service.sendDailyUrgentNotifications('employee'); await service.sendWarningNotifications('employee');
   assert.deepEqual(summaries.map(row => Array.from(row)), [['urgent'], ['exact']]);
+  // The other department sees its own row and never the first department's rows.
   await service.sendDailyUrgentNotifications('outsider');
-  assert.deepEqual(Array.from(summaries[2]), ['private']);
+  assert.deepEqual(Array.from(summaries[2]), ['foreign']);
+  // An account without a department receives nothing, even with personal rows.
+  await service.sendDailyUrgentNotifications('stranger');
+  assert.equal(summaries.length, 3);
   assert.deepEqual(sent, ['employee@example.invalid', 'employee@example.invalid', 'outsider@example.invalid']);
 });
 
-test('store APIs reject employee administration, preserve private data on joining and immediately revoke actions', async t => {
+test('a manager hires with credentials, resets passwords and revokes access inside their own department', async t => {
   const { db, call, login } = await fixture(t);
   const members = 'src/pages/api/store/members.ts', settings = 'src/pages/api/store/settings.ts';
-  login('employee'); assert.equal((await call(settings, 'POST', { urgentThreshold: 1, warningThreshold: 2 })).code, 403);
-  assert.equal((await call(members, 'POST', { email: 'outsider@example.invalid' })).code, 403);
+  login('employee');
+  assert.equal((await call(members, 'POST', { name: 'New', email: 'new@example.invalid', password: 'fixture-password' })).code, 403);
+  assert.equal((await call(settings, 'POST', { urgentThreshold: 1, warningThreshold: 2 })).code, 403);
   login('manager');
-  await db.product.create({ data: { name: 'Private', barcode: '01234567', userId: 'outsider' } });
-  assert.equal((await call(members, 'POST', { email: 'outsider@example.invalid' })).code, 409);
+  for (const body of [{}, { name: 'New' }, { name: 'New', email: 'broken', password: 'fixture-password' },
+    { name: 'New', email: 'new@example.invalid', password: 'short' }]) {
+    assert.equal((await call(members, 'POST', body)).code, 400);
+  }
+  const hired = await call(members, 'POST', { name: ' New ', email: 'new@example.invalid', password: 'fixture-password' });
+  assert.equal(hired.code, 201);
+  const userId = hired.data.employee.id;
+  const membership = await db.storeMembership.findUniqueOrThrow({ where: { userId } });
+  assert.equal(membership.storeId, 'main'); assert.equal(membership.role, 'EMPLOYEE');
+  assert.ok(await bcrypt.compare('fixture-password', (await db.user.findUniqueOrThrow({ where: { id: userId } })).password));
+  assert.equal((await call(members, 'POST', { name: 'Again', email: 'new@example.invalid', password: 'fixture-password' })).code, 409);
   assert.equal((await call(settings, 'POST', { urgentThreshold: 5, warningThreshold: 3 })).code, 400);
   assert.equal((await call(settings, 'POST', { urgentThreshold: 1, warningThreshold: 2 })).code, 200);
+
+  // Password reset belongs to the department manager, and only for employees.
+  const reset = 'src/pages/api/store/members/[userId]/password.ts';
+  assert.equal((await call(reset, 'POST', { password: 'next-password' }, { userId: 'outsider' })).code, 404);
+  assert.equal((await call(reset, 'POST', { password: 'next-password' }, { userId: 'manager' })).code, 409);
+  assert.equal((await call(reset, 'POST', { password: 'short' }, { userId })).code, 400);
+  assert.equal((await call(reset, 'POST', { password: 'next-password' }, { userId })).code, 200);
+  assert.ok(await bcrypt.compare('next-password', (await db.user.findUniqueOrThrow({ where: { id: userId } })).password));
+
+  // Revocation removes the membership, the personal link and queued work, and
+  // releases authorship while the department keeps the rows.
+  const row = await db.product.create({ data: { id: 'shared-row', name: 'Shared', barcode: '01234567', storeId: 'main', userId } });
+  await db.telegramLink.create({ data: { userId, telegramUserId: '202', chatId: '202', displayName: 'New' } });
+  await db.telegramDelivery.create({ data: { userId, key: 'pending', kind: 'URGENT', scheduleDate: '2026-10-06' } });
   assert.equal((await call(members, 'DELETE', { userId: 'manager' })).code, 409);
-  assert.equal((await call(members, 'DELETE', { userId: 'employee' })).code, 200);
-  login('employee'); assert.equal((await call('src/pages/api/store/worklist.ts', 'GET')).code, 403);
+  assert.equal((await call(members, 'DELETE', { userId: 'outsider' })).code, 404);
+  assert.equal((await call(members, 'DELETE', { userId })).code, 200);
+  assert.equal(await db.storeMembership.count({ where: { userId } }), 0);
+  assert.equal(await db.telegramLink.count({ where: { userId } }), 0);
+  assert.equal((await db.telegramDelivery.findUniqueOrThrow({ where: { key: 'pending' } })).state, 'CANCELLED');
+  const released = await db.product.findUniqueOrThrow({ where: { id: row.id } });
+  assert.equal(released.userId, null); assert.equal(released.storeId, 'main');
+  login(userId);
+  assert.equal((await call('src/pages/api/store/worklist.ts', 'GET')).code, 403);
 });
 
-test('settings return safe credentials and shared thresholds; bulk import uses current membership', async t => {
+test('settings return safe credentials and shared thresholds; bulk import uses the current department', async t => {
   const { db, call, login } = await fixture(t);
   login('employee');
   await db.settings.update({ where: { userId: 'employee' }, data: { telegramToken: 'legacy-private-fixture', telegramChatId: '123', smtpPass: 'fixture-password' } });
@@ -137,19 +184,21 @@ test('webhook verifies secret, persists once and redacts linking credentials bef
   assert.equal((await db.telegramUpdate.findFirstOrThrow()).payload.includes('a'.repeat(32)), false);
 });
 
-test('JSON v2 backup restores store, membership and audit atomically; legacy replacement remains personal and paused', async t => {
+test('JSON v2 backup restores departments, membership and audit atomically; legacy replacement remains unscoped and paused', async t => {
   const { db, call, login } = await fixture(t); login('manager', 'ADMIN');
   await db.product.create({ data: { id: 'batch', name: 'Original', barcode: '01234567', userId: 'employee', storeId: 'main' } });
   const backup = await call('src/pages/api/admin/backup.ts', 'GET'); assert.equal(backup.data.version, '2.0');
   const copied = JSON.parse(JSON.stringify(backup.data));
   const restored = await call('src/pages/api/admin/restore.ts', 'POST', { mode: 'replace', data: copied });
-  assert.equal(restored.code, 200); assert.equal(await db.storeMembership.count(), 2);
+  assert.equal(restored.code, 200); assert.equal(await db.storeMembership.count(), 3);
+  assert.equal(await db.store.count(), 2);
   assert.equal((await db.product.findUniqueOrThrow({ where: { id: 'batch' } })).storeId, 'main');
   assert.equal((await db.integrationState.findUniqueOrThrow({ where: { id: 'telegram' } })).paused, true);
   const legacyMerge = { version: '1.0', data: { users: [{ id: 'employee', email: 'employee@example.invalid' }], products: [{ id: 'batch', userId: 'employee', name: 'Legacy edit', barcode: '01234567' }] } };
   assert.equal((await call('src/pages/api/admin/restore.ts', 'POST', { mode: 'merge', data: legacyMerge })).code, 200);
   assert.equal((await db.product.findUniqueOrThrow({ where: { id: 'batch' } })).storeId, 'main');
   assert.equal((await db.product.findUniqueOrThrow({ where: { id: 'batch' } })).version, 1);
+  // A membership pointing at a department missing from the archive is refused.
   copied.data.memberships[0].storeId = 'forged';
   assert.equal((await call('src/pages/api/admin/restore.ts', 'POST', { mode: 'replace', data: copied })).code, 400);
   assert.equal(await db.product.count(), 1);

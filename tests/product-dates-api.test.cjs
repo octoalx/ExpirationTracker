@@ -35,6 +35,9 @@ test('manufacture metadata survives edits; migration preserves legacy records an
   for (const key of Object.keys(before)) assert.equal(after[key], before[key]);
   assert.equal(after.manufacturingDate, null);
   for (const name of names.filter(name => name > "20261003000000_product_manufacture_date")) db.exec(fs.readFileSync(path.join(migrations, name, "migration.sql"), "utf8"));
+  // Each account works its own department table; a foreign row must stay invisible.
+  db.exec("INSERT INTO Store (id,name) VALUES ('dep','Отдел'),('other-dep','Другой отдел');" +
+    "INSERT INTO StoreMembership (id,storeId,userId,role) VALUES ('m1','dep','owner','MANAGER'),('m2','other-dep','other','MANAGER');");
   db.close();
   const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
   let session = { user: { id: 'owner' } };
@@ -54,20 +57,26 @@ test('manufacture metadata survives edits; migration preserves legacy records an
     assert.equal(created.code, 201);
     const id = created.data.id;
     assert.equal(created.data.userId, 'owner');
+    assert.equal(created.data.storeId, 'dep');
     assert.equal(created.data.expiryDate.toISOString(), '2024-02-29T00:00:00.000Z');
-    await call(edit, 'PATCH', { name: 'Renamed' }, id);
+    // A row can no longer be created outside a department.
+    await prisma.user.create({ data: { id: 'lonely', email: 'lonely@example.invalid' } });
+    session = { user: { id: 'lonely' } };
+    assert.equal((await call(create, 'POST', { name: 'No department', barcode: '12345678' })).code, 403);
+    session = { user: { id: 'owner' } };
+    await call(edit, 'PATCH', { name: 'Renamed', version: 0 }, id);
     assert.equal((await prisma.product.findUnique({ where: { id } })).manufacturingDate, '2024-01-31');
-    const changed = await call(edit, 'PATCH', { manufacturingDate: '2026-12-31', shelfLife: 1, shelfLifeUnit: 'days' }, id);
+    const changed = await call(edit, 'PATCH', { manufacturingDate: '2026-12-31', shelfLife: 1, shelfLifeUnit: 'days', version: 1 }, id);
     assert.equal(changed.data.expiryDate.toISOString(), '2027-01-01T00:00:00.000Z');
-    assert.equal((await call(edit, 'PATCH', { manufacturingDate: '2026-02-30', shelfLife: 1, shelfLifeUnit: 'months' }, id)).code, 400);
+    assert.equal((await call(edit, 'PATCH', { manufacturingDate: '2026-02-30', shelfLife: 1, shelfLifeUnit: 'months', version: 2 }, id)).code, 400);
     assert.equal((await prisma.product.findUnique({ where: { id } })).manufacturingDate, '2026-12-31');
     session = { user: { id: 'other' } };
-    assert.equal((await call(edit, 'PATCH', { name: 'Forbidden' }, id)).code, 404);
+    assert.equal((await call(edit, 'PATCH', { name: 'Forbidden', version: 2 }, id)).code, 404);
     assert.equal((await prisma.product.findUnique({ where: { id } })).name, 'Renamed');
     session = null;
     assert.equal((await call(edit, 'PATCH', {}, id)).code, 401);
     session = { user: { id: 'owner' } };
-    const cleared = await call(edit, 'PATCH', { expiryDate: null }, id);
+    const cleared = await call(edit, 'PATCH', { expiryDate: null, version: 2 }, id);
     assert.equal(cleared.data.expiryDate, null);
     assert.equal(cleared.data.manufacturingDate, null);
     assert.equal(cleared.data.shelfLife, null);

@@ -30,7 +30,7 @@ test('Excel API imports into empty storage with session ownership and validates 
     const file = path.join(migrations, name, 'migration.sql');
     if (fs.existsSync(file)) db.exec(fs.readFileSync(file, 'utf8'));
   }
-  db.exec("INSERT INTO User (id) VALUES ('owner'), ('other');");
+  db.exec("INSERT INTO User (id) VALUES ('owner'), ('other'); INSERT INTO Store (id,name) VALUES ('dep','Отдел'); INSERT INTO StoreMembership (id,storeId,userId,role) VALUES ('m1','dep','owner','MANAGER');");
   db.close();
   const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
   let session = { user: { id: 'owner' } };
@@ -62,8 +62,13 @@ test('Excel API imports into empty storage with session ownership and validates 
     assert.equal(products[0].barcode, item.barcode);
     assert.equal(products[1].expiryDate, null);
     assert.equal(products[1].quantity, 3);
-    assert.ok(products.every(p => p.userId === 'owner' && p.status === 'ACTIVE'));
+    assert.ok(products.every(p => p.userId === 'owner' && p.status === 'ACTIVE' && p.storeId === 'dep'));
     assert.equal(await prisma.product.count({ where: { userId: 'other' } }), 0);
+    // An account without a department imports nothing.
+    await prisma.user.create({ data: { id: 'lonely', email: 'lonely@example.invalid' } });
+    session = { user: { id: 'lonely' } };
+    assert.equal((await call([item])).code, 403);
+    assert.equal(await prisma.product.count(), 2);
   } finally {
     await prisma.$disconnect();
     fs.rmSync(dir, { recursive: true, force: true });

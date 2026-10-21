@@ -26,13 +26,14 @@ test("statistics API rejects anonymous reads, scopes ownership and serializes nu
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [fixed.getTime()])); } }
   let session = null;
   const scopes = [];
+  let member = null;
   const handler = load("src/pages/api/user/stats.ts", {
     "next-auth": { getServerSession: async () => session }, "@/lib/auth": { authOptions: {} }, "date-fns": dateFns,
     "@/lib/expiry-overview": { expiryOverview: overview },
     "@/lib/apiErrorHandler": { apiErrorHandler: error => { throw error; } },
-    "@/lib/prisma": { prisma: { storeMembership: { findUnique: async () => null },
+    "@/lib/prisma": { prisma: { storeMembership: { findUnique: async args => { scopes.push(args.where.userId); return member; } },
       settings: { findUnique: async args => { scopes.push(args.where.userId); return { urgentThreshold: 0, warningThreshold: 7 }; } },
-      product: { findMany: async args => { scopes.push(args.where.userId); return [record("missing", "ACTIVE", null), record("today", "ACTIVE", new Date(Date.UTC(2026, 9, 2))), record("archive", "ARCHIVED", new Date(Date.UTC(2026, 8, 1)))]; } },
+      product: { findMany: async args => { scopes.push(args.where.storeId ?? args.where.userId); return [record("missing", "ACTIVE", null), record("today", "ACTIVE", new Date(Date.UTC(2026, 9, 2))), record("archive", "ARCHIVED", new Date(Date.UTC(2026, 8, 1)))]; } },
       emailLog: { findMany: async args => { scopes.push(args.where.userId); return []; } },
     } },
   }, Clock).default;
@@ -41,9 +42,13 @@ test("statistics API rejects anonymous reads, scopes ownership and serializes nu
   assert.equal((await call("GET")).code, 401);
   assert.equal(scopes.length, 0);
   session = { user: { id: "owner" } };
+  // Without a department there are no statistics at all.
+  assert.equal((await call("GET")).code, 403);
+  assert.deepEqual(scopes, ["owner"]);
+  member = { userId: "owner", storeId: "dep", store: { id: "dep", name: "Отдел", urgentThreshold: 0, warningThreshold: 7 } };
   const response = await call("GET");
   assert.equal(response.code, 200);
-  assert.deepEqual(scopes, ["owner", "owner", "owner"]);
+  assert.deepEqual(scopes, ["owner", "owner", "owner", "dep", "owner"]);
   assert.equal(response.data.unknownExpiryCount, 1);
   assert.equal(response.data.expiredCount, 0);
   assert.equal(response.data.urgentCount, 1);

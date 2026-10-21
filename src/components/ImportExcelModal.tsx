@@ -126,7 +126,7 @@ export default function ImportExcelModal({
         onImportComplete();
       } else {
         setState("error");
-        setErrorMessage(data.error || data.errors?.join(", ") || "Ошибка импорта");
+        setErrorMessage(data.message || data.error || data.errors?.join(", ") || "Ошибка импорта");
       }
     } catch {
       setState("error");

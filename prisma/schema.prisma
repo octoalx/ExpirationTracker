@@ -62,6 +62,9 @@ model Product {
   updatedAt  DateTime @updatedAt
   userId     String?
   user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // A department is the only product scope. The column stays nullable for one
+  // migration cycle so legacy rows survive the rollout; no code path writes null
+  // once membership is mandatory. It becomes NOT NULL after the approved purge.
   storeId    String?
   store      Store?   @relation(fields: [storeId], references: [id], onDelete: Restrict)
   version    Int      @default(0)
@@ -82,10 +85,11 @@ model Product {
 }
 
 model Store {
-  id               String @id
+  id               String @id @default(cuid())
   name             String
   urgentThreshold  Int @default(3)
   warningThreshold Int @default(7)
+  createdAt        DateTime @default(now())
   members          StoreMembership[]
   products         Product[]
 }

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
-import { accessibleProduct, claimProduct, inspectProduct, inventoryScope, InventoryError, worklist } from "./inventory";
+import { accessibleProduct, claimProduct, inspectProduct, inventoryScope, InventoryError, storeMembership, worklist } from "./inventory";
 import { expiryLabel, expiryDays } from "../expiry-calendar";
 import { linkHash, nominateLink } from "./telegram-link";
 import { transportFailure, type BotTransport, type BotButtons } from "./telegram-transport";
@@ -103,9 +103,9 @@ export async function handleBotUpdate(db: PrismaClient, transport: BotTransport,
       return;
     }
     const link = await db.telegramLink.findUnique({ where: { telegramUserId: String(from.id) } });
-    if (!link || link.chatId !== chatId || !(await inventoryScope(db, link.userId)).membership) {
+    if (!link || link.chatId !== chatId || !(await storeMembership(db, link.userId))) {
       if (update.callback_query) await acknowledge(transport, update.callback_query.id, "Доступ недоступен.");
-      await transport.send(chatId, "Подключите Telegram в настройках приложения. Для работы нужно членство в магазине.");
+      await transport.send(chatId, "Подключите Telegram в настройках приложения. Для работы нужно членство в отделе.");
       return;
     }
     if (link.deliveryStatus !== "READY") await db.telegramLink.update({ where: { userId: link.userId }, data: { deliveryStatus: "READY" } });

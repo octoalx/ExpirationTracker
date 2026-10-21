@@ -216,8 +216,10 @@ const Dashboard = () => {
     setLoading(true); setLoadError("");
     try {
       const response = await fetch("/api/products");
-      if (!response.ok) throw new Error("Не удалось загрузить товары. Повторите попытку.");
-      const data = await response.json(); setProducts(data.products ?? []); setCanDelete(data.canDelete ?? true);
+      const data = await response.json().catch(() => null);
+      // The server explains a missing department; keep that text instead of a generic retry.
+      if (!response.ok) throw new Error(data?.message ?? "Не удалось загрузить товары. Повторите попытку.");
+      setProducts(data.products ?? []); setCanDelete(data.canDelete ?? true);
     } catch (error) { setLoadError(error instanceof Error ? error.message : "Ошибка сети"); }
     finally { setLoading(false); }
   }, []);

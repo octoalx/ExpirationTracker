@@ -20,8 +20,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const entry = await prisma.catalogEntry.findUnique({
         where: { userId_barcode: { userId, barcode } }, select: { barcode: true, name: true },
       });
-      if (!entry) return res.status(404).json({ error: "Товар не найден в вашем каталоге" });
-      return res.status(200).json(entry);
+      if (entry) return res.status(200).json(entry);
+      // The shared barcode reference is the second source: one employee no longer
+      // has to import the same file privately before another one can find a name.
+      const shared = await prisma.sharedCatalogEntry.findUnique({ where: { barcode }, select: { barcode: true, name: true } });
+      if (shared) return res.status(200).json(shared);
+      return res.status(404).json({ error: "Товар не найден в каталоге" });
     } catch {
       return res.status(500).json({ error: "Не удалось прочитать каталог" });
     }

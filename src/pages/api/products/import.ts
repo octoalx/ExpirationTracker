@@ -5,11 +5,13 @@ import { prisma } from "../../../lib/prisma";
 
 import { validateInventoryProducts } from "../../../lib/inventory-import";
 import { inventoryScope, recordEvent } from "@/lib/server/inventory";
+import { apiFailure } from "@/lib/server/api";
 import { expiredOn } from "@/lib/expiry-calendar";
 
 interface ImportResponse {
   imported: number;
   errors: string[];
+  message?: string;
 }
 
 /** POST: bulk-import products from a parsed Excel file. */
@@ -48,7 +50,7 @@ export default async function handler(
             quantity: p.quantity,
             expiryDate,
             isExpired: expiredOn(expiryDate),
-            storeId: membership?.storeId ?? null,
+            storeId: membership.storeId,
             userId,
           },
         });
@@ -63,7 +65,6 @@ export default async function handler(
       errors: [],
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Ошибка при импорте";
-    return res.status(500).json({ error: message });
+    return apiFailure(res, error);
   }
 }

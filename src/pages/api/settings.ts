@@ -6,7 +6,7 @@ import { authOptions } from "../../lib/auth";
 import { logger } from "../../lib/logger";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { inventoryScope } from "@/lib/server/inventory";
+import { storeMembership } from "@/lib/server/inventory";
 
 const settingsSchema = z.object({
   urgentThreshold: z.number().int().nonnegative().optional(),
@@ -36,7 +36,7 @@ export default async function handler(
   }
 
   const userId = session.user.id;
-  const { membership } = await inventoryScope(prisma, userId);
+  const membership = await storeMembership(prisma, userId);
 
   if (req.method === "GET") {
     try {

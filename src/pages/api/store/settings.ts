@@ -1,13 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
 import { apiUser, apiFailure } from "@/lib/server/api";
-import { inventoryScope, requireManager, InventoryError } from "@/lib/server/inventory";
+import { storeMembership, requireManager, InventoryError } from "@/lib/server/inventory";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const user = await apiUser(req, res);
     if (req.method === "GET") {
-      const { membership } = await inventoryScope(prisma, user.id);
+      const membership = await storeMembership(prisma, user.id);
       return res.json({ store: membership?.store ?? null });
     }
     if (req.method !== "POST") return res.status(405).end();

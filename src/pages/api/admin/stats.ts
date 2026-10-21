@@ -3,9 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
-import { minskDate } from "@/lib/expiry-calendar";
 
-/** GET: admin dashboard KPIs (total users, active/expired products, issues). */
+/**
+ * GET: service counters for the administrator dashboard.
+ * The administrator sees accounts and departments, never product rows, so this
+ * endpoint deliberately does not read the product table.
+ */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -21,23 +24,18 @@ export default async function handler(
   }
 
   try {
-    const totalUsers = await prisma.user.count();
-    const activeProducts = await prisma.product.count({
-      where: { status: "ACTIVE", deletedAt: null },
-    });
-    const expiredProducts = await prisma.product.count({
-      where: {
-        deletedAt: null,
-        expiryDate: { lt: new Date(`${minskDate()}T00:00:00.000Z`) },
-        status: "ACTIVE",
-      },
-    });
-    const totalIssues = await prisma.systemLog.count();
+    const [totalUsers, departments, assignedAccounts, totalIssues] = await Promise.all([
+      prisma.user.count(),
+      prisma.store.count(),
+      prisma.storeMembership.count(),
+      prisma.systemLog.count(),
+    ]);
 
+    res.setHeader("Cache-Control", "private, no-store");
     res.status(200).json({
       totalUsers,
-      activeProducts,
-      expiredProducts,
+      departments,
+      accountsWithoutDepartment: totalUsers - assignedAccounts,
       totalIssues,
     });
   } catch (error) {

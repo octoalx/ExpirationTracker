@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../lib/prisma";
-import { apiErrorHandler } from "../../../lib/apiErrorHandler";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { productDates } from "@/lib/product-dates";
@@ -30,10 +29,11 @@ export default async function handler(
         where,
       });
       res.setHeader("Cache-Control", "private, no-store");
-      const { membership } = await inventoryScope(prisma, session.user.id);
-      res.status(200).json({ products, canDelete: !membership || membership.role === "MANAGER" });
+      // Every member of the department works the same shared table: deletion is
+      // no longer a manager privilege, it is a membership right.
+      res.status(200).json({ products, canDelete: true });
     } catch (error) {
-      apiErrorHandler(error, res);
+      apiFailure(res, error);
     }
   } else if (req.method === "POST") {
     try {
@@ -54,7 +54,7 @@ export default async function handler(
             ...dates,
             quantity: quantity ?? null,
             userId: session.user.id,
-            storeId: membership?.storeId ?? null,
+            storeId: membership.storeId,
           },
         });
         await recordEvent(tx, { userId: session.user.id, source: "WEB" }, created, "CREATE", { product: created });

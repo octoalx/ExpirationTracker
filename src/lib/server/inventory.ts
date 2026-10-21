@@ -10,23 +10,41 @@ export type Actor = { userId: string; source: "WEB" | "TELEGRAM" };
 export const RESULTS = ["CHECKED", "MISSING", "SOLD", "REMOVED", "DEFECT"] as const;
 export type InspectionResult = typeof RESULTS[number];
 
+/** Refusal text shared by every route that needs a department. */
+export const DEPARTMENT_REQUIRED = "Таблицы отделов доступны только их сотрудникам.";
+
+/**
+ * The caller's department membership, or null when the account belongs to no
+ * department. Background jobs iterate every account and must not throw here;
+ * request handlers use `inventoryScope` instead.
+ */
+export async function storeMembership(db: Database, userId: string) {
+  return db.storeMembership.findUnique({ where: { userId }, include: { store: true } });
+}
+
+/**
+ * The single source of product visibility. A department membership is mandatory:
+ * there is no personal product scope, so an account without a department — the
+ * platform administrator included — cannot reach any row.
+ */
 export async function inventoryScope(db: Database, userId: string) {
-  const membership = await db.storeMembership.findUnique({ where: { userId }, include: { store: true } });
-  const where: Prisma.ProductWhereInput = membership
-    ? { storeId: membership.storeId, deletedAt: null }
-    : { userId, storeId: null, deletedAt: null };
+  const membership = await storeMembership(db, userId);
+  if (!membership) throw new InventoryError(403, DEPARTMENT_REQUIRED);
+  const where: Prisma.ProductWhereInput = { storeId: membership.storeId, deletedAt: null };
   return { membership, where };
 }
 
+/** Department thresholds, falling back to the account's own settings when it has no department. */
 export async function inventoryThresholds(db: Database, userId: string) {
-  const scope = await inventoryScope(db, userId);
-  const settings = scope.membership?.store ?? await db.settings.findUnique({ where: { userId } });
+  const membership = await storeMembership(db, userId);
+  const settings = membership?.store ?? await db.settings.findUnique({ where: { userId } });
   return { urgentThreshold: settings?.urgentThreshold ?? 3, warningThreshold: settings?.warningThreshold ?? 7 };
 }
 
+/** One manager per department; hiring, thresholds and employee management require it. */
 export async function requireManager(db: Database, userId: string) {
   const { membership } = await inventoryScope(db, userId);
-  if (membership?.role !== "MANAGER") throw new InventoryError(403, "Нужны права руководителя магазина.");
+  if (membership.role !== "MANAGER") throw new InventoryError(403, "Нужны права руководителя отдела.");
   return membership;
 }
 
@@ -49,8 +67,8 @@ export async function recordEvent(db: Database, actor: Actor, product: { id: str
 export async function updateInventory(db: PrismaClient, actor: Actor, id: string, version: unknown,
   data: Prisma.ProductUncheckedUpdateManyInput, action = "EDIT") {
   return db.$transaction(async tx => {
-    const { product, membership } = await accessibleProduct(tx, actor.userId, id);
-    if (membership && (!Number.isInteger(version) || version !== product.version)) {
+    const { product } = await accessibleProduct(tx, actor.userId, id);
+    if (!Number.isInteger(version) || version !== product.version) {
       throw new InventoryError(409, "Запись изменилась. Обновите её и повторите действие.");
     }
     const changed = await tx.product.updateMany({ where: { id, version: product.version },
@@ -64,8 +82,7 @@ export async function updateInventory(db: PrismaClient, actor: Actor, id: string
 
 export async function claimProduct(db: PrismaClient, actor: Actor, id: string, release = false, now = new Date()) {
   return db.$transaction(async tx => {
-    const { product, membership } = await accessibleProduct(tx, actor.userId, id);
-    if (!membership) throw new InventoryError(403, "Обход доступен сотрудникам магазина.");
+    const { product } = await accessibleProduct(tx, actor.userId, id);
     if (product.status !== "ACTIVE") throw new InventoryError(409, "Товар уже обработан.");
     await tx.productClaim.deleteMany({ where: { productId: id, expiresAt: { lte: now } } });
     const previous = await tx.productClaim.findUnique({ where: { productId: id } });
@@ -88,8 +105,7 @@ export async function inspectProduct(db: PrismaClient, actor: Actor, id: string,
     throw new InventoryError(400, "Некорректный результат проверки.");
   }
   return db.$transaction(async tx => {
-    const { product, membership } = await accessibleProduct(tx, actor.userId, id);
-    if (!membership) throw new InventoryError(403, "Обход доступен сотрудникам магазина.");
+    const { product } = await accessibleProduct(tx, actor.userId, id);
     const previous = await tx.productEvent.findUnique({ where: { key } });
     if (previous) {
       if (previous.actorId !== actor.userId || previous.productId !== id || previous.action !== result) {
@@ -116,7 +132,6 @@ export async function inspectProduct(db: PrismaClient, actor: Actor, id: string,
 
 export async function worklist(db: Database, userId: string, now = new Date()) {
   const scope = await inventoryScope(db, userId);
-  if (!scope.membership) throw new InventoryError(403, "Вы пока не включены в команду магазина.");
   const thresholds = scope.membership.store;
   const products = await db.product.findMany({ where: { ...scope.where, status: "ACTIVE" }, include: { claim: true } });
   const members = await db.storeMembership.findMany({ where: { storeId: scope.membership.storeId },

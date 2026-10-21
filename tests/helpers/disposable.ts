@@ -26,12 +26,23 @@ export async function disposable(t: TestContext) {
   });
   return { db, dir, url };
 }
+/**
+ * One department ("main") with its manager and employee, a second department
+ * ("second") owned by "outsider" and an account without any department
+ * ("stranger"). The stranger is the case the model must refuse with 403, and the
+ * outsider is the case that must receive 404 on a foreign row.
+ */
 export async function storeFixture(t: TestContext) {
   const fixture = await disposable(t);
-  for (const id of ["manager", "employee", "outsider"]) await fixture.db.user.create({ data: {
+  for (const id of ["manager", "employee", "outsider", "stranger"]) await fixture.db.user.create({ data: {
     id, name: id, email: `${id}@example.invalid`, settings: { create: {} } } });
   await fixture.db.store.create({ data: { id: "main", name: "Test store" } });
-  for (const id of ["manager", "employee"]) await fixture.db.storeMembership.create({ data: {
-    userId: id, storeId: "main", role: id === "manager" ? "MANAGER" : "EMPLOYEE" } });
+  await fixture.db.store.create({ data: { id: "second", name: "Second department" } });
+  const memberships = [
+    { userId: "manager", storeId: "main", role: "MANAGER" },
+    { userId: "employee", storeId: "main", role: "EMPLOYEE" },
+    { userId: "outsider", storeId: "second", role: "MANAGER" },
+  ];
+  for (const membership of memberships) await fixture.db.storeMembership.create({ data: membership });
   return fixture;
 }
