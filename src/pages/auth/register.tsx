@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Loader2, Mail, Lock, UserPlus } from "lucide-react";
+import { Loader2, Mail, Lock, UserPlus, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* ── Floating input ── */
@@ -79,6 +79,7 @@ const shakeVariants = {
 /** New user registration page with name, email, and password form. */
 export default function Register() {
   const [name, setName] = useState("");
+  const [department, setDepartment] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -106,7 +107,7 @@ export default function Register() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, department }),
     });
 
     if (res.ok) {
@@ -138,10 +139,10 @@ export default function Register() {
               Учёт сроков годности
             </p>
             <h2 className="mt-3 text-xl font-bold text-foreground">
-              Создать аккаунт
+              Создать отдел
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Присоединяйтесь к нам
+              Вы станете руководителем нового отдела
             </p>
           </div>
 
@@ -163,6 +164,14 @@ export default function Register() {
               value={name}
               onChange={setName}
               icon={<UserPlus size={16} />}
+            />
+
+            <FloatingInput
+              id="department"
+              label="Название отдела"
+              value={department}
+              onChange={setDepartment}
+              icon={<Building2 size={16} />}
             />
 
             <FloatingInput

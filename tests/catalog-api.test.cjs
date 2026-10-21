@@ -51,6 +51,7 @@ test('catalog lookup and import APIs scope data to the verified owner and valida
     '../../../lib/prisma': { prisma },
     '@/lib/catalog-parser': load('src/lib/catalog-parser.ts', {}),
     '@/lib/server/inventory': require('../src/lib/server/inventory.ts'),
+    '@/lib/server/api': require('../src/lib/server/errors.ts'),
     '@/lib/expiry-calendar': require('../src/lib/expiry-calendar.ts'),
     '../../../lib/inventory-import': load('src/lib/inventory-import.ts', {}),
   };
@@ -66,6 +67,9 @@ test('catalog lookup and import APIs scope data to the verified owner and valida
     for (const id of ['owner', 'other']) {
       await prisma.user.create({ data: { id, email: `${id}@example.invalid` } });
     }
+    // The department membership is the product scope; the catalog stays per account.
+    await prisma.store.create({ data: { id: 'dep', name: 'Отдел' } });
+    await prisma.storeMembership.create({ data: { userId: 'owner', storeId: 'dep', role: 'MANAGER' } });
 
     // Unauthenticated requests mutate nothing and disclose nothing.
     assert.equal((await call(catalog, 'GET', {}, { barcode: '2000000000001' })).code, 401);
@@ -123,7 +127,7 @@ test('catalog lookup and import APIs scope data to the verified owner and valida
     assert.equal(batch.data.imported, 1);
     const saved = await prisma.product.findFirst({ where: { name: 'Excel batch' } });
     assert.equal(saved.userId, 'owner');
-    assert.equal(saved.storeId, null);
+    assert.equal(saved.storeId, 'dep');
     assert.equal(saved.expiryDate.toISOString(), '2026-12-31T00:00:00.000Z');
     assert.ok(saved.createdAt.getTime() >= before);
     // Expiry labels are calendar dates, so a past date lands as expired on import.

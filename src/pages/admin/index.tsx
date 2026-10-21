@@ -3,7 +3,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import { 
-  Users, FileText, Database, Shield
+  Users, FileText, Database, Shield, Building2, Send
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
@@ -11,14 +11,18 @@ import { cn } from "@/lib/utils";
 const CatalogImport = dynamic(() => import("@/components/CatalogImport"), { ssr: false });
 
 const UsersTab = dynamic(() => import("@/components/admin/UsersTab"), { ssr: false });
+const DepartmentsTab = dynamic(() => import("@/components/admin/DepartmentsTab"), { ssr: false });
 const LogsTab = dynamic(() => import("@/components/admin/LogsTab"), { ssr: false });
 const BackupTab = dynamic(() => import("@/components/admin/BackupTab"), { ssr: false });
+const TelegramStatus = dynamic(() => import("@/components/admin/TelegramStatus"), { ssr: false });
 
 const tabs = [
   { id: "users", label: "Пользователи", icon: Users },
+  { id: "departments", label: "Отделы", icon: Building2 },
   { id: "logs", label: "Журнал", icon: FileText },
   { id: "catalog", label: "Каталог", icon: Database },
   { id: "backup", label: "Копии данных", icon: Database },
+  { id: "telegram", label: "Telegram", icon: Send },
 ];
 
 const VALID_TABS = tabs.map((t) => t.id);
@@ -43,12 +47,16 @@ export default function AdminPage() {
     switch (activeTab) {
       case "users":
         return <UsersTab />;
+      case "departments":
+        return <DepartmentsTab />;
       case "logs":
         return <LogsTab />;
       case "catalog":
         return <CatalogImport />;
       case "backup":
         return <BackupTab />;
+      case "telegram":
+        return <TelegramStatus />;
       default:
         return null;
     }
@@ -56,7 +64,7 @@ export default function AdminPage() {
 
   if (status === "loading") return <p role="status" className="p-4 text-slate-600">Проверка доступа…</p>;
   if (session?.user?.role !== "ADMIN") return <div className="work-surface p-5"><h1>Нет доступа</h1><p className="mt-3 text-sm text-slate-600">Этот раздел доступен администратору.</p></div>;
-  const descriptions: Record<string, string> = { catalog: "Названия для сканера всех пользователей. Сроки и количество не импортируются.", users: "Учётные записи и доступ сотрудников. Изменение роли влияет на доступ к управлению системой.", logs: "События приложения: ошибки, предупреждения и информационные записи.", backup: "Резервные копии и перенос данных. Восстановление заменяет текущие данные — проверьте выбранную копию." };
+  const descriptions: Record<string, string> = { catalog: "Названия для сканера всех пользователей. Сроки и количество не импортируются.", users: "Учётные записи. Роль влияет на доступ к управлению системой, а не к таблицам отделов.", departments: "Отделы, их руководители и временный доступ администратора. Таблицы отделов здесь не показываются.", logs: "События приложения: ошибки, предупреждения и информационные записи.", backup: "Резервные копии и перенос данных. Восстановление заменяет текущие данные — проверьте выбранную копию.", telegram: "Общий бот и очередь уведомлений всех отделов." };
   return (
     <div className="admin-workspace mx-auto max-w-6xl">
       {/* Header */}
@@ -81,7 +89,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="relative mb-8">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 pb-px">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 pb-px">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
             return (

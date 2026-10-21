@@ -3,8 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import Database from "better-sqlite3";
 import { disposable, storeFixture, migrate, migrations } from "./helpers/disposable";
-import { accessibleProduct, claimProduct, inspectProduct, inventoryScope, updateInventory, worklist, requireManager } from "../src/lib/server/inventory";
-import { transferPreview, transferStore } from "../src/lib/server/store-transfer";
+import { accessibleProduct, claimProduct, inspectProduct, inventoryScope, storeMembership, updateInventory, worklist, requireManager } from "../src/lib/server/inventory";
 import { expiryDays, expiryDisplay, minskDate, expiredOn } from "../src/lib/expiry-calendar";
 import { copySqliteSnapshot } from "../src/lib/server/sqlite-snapshot";
 import { prepareSnapshot } from "../src/lib/server/snapshot-restore";
@@ -62,42 +61,38 @@ test("incremental migration and prepared legacy snapshot preserve every legacy p
   const untouched = new Database(source); assert.equal((untouched.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name='Store'").get() as any).n, 0); untouched.close();
 });
 
-test("explicit transfer preserves IDs and timestamps, keeps duplicate batches and excludes unselected owners", async t => {
-  const { db } = await disposable(t);
-  for (const id of ["manager", "employee", "outsider"]) await db.user.create({ data: { id, email: `${id}@example.invalid` } });
-  await db.settings.create({ data: { userId: "manager", urgentThreshold: 2, warningThreshold: 9 } });
-  const first = await db.product.create({ data: { ...record, storeId: null } });
-  await db.product.create({ data: { ...record, id: "duplicate", storeId: null, userId: "manager", status: "ARCHIVED" } });
-  await db.product.create({ data: { ...record, id: "private", storeId: null, userId: "outsider" } });
-  const users = ["manager", "employee"];
-  const preview = await transferPreview(db, "manager", users);
-  assert.equal(preview.records, 2); assert.equal(preview.possibleDuplicates, 2);
-  const result = await transferStore(db, "manager", { managerId: "manager", userIds: users, name: "Store", digest: preview.digest });
-  assert.equal(result.transferred, 2); assert.equal(result.store.warningThreshold, 9);
-  const after = await db.product.findUniqueOrThrow({ where: { id: first.id } });
-  assert.equal(after.createdAt.getTime(), first.createdAt.getTime()); assert.equal(after.updatedAt.getTime(), first.updatedAt.getTime());
-  assert.equal(after.quantity, null); assert.equal(after.userId, "employee");
-  assert.equal((await db.product.findUniqueOrThrow({ where: { id: "private" } })).storeId, null);
-  assert.equal(await db.product.count({ where: (await inventoryScope(db, "employee")).where }), 2);
-  assert.equal(await db.product.count({ where: (await inventoryScope(db, "outsider")).where }), 1);
-  const repeated = await transferPreview(db, "manager", users);
-  assert.equal((await transferStore(db, "manager", { managerId: "manager", userIds: users, name: "Store", digest: repeated.digest })).transferred, 0);
-  assert.equal(await db.productEvent.count({ where: { action: "TRANSFER" } }), 2);
-});
-
-test("stale transfer preview rolls back membership and leaves inventory untouched", async t => {
-  const { db } = await disposable(t);
-  await db.user.create({ data: { id: "manager" } });
-  const preview = await transferPreview(db, "manager", ["manager"]);
-  await db.product.create({ data: { ...record, userId: "manager", storeId: null } });
-  await assert.rejects(transferStore(db, "manager", { managerId: "manager", userIds: ["manager"], name: "Store", digest: preview.digest }), { status: 409 });
-  assert.equal(await db.store.count(), 0); assert.equal(await db.storeMembership.count(), 0);
+test("the department migration keeps the legacy store, its members and its rows", async t => {
+  const { dir } = await disposable(t);
+  const source = `${dir}/legacy-store.db`;
+  const sql = new Database(source);
+  migrate(sql, migrations().filter(name => name < "20261021000000"));
+  sql.exec(`INSERT INTO User (id,name) VALUES ('manager','Manager'),('employee','Employee');
+    INSERT INTO Store (id,name,urgentThreshold,warningThreshold) VALUES ('main','Магазин',3,100);
+    INSERT INTO StoreMembership (id,storeId,userId,role) VALUES ('m','main','manager','MANAGER'),('e','main','employee','EMPLOYEE');
+    INSERT INTO Product (id,name,barcode,status,updatedAt,userId,storeId,version) VALUES ('p','Товар','0123456789012','ACTIVE',CURRENT_TIMESTAMP,'manager','main',0);`);
+  const rowsBefore = sql.prepare("SELECT * FROM Product").get() as any;
+  const membersBefore = sql.prepare("SELECT storeId,userId,role FROM StoreMembership ORDER BY userId").all();
+  sql.close();
+  const upgraded = new Database(source);
+  migrate(upgraded, migrations().filter(name => name >= "20261021000000"));
+  const rowsAfter = upgraded.prepare("SELECT * FROM Product").get() as any;
+  for (const key of Object.keys(rowsBefore)) assert.equal(rowsAfter[key], rowsBefore[key], key);
+  assert.deepEqual(upgraded.prepare("SELECT storeId,userId,role FROM StoreMembership ORDER BY userId").all(), membersBefore);
+  const store = upgraded.prepare("SELECT * FROM Store").get() as any;
+  assert.equal(store.id, "main"); assert.equal(store.name, "Магазин"); assert.equal(store.warningThreshold, 100);
+  assert.ok(store.createdAt);
+  assert.deepEqual(upgraded.pragma("foreign_key_check"), []);
+  upgraded.close();
 });
 
 test("claims are exclusive, expire, and inspection requires a current version and claim", async t => {
   const { db } = await storeFixture(t); await db.product.create({ data: record });
   await assert.rejects(accessibleProduct(db, "outsider", record.id), { status: 404 });
   await assert.rejects(requireManager(db, "employee"), { status: 403 });
+  // A department is the only product scope: without one there is no table at all.
+  assert.equal(await storeMembership(db, "stranger"), null);
+  await assert.rejects(inventoryScope(db, "stranger"), { status: 403 });
+  await assert.rejects(worklist(db, "stranger", now), { status: 403 });
   await claimProduct(db, employee, record.id, false, now);
   await assert.rejects(claimProduct(db, manager, record.id, false, now), { status: 409 });
   const later = new Date(now.getTime() + 600001);
@@ -137,8 +132,9 @@ test("expired checked records remain actionable and revocation blocks old claims
   await inspectProduct(db, employee, record.id, 0, "CHECKED", "checked-expired", now);
   const list = await worklist(db, "manager", now);
   assert.equal(list.counts.expired, 1); assert.equal(list.products.length, 1);
+  // Revocation removes the membership, so the former member has no scope at all.
   await db.storeMembership.delete({ where: { userId: "employee" } });
-  await assert.rejects(accessibleProduct(db, "employee", record.id), { status: 404 });
+  await assert.rejects(accessibleProduct(db, "employee", record.id), { status: 403 });
   await db.user.delete({ where: { id: "employee" } });
   assert.equal((await db.product.findUniqueOrThrow({ where: { id: record.id } })).userId, null);
   assert.equal((await db.productEvent.findFirstOrThrow()).actorName, "employee");
@@ -159,5 +155,5 @@ test("store backup round trip restores ownership/history and cancels pending ext
   assert.equal((await db.telegramDelivery.findUniqueOrThrow({ where: { key: "pending" } })).state, "CANCELLED");
   assert.equal((await db.integrationState.findUniqueOrThrow({ where: { id: "telegram" } })).paused, true);
   assert.equal(await db.telegramLink.count(), 1); assert.equal(await db.productEvent.count(), 1);
-  assert.equal(await db.storeMembership.count(), 2);
+  assert.equal(await db.storeMembership.count(), 3);
 });

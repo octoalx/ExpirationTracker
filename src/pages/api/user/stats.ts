@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { apiErrorHandler } from "@/lib/apiErrorHandler";
 import { format, startOfDay, subDays } from "date-fns";
 import { expiryOverview } from "@/lib/expiry-overview";
-import { inventoryScope, inventoryThresholds } from "@/lib/server/inventory";
+import { DEPARTMENT_REQUIRED, inventoryThresholds, storeMembership } from "@/lib/server/inventory";
 
 /** Category mapping based on product name keywords (Russian). */
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
@@ -57,15 +57,19 @@ export default async function handler(
   try {
     const userId = session.user.id;
 
-    // Load user settings for threshold values
+    // Statistics are department statistics: an account without a department has none.
+    const membership = await storeMembership(prisma, userId);
+    if (!membership) return res.status(403).json({ message: DEPARTMENT_REQUIRED });
+
+    // Load department thresholds for classification
     const settings = await inventoryThresholds(prisma, userId);
 
     const urgentThreshold = settings?.urgentThreshold ?? 3;
     const warningThreshold = settings?.warningThreshold ?? 7;
 
-    // Load all products owned by the user
+    // Load all products of the caller's department
     const products = await prisma.product.findMany({
-      where: (await inventoryScope(prisma, userId)).where,
+      where: { storeId: membership.storeId, deletedAt: null },
       orderBy: { createdAt: "desc" },
     });
 

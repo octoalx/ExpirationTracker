@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { expiryDays, expiryLabel, minskDate, minskTime } from "../expiry-calendar";
 import { handleBotUpdate, menuButtons } from "./telegram-bot";
-import { inventoryScope, worklist } from "./inventory";
+import { storeMembership, worklist } from "./inventory";
 import { transportFailure, type BotTransport } from "./telegram-transport";
 
 export async function telegramPaused(db: PrismaClient) {
@@ -52,7 +52,8 @@ export async function processDeliveries(db: PrismaClient, transport: BotTranspor
     try {
       const link = await db.telegramLink.findUnique({ where: { userId: delivery.userId } });
       const settings = await db.settings.findUnique({ where: { userId: delivery.userId } });
-      const { membership, where } = await inventoryScope(db, delivery.userId);
+      const membership = await storeMembership(db, delivery.userId);
+      const where = { storeId: membership?.storeId ?? "", deletedAt: null };
       if (!link || link.deliveryStatus !== "READY" || !membership || !settings?.telegramNotifications || delivery.scheduleDate !== minskDate(now)) {
         await db.telegramDelivery.update({ where: { id: delivery.id }, data: { state: "CANCELLED", leaseUntil: null } });
         continue;
@@ -75,7 +76,7 @@ export async function processDeliveries(db: PrismaClient, transport: BotTranspor
         (selected.length > 5 ? `\nЕщё записей: ${selected.length - 5}` : "");
       // Recheck revocation immediately before external delivery.
       const current = await db.telegramLink.findUnique({ where: { userId: link.userId } });
-      if (current?.telegramUserId !== link.telegramUserId || !(await inventoryScope(db, link.userId)).membership || await telegramPaused(db)) {
+      if (current?.telegramUserId !== link.telegramUserId || !(await storeMembership(db, link.userId)) || await telegramPaused(db)) {
         await db.telegramDelivery.update({ where: { id: delivery.id }, data: { state: "CANCELLED", leaseUntil: null } }); continue;
       }
       const sent = await transport.send(link.chatId, text, await menuButtons(db, link.userId, now));

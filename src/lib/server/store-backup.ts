@@ -3,12 +3,23 @@ import { z } from "zod";
 
 const date = z.coerce.date();
 const extension = z.object({
-  stores: z.array(z.object({ id: z.literal("main"), name: z.string().min(1).max(100), urgentThreshold: z.number().int().nonnegative(), warningThreshold: z.number().int().nonnegative() }).refine(s => s.warningThreshold >= s.urgentThreshold)).default([]),
-  memberships: z.array(z.object({ id: z.string(), storeId: z.literal("main"), userId: z.string(), role: z.enum(["MANAGER", "EMPLOYEE"]), createdAt: date })).default([]),
+  // Department ids are cuids now; older archives stored the literal "main".
+  stores: z.array(z.object({ id: z.string().min(1), name: z.string().min(1).max(100), urgentThreshold: z.number().int().nonnegative(), warningThreshold: z.number().int().nonnegative(), createdAt: date.optional() }).refine(s => s.warningThreshold >= s.urgentThreshold)).default([]),
+  memberships: z.array(z.object({ id: z.string(), storeId: z.string().min(1), userId: z.string(), role: z.enum(["MANAGER", "EMPLOYEE"]), createdAt: date })).default([]),
   productEvents: z.array(z.object({ id: z.string(), productId: z.string().nullable(), storeId: z.string().nullable(), actorId: z.string(), actorName: z.string(), source: z.enum(["WEB", "TELEGRAM"]), action: z.string(), details: z.string(), key: z.string(), createdAt: date })).default([]),
   telegramLinks: z.array(z.object({ userId: z.string(), telegramUserId: z.string(), chatId: z.string(), displayName: z.string(), deliveryStatus: z.string(), createdAt: date })).default([]),
   telegramWarnings: z.array(z.object({ id: z.string(), userId: z.string(), productId: z.string(), fingerprint: z.string() })).default([]),
   telegramDeliveries: z.array(z.object({ id: z.string(), key: z.string(), userId: z.string(), kind: z.string(), scheduleDate: z.string(), state: z.string(), attempts: z.number().int().nonnegative(), availableAt: date, leaseUntil: date.nullable(), messageId: z.string().nullable(), error: z.string().nullable(), sentAt: date.nullable(), createdAt: date })).default([]),
+}).superRefine((value, ctx) => {
+  // A membership must point at a department carried by the same archive. With the
+  // hardcoded "main" store gone, this is the only guard left against a dangling team.
+  const known = new Set(value.stores.map(store => store.id));
+  if (!known.size) return;
+  for (const membership of value.memberships) {
+    if (!known.has(membership.storeId)) {
+      ctx.addIssue({ code: "custom", path: ["memberships"], message: "Membership references a department missing from the backup" });
+    }
+  }
 });
 export function parseStoreBackup(data: unknown) { return extension.parse(data); }
 

@@ -18,14 +18,11 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
 
   if (req.method === "DELETE") {
     try {
-      const { product, membership } = await accessibleProduct(prisma, session.user.id, String(productId));
-      if (membership) {
-        if (membership.role !== "MANAGER") throw new InventoryError(403, "Удалять общие записи может руководитель.");
-        await updateInventory(prisma, { userId: session.user.id, source: "WEB" }, product.id,
-          Number(req.query.version), { deletedAt: new Date() }, "DELETE");
-      } else {
-        await prisma.product.delete({ where: { id: product.id, userId: session.user.id, storeId: null } });
-      }
+      // Any member may delete a row of their own department. The delete stays a
+      // soft delete with an audit event, so the actor and the row are recoverable.
+      const { product } = await accessibleProduct(prisma, session.user.id, String(productId));
+      await updateInventory(prisma, { userId: session.user.id, source: "WEB" }, product.id,
+        Number(req.query.version), { deletedAt: new Date() }, "DELETE");
       res.status(204).end();
     } catch (error) {
       apiFailure(res, error);

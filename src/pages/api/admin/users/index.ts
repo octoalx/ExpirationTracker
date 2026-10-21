@@ -53,7 +53,8 @@ export default async function handler(
       return res.status(201).json(user);
     }
     const users = await prisma.user.findMany({
-      select: publicUserFields,
+      select: { ...publicUserFields,
+        membership: { select: { role: true, store: { select: { id: true, name: true } } } } },
     });
     res.status(200).json(users);
   } catch (error) {

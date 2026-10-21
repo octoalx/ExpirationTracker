@@ -3,7 +3,7 @@ import { logger } from "../lib/logger";
 import { emailService } from "./emailService";
 import { getEmailTemplate } from "../lib/email-templates/index";
 import type { ExpirationProduct } from "../lib/email-templates/index";
-import { inventoryScope, inventoryThresholds } from "../lib/server/inventory";
+import { inventoryThresholds, storeMembership } from "../lib/server/inventory";
 import { expiryDays } from "../lib/expiry-calendar";
 
 type UrgencyLevel = "EXPIRED" | "URGENT" | "WARNING" | "SAFE";
@@ -122,8 +122,11 @@ export async function sendDailyUrgentNotifications(userId?: string): Promise<Sen
       continue;
     }
 
+    // Email reports are department reports; an account without a department has none.
+    const membership = await storeMembership(prisma, user.id);
+    if (!membership) continue;
     const { urgentThreshold, warningThreshold } = await inventoryThresholds(prisma, user.id);
-    user.products = await prisma.product.findMany({ where: { ...(await inventoryScope(prisma, user.id)).where, status: "ACTIVE" } });
+    user.products = await prisma.product.findMany({ where: { storeId: membership.storeId, deletedAt: null, status: "ACTIVE" } });
 
     const urgentProducts = user.products
       .filter((p) => {
@@ -189,8 +192,10 @@ export async function sendWarningNotifications(userId?: string): Promise<SendRes
       continue;
     }
 
+    const membership = await storeMembership(prisma, user.id);
+    if (!membership) continue;
     const { warningThreshold } = await inventoryThresholds(prisma, user.id);
-    user.products = await prisma.product.findMany({ where: { ...(await inventoryScope(prisma, user.id)).where, status: "ACTIVE" } });
+    user.products = await prisma.product.findMany({ where: { storeId: membership.storeId, deletedAt: null, status: "ACTIVE" } });
 
     const warningProducts = user.products
       .filter((p) => {

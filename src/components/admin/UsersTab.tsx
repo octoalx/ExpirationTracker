@@ -14,6 +14,8 @@ interface UserWithStats {
   name: string | null;
   email: string | null;
   role: string;
+  /** null when the account belongs to no department: it sees no product table. */
+  membership?: { role: string; store: { id: string; name: string } } | null;
   _count?: {
     products: number;
   };
@@ -224,7 +226,7 @@ export default function UsersTab() {
       <div className="space-y-3 md:hidden">
         {paginatedUsers.length === 0 && <p className="work-surface p-5 text-sm text-slate-600">Пользователей не найдено</p>}
         {paginatedUsers.map(user => <article key={user.id} className="work-surface p-4">
-          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words text-base font-bold">{user.name || "Без имени"}</h2><p className="mt-1 break-all text-sm text-slate-600">{user.email || "Email не указан"}</p></div><span className={cn("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", user.role === "ADMIN" ? "bg-blue-50 text-blue-800" : "bg-slate-100 text-slate-700")}>{user.role === "ADMIN" ? "Админ" : "Сотрудник"}</span></div>
+          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words text-base font-bold">{user.name || "Без имени"}</h2><p className="mt-1 break-all text-sm text-slate-600">{user.email || "Email не указан"}</p><p className="mt-1 text-sm text-slate-600">{user.membership ? `Отдел «${user.membership.store.name}» · ${user.membership.role === "MANAGER" ? "руководитель" : "сотрудник"}` : "Без отдела — таблиц не видит"}</p></div><span className={cn("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", user.role === "ADMIN" ? "bg-blue-50 text-blue-800" : "bg-slate-100 text-slate-700")}>{user.role === "ADMIN" ? "Админ" : "Сотрудник"}</span></div>
           <details className="mt-3 border-t border-slate-200 pt-2"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-blue-700">Управление доступом</summary><div className="flex flex-col gap-2">
             <Button variant="outline" onClick={() => handleRoleChange(user.id, user.role === "ADMIN" ? "USER" : "ADMIN")}>{user.role === "ADMIN" ? "Снять права администратора" : "Назначить администратором"}</Button>
             <Button variant="outline" onClick={() => openResetModal(user)}><Key className="size-4" />Сбросить пароль</Button>
@@ -240,6 +242,7 @@ export default function UsersTab() {
               <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                 <th className="px-4 py-3 text-left font-medium text-slate-600 dark:text-slate-400">Пользователь</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600 dark:text-slate-400">Email</th>
+                <th className="px-4 py-3 text-left font-medium text-slate-600 dark:text-slate-400">Отдел</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600 dark:text-slate-400">Роль</th>
                 <th className="px-4 py-3 text-right font-medium text-slate-600 dark:text-slate-400">Действия</th>
               </tr>
@@ -247,7 +250,7 @@ export default function UsersTab() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {paginatedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-12 text-center text-slate-500">
                     <Users className="h-12 w-12 mx-auto mb-3 opacity-40" />
                     <p>Пользователей не найдено</p>
                   </td>
@@ -269,6 +272,7 @@ export default function UsersTab() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{user.email || "—"}</td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{user.membership ? `${user.membership.store.name} · ${user.membership.role === "MANAGER" ? "руководитель" : "сотрудник"}` : "без отдела"}</td>
                   <td className="px-4 py-3">
                     <span
                       className={cn(

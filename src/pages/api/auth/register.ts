@@ -1,9 +1,13 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { apiErrorHandler } from "@/lib/apiErrorHandler";
+import { apiFailure } from "@/lib/server/api";
+import { registerDepartment } from "@/lib/server/departments";
 
-/** POST: register a new user with name, email, and password. */
+/**
+ * POST: register the founder of a department.
+ * The account, its department and the manager membership are created together;
+ * a registration can no longer produce an account without a department.
+ */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -13,42 +17,16 @@ export default async function handler(
   }
 
   try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
+    const { name, email, password, department } = req.body ?? {};
+    if (!name || !email || !password || !department) {
       return res
         .status(400)
-        .json({ message: "Имя, email и пароль обязательны для заполнения" });
+        .json({ message: "Имя, email, пароль и название отдела обязательны для заполнения" });
     }
-
-    if (password.length < 8) {
-      return res
-        .status(400)
-        .json({ message: "Пароль должен быть не менее 8 символов" });
-    }
-
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "Пользователь с таким email уже существует" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-      },
-    });
-
-    res.status(201).json({ message: "User created successfully" });
+    const { user, store } = await registerDepartment(prisma, { name, email, password, department });
+    return res.status(201).json({ message: "User created successfully",
+      user: { id: user.id, name: user.name, email: user.email }, department: store.name });
   } catch (error) {
-    apiErrorHandler(error, res);
+    return apiFailure(res, error);
   }
 }

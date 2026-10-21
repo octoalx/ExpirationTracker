@@ -1,6 +1,6 @@
 # Active context
 
-Updated: 2026-10-14
+Updated: 2026-10-21
 
 ## Where the project stands
 
@@ -64,6 +64,29 @@ already the final expiry.
   `expiryFromManufacture` otherwise.
 - Cause and evidence: `docs/plans/2026-10-20-simple-import-final-expiry.md`.
 
+## Department access model implemented (2026-10-21, branch `local/department-access-model`)
+
+The service is one store with departments. A department (`Store`) is the only
+product scope, it has exactly one manager and any number of employees, and no
+account — the platform administrator included — reads a table it does not belong
+to.
+
+- `inventoryScope()` requires a `StoreMembership` and refuses everything else with
+  403; the personal (`storeId = null`) branch is gone. `storeMembership()` is the
+  non-throwing lookup for background jobs and "no department" screens.
+- Self-registration founds a department and its manager in one transaction;
+  managers hire employees with credentials and reset their passwords; the
+  administrator runs the department registry, ownership transfer, deletion and a
+  logged temporary support visit.
+- The old personal-to-store transfer flow is removed. `Store.id` is a cuid with a
+  `createdAt` (migration `20261021000000_department_access_model`).
+- `Product.storeId` is still nullable on purpose: it becomes `NOT NULL` in a
+  follow-up migration **after** the owner-approved purge, because the nullable
+  column lets the change ship without deleting production rows.
+- Not done and not authorized: the production purge (all users except the
+  administrator, all rows, memberships and stores) and any deploy. Owner decisions
+  and the full verification list are in `docs/plans/2026-10-21-department-access-model.md`.
+
 ## Open threads
 
 1. `.release-version` is written before the image build, so the marker can claim a
@@ -84,8 +107,10 @@ VPS: `Alex@146.103.42.228:34657`, workspace `/home/Alex/ExpirationTracker`, publ
 
 ## Invariants
 
-Private APIs derive ownership from the verified session. Preserve barcode strings
-and optional expiry/quantity. Camera requires an explicit start and HTTPS. Production
-actions, migrations and backup restoration each require their own authorization.
+Private APIs derive identity from the verified session and scope product access by
+the caller's department membership; there is no personal product scope. Preserve
+barcode strings and optional expiry/quantity. Camera requires an explicit start and
+HTTPS. Production actions, migrations and backup restoration each require their own
+authorization.
 
 Detailed history lives in `docs/plans/`, one dated file per task.
