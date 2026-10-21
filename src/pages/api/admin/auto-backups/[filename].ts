@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       if (!suspendTelegram()) return res.status(409).json({ message: "Telegram завершает действие. Повторите восстановление через минуту." });
       const dbPath = resolvePrismaDbPath();
-      const prepared = prepareSnapshot(backupPath, path.dirname(dbPath));
+      const { path: prepared, droppedProducts } = prepareSnapshot(backupPath, path.dirname(dbPath));
 
       // Create emergency backup before overwriting the database
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -78,6 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             backupFile: filename,
             mode,
             emergencyBackup,
+            skippedProducts: droppedProducts,
           }),
         },
       });
@@ -86,6 +87,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         success: true,
         message: "Database restored successfully",
         emergencyBackup: path.basename(emergencyBackup),
+        // A snapshot taken before Product.storeId became mandatory may hold rows
+        // without a department. They are dropped from the restored copy, and the
+        // count travels to the admin UI so the loss is never silent.
+        skippedProducts: droppedProducts,
       });
     } catch (error) {
       resumeTelegramRuntime();

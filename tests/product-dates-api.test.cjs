@@ -34,10 +34,16 @@ test('manufacture metadata survives edits; migration preserves legacy records an
   const after = db.prepare('SELECT * FROM Product').get();
   for (const key of Object.keys(before)) assert.equal(after[key], before[key]);
   assert.equal(after.manufacturingDate, null);
-  for (const name of names.filter(name => name > "20261003000000_product_manufacture_date")) db.exec(fs.readFileSync(path.join(migrations, name, "migration.sql"), "utf8"));
+  const department = '20261021000000_department_access_model';
+  for (const name of names.filter(name => name > "20261003000000_product_manufacture_date" && name <= department)) db.exec(fs.readFileSync(path.join(migrations, name, "migration.sql"), "utf8"));
   // Each account works its own department table; a foreign row must stay invisible.
+  // The mandatory-storeId migration refuses a row without a department, so the legacy
+  // row is given one first. On production that row is the operator's approved purge;
+  // here it keeps the metadata and ownership assertions below meaningful.
   db.exec("INSERT INTO Store (id,name) VALUES ('dep','Отдел'),('other-dep','Другой отдел');" +
-    "INSERT INTO StoreMembership (id,storeId,userId,role) VALUES ('m1','dep','owner','MANAGER'),('m2','other-dep','other','MANAGER');");
+    "INSERT INTO StoreMembership (id,storeId,userId,role) VALUES ('m1','dep','owner','MANAGER'),('m2','other-dep','other','MANAGER');" +
+    "UPDATE Product SET storeId='dep' WHERE id='legacy';");
+  for (const name of names.filter(name => name > department)) db.exec(fs.readFileSync(path.join(migrations, name, "migration.sql"), "utf8"));
   db.close();
   const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
   let session = { user: { id: 'owner' } };

@@ -50,7 +50,11 @@ test('admin role, password and JSON merge preserve disposable SQLite data', asyn
   try {
     await prisma.user.create({ data: { id: 'admin', email: 'admin@example.invalid', role: 'ADMIN' } });
     await prisma.user.create({ data: { id: 'employee', email: 'employee@example.invalid', password: await bcrypt.hash('fixture-original', 4) } });
-    await prisma.product.create({ data: { id: 'record', name: 'Original', barcode: '00123456', expiryDate: null, status: 'ARCHIVED', quantity: null, userId: 'employee' } });
+    // Every product needs a department, so the fixture creates one and gives the row
+    // a home; a merge that keeps this scope is what the restore path below checks.
+    await prisma.store.create({ data: { id: 'dep', name: 'Отдел' } });
+    await prisma.storeMembership.create({ data: { storeId: 'dep', userId: 'employee', role: 'EMPLOYEE' } });
+    await prisma.product.create({ data: { id: 'record', name: 'Original', barcode: '00123456', expiryDate: null, status: 'ARCHIVED', quantity: null, userId: 'employee', storeId: 'dep' } });
     assert.equal((await call(users, 'PUT', { role: 'ADMIN' })).code, 403);
     session = { user: { id: 'employee', role: 'USER' } };
     assert.equal((await call(reset, 'POST', { password: 'fixture-new' })).code, 403);
@@ -65,7 +69,7 @@ test('admin role, password and JSON merge preserve disposable SQLite data', asyn
     const before = await prisma.user.findUnique({ where: { id: 'employee' } });
     assert.ok(await bcrypt.compare('fixture-new', before.password));
     assert.ok(!(await bcrypt.compare('fixture-original', before.password)));
-    const product = { id: 'record', name: 'Restored', barcode: '00123456', expiryDate: null, manufacturingDate: '2026-01-31', shelfLife: 2, shelfLifeUnit: 'months', status: 'DEFECT', quantity: null, userId: 'employee' };
+    const product = { id: 'record', name: 'Restored', barcode: '00123456', expiryDate: null, manufacturingDate: '2026-01-31', shelfLife: 2, shelfLifeUnit: 'months', status: 'DEFECT', quantity: null, userId: 'employee', storeId: 'dep' };
     assert.equal((await call(restore, 'POST', { mode: 'merge', data: { data: { products: [product] } } })).code, 200);
     const restored = await prisma.product.findUnique({ where: { id: 'record' } });
     assert.equal(restored.expiryDate, null);

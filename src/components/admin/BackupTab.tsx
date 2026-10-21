@@ -45,7 +45,7 @@ export default function BackupTab() {
     success: boolean;
     results?: {
       users: { created: number; updated: number; skipped: number };
-      products: { created: number; updated: number; skipped: number };
+      products: { created: number; updated: number; skipped: number; missingDepartment: number };
       settings: { created: number; updated: number; skipped: number };
     };
   } | null>(null);
@@ -151,7 +151,11 @@ export default function BackupTab() {
         body: JSON.stringify({ mode: "replace" }),
       });
       if (res.ok) {
-        toast.success("База восстановлена. Перезагрузка...");
+        const data = await res.json().catch(() => ({}));
+        const skipped = Number(data?.skippedProducts ?? 0);
+        toast.success(skipped > 0
+          ? `База восстановлена. ${skipped} товаров пропущено: нет отдела. Перезагрузка...`
+          : "База восстановлена. Перезагрузка...");
         setTimeout(() => window.location.reload(), 2000);
       } else {
         const err = await res.json();
@@ -545,6 +549,11 @@ export default function BackupTab() {
                   </p>
                 </div>
               </div>
+            )}
+            {importResult.results?.products.missingDepartment > 0 && (
+              <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
+                {importResult.results.products.missingDepartment} товаров пропущено: нет отдела.
+              </p>
             )}
           </motion.div>
         )}

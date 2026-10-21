@@ -175,3 +175,24 @@ test('barcode lookup falls back to the shared reference and keeps the personal n
   assert.equal((await call(catalog, 'GET', {}, { barcode: '4000000000002' })).code, 404);
   assert.equal((await call(catalog, 'GET', {}, { barcode: 'nope' })).code, 400);
 });
+
+test('an archive without departments restores what it can and reports the products it drops', async t => {
+  const { db, call, login } = await fixture(t, true);
+  login('admin', 'ADMIN');
+  // A v1.0 archive knows an owner for every product but no department; one row also
+  // names a department this database does not have.
+  const archive = { mode: 'merge', data: { version: '1.0', exportedAt: '2026-10-01T00:00:00.000Z', data: {
+    users: [{ id: 'legacy', name: 'Legacy', email: 'legacy@example.invalid', role: 'USER' }],
+    products: [
+      { id: 'no-department', name: 'Личный', barcode: '4600000000010', userId: 'legacy', status: 'ACTIVE' },
+      { id: 'in-department', name: 'Общий', barcode: '4600000000011', userId: 'legacy', storeId: 'main', status: 'ACTIVE' },
+      { id: 'unknown-department', name: 'Чужой', barcode: '4600000000012', userId: 'legacy', storeId: 'ghost', status: 'ACTIVE' },
+    ],
+  } } };
+  const restored = await call('src/pages/api/admin/restore.ts', 'POST', archive);
+  assert.equal(restored.code, 200, JSON.stringify(restored.data));
+  assert.equal(restored.data.results.products.created, 1);
+  assert.equal(restored.data.results.products.missingDepartment, 2);
+  assert.deepEqual((await db.product.findMany()).map(p => p.id), ['in-department']);
+  assert.equal((await db.product.findFirstOrThrow()).storeId, 'main');
+});

@@ -10,7 +10,7 @@ test("desktop and mobile inventory render saved urgency thresholds consistently"
   const product: Product = { id: "fixture", name: "Test product", barcode: "4607015330124", expiryDate: new Date(Date.UTC(2026, 9, 23)),
     status: "ACTIVE", isExpired: false, quantity: null, createdAt: referenceDate, updatedAt: referenceDate, userId: "owner",
     manufacturingDate: null, shelfLife: null, shelfLifeUnit: null,
-    storeId: null, version: 0, resolution: null, missing: false, checkedAt: null, checkedBy: null, deletedAt: null };
+    storeId: "main", version: 0, resolution: null, missing: false, checkedAt: null, checkedBy: null, deletedAt: null };
   const render = (urgentThreshold: number, warningThreshold: number) => renderToStaticMarkup(createElement(ProductTableEnhanced,
     { products: [product], urgentThreshold, warningThreshold, referenceDate }));
   const safe = render(3, 7);
@@ -53,7 +53,7 @@ test("mobile expired status renders overdue days on a second line", () => {
     status: "ACTIVE", isExpired: false, quantity: null, createdAt: referenceDate,
     updatedAt: referenceDate, userId: "owner", manufacturingDate: null,
     shelfLife: null, shelfLifeUnit: null,
-    storeId: null, version: 0, resolution: null, missing: false, checkedAt: null, checkedBy: null, deletedAt: null,
+    storeId: "main", version: 0, resolution: null, missing: false, checkedAt: null, checkedBy: null, deletedAt: null,
   });
   const render = (expiryDate: Date) => renderToStaticMarkup(createElement(ProductTableEnhanced,
     { products: [make("expired", expiryDate)], urgentThreshold: 3, warningThreshold: 7, referenceDate }));

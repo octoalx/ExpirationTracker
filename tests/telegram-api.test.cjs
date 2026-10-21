@@ -84,9 +84,11 @@ test('email reports cover the caller department only and skip accounts without o
     emailNotifications: true, smtpHost: 'offline.invalid', smtpUser: 'offline', smtpPass: 'offline', urgentThreshold: 0, warningThreshold: 10,
   } });
   await db.settings.update({ where: { userId: 'outsider' }, data: { urgentThreshold: 0, warningThreshold: 10 } });
+  // A product always belongs to a department now, so the only way an account owns
+  // nothing is to have no membership at all: "stranger" below is exactly that case.
   for (const [id, expiryDate, storeId, userId] of [
     ['urgent', '2026-10-07', 'main', 'manager'], ['exact', '2026-10-13', 'main', 'manager'],
-    ['foreign', '2026-10-07', 'second', 'outsider'], ['orphan', '2026-10-06', null, 'stranger'],
+    ['foreign', '2026-10-07', 'second', 'outsider'],
   ]) await db.product.create({ data: { id, name: id, barcode: '01234567', expiryDate: new Date(expiryDate), storeId, userId } });
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : ['2026-10-06T10:00:00+03:00'])); } }
   const service = load('src/services/notificationService.ts', {
@@ -101,7 +103,7 @@ test('email reports cover the caller department only and skip accounts without o
   // The other department sees its own row and never the first department's rows.
   await service.sendDailyUrgentNotifications('outsider');
   assert.deepEqual(Array.from(summaries[2]), ['foreign']);
-  // An account without a department receives nothing, even with personal rows.
+  // An account without a department receives nothing at all.
   await service.sendDailyUrgentNotifications('stranger');
   assert.equal(summaries.length, 3);
   assert.deepEqual(sent, ['employee@example.invalid', 'employee@example.invalid', 'outsider@example.invalid']);
@@ -184,7 +186,7 @@ test('webhook verifies secret, persists once and redacts linking credentials bef
   assert.equal((await db.telegramUpdate.findFirstOrThrow()).payload.includes('a'.repeat(32)), false);
 });
 
-test('JSON v2 backup restores departments, membership and audit atomically; legacy replacement remains unscoped and paused', async t => {
+test('JSON v2 backup restores departments, membership and audit atomically; a legacy replacement stays paused and reports what it cannot scope', async t => {
   const { db, call, login } = await fixture(t); login('manager', 'ADMIN');
   await db.product.create({ data: { id: 'batch', name: 'Original', barcode: '01234567', userId: 'employee', storeId: 'main' } });
   const backup = await call('src/pages/api/admin/backup.ts', 'GET'); assert.equal(backup.data.version, '2.0');
@@ -203,7 +205,11 @@ test('JSON v2 backup restores departments, membership and audit atomically; lega
   assert.equal((await call('src/pages/api/admin/restore.ts', 'POST', { mode: 'replace', data: copied })).code, 400);
   assert.equal(await db.product.count(), 1);
   const legacy = { version: '1.0', data: { users: [{ id: 'legacy', name: 'Legacy', email: 'legacy@example.invalid' }], products: [{ id: 'old', userId: 'legacy', name: 'Old', barcode: '01234567', expiryDate: null }] } };
-  assert.equal((await call('src/pages/api/admin/restore.ts', 'POST', { mode: 'replace', data: legacy })).code, 200);
+  const legacyResponse = await call('src/pages/api/admin/restore.ts', 'POST', { mode: 'replace', data: legacy });
+  assert.equal(legacyResponse.code, 200);
+  // A v1.0 archive carries no departments, so its products cannot be scoped: they are
+  // skipped and counted rather than written without one, and the admin UI shows it.
+  assert.equal(legacyResponse.data.results.products.missingDepartment, 1);
   assert.equal(await db.store.count(), 0); assert.equal(await db.storeMembership.count(), 0);
-  assert.equal((await db.product.findFirstOrThrow()).storeId, null);
+  assert.equal(await db.product.count(), 0);
 });

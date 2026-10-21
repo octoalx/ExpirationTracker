@@ -80,12 +80,17 @@ to.
   logged temporary support visit.
 - The old personal-to-store transfer flow is removed. `Store.id` is a cuid with a
   `createdAt` (migration `20261021000000_department_access_model`).
-- `Product.storeId` is still nullable on purpose: it becomes `NOT NULL` in a
-  follow-up migration **after** the owner-approved purge, because the nullable
-  column lets the change ship without deleting production rows.
-- Not done and not authorized: the production purge (all users except the
-  administrator, all rows, memberships and stores) and any deploy. Owner decisions
-  and the full verification list are in `docs/plans/2026-10-21-department-access-model.md`.
+- `Product.storeId` is `NOT NULL` in the repository (migration
+  `20261022000000_product_store_required`). That migration may only be deployed
+  **after** the owner-approved purge: it refuses a row without a department, and
+  the deploy applies migrations at startup.
+- The production purge ran on 2026-10-21 with the owner's explicit approval:
+  `scripts/purge-departments.mjs` kept `admin@localhost` and the shared barcode
+  catalog (444 297 rows) and removed every other account, department, membership,
+  product and queue row. It wrote a verified pre-purge snapshot to `/app/backups`
+  first and recorded the filename in a `SystemLog` row, so rollback is a restore of
+  that file rather than a reverse script. Owner decisions and the verification list
+  are in `docs/plans/2026-10-21-brief-department-purge.md`.
 
 ## Open threads
 

@@ -31,30 +31,36 @@ test("SQLite snapshot captures committed WAL data and legacy tracked snapshots a
   db.pragma("journal_mode = WAL"); db.pragma("wal_autocheckpoint = 0");
   const applied = migrations().filter(name => name < "20261002000000");
   migrate(db, applied);
-  db.exec("CREATE TABLE _prisma_migrations(id TEXT PRIMARY KEY,checksum TEXT,finished_at DATETIME,migration_name TEXT,started_at DATETIME,applied_steps_count INTEGER,rolled_back_at DATETIME); INSERT INTO User(id) VALUES('owner'); INSERT INTO Product(id,name,barcode,userId,updatedAt) VALUES('wal','Committed WAL','01234567','owner',CURRENT_TIMESTAMP);");
+  db.exec("CREATE TABLE _prisma_migrations(id TEXT PRIMARY KEY,checksum TEXT,finished_at DATETIME,migration_name TEXT,started_at DATETIME,applied_steps_count INTEGER,rolled_back_at DATETIME); INSERT INTO User(id,name) VALUES('owner','Committed WAL'); INSERT INTO Product(id,name,barcode,userId,updatedAt) VALUES('wal','Committed WAL','01234567','owner',CURRENT_TIMESTAMP);");
   for (const name of applied) db.prepare("INSERT INTO _prisma_migrations(id,migration_name,finished_at) VALUES(?,?,CURRENT_TIMESTAMP)").run(name, name);
   assert.ok(fs.statSync(`${source}-wal`).size > 0);
   await copySqliteSnapshot(source, copied);
-  const prepared = prepareSnapshot(copied, dir), restored = new Database(prepared);
-  assert.equal((restored.prepare("SELECT name FROM Product WHERE id='wal'").get() as any).name, "Committed WAL");
+  const { path: prepared, droppedProducts } = prepareSnapshot(copied, dir), restored = new Database(prepared);
+  assert.equal((restored.prepare("SELECT name FROM User WHERE id='owner'").get() as any).name, "Committed WAL");
+  // The committed product carries no department, and the upgraded schema refuses
+  // such a row: it is dropped and counted instead of failing the whole restore.
+  assert.equal(droppedProducts, 1);
+  assert.equal((restored.prepare("SELECT COUNT(*) AS n FROM Product").get() as any).n, 0);
   assert.equal((restored.prepare("SELECT COUNT(*) AS n FROM _prisma_migrations WHERE finished_at IS NOT NULL").get() as any).n, migrations().length);
   assert.deepEqual(restored.pragma("foreign_key_check"), []);
   restored.close(); db.close();
 });
 
-test("incremental migration and prepared legacy snapshot preserve every legacy product field", async t => {
+test("a prepared legacy snapshot drops the products that belong to no department and reports them", async t => {
   const { dir } = await disposable(t);
   const source = `${dir}/legacy.db`;
   const sql = new Database(source);
   migrate(sql, migrations().filter(name => name < "20261006000000"));
-  sql.exec("INSERT INTO User(id) VALUES('owner'); INSERT INTO Product(id,name,barcode,quantity,status,updatedAt,userId) VALUES('old','Original','01234567',NULL,'DEFECT',CURRENT_TIMESTAMP,'owner');");
-  const before = sql.prepare("SELECT * FROM Product").get() as any;
+  sql.exec("INSERT INTO User(id,name) VALUES('owner','Original'); INSERT INTO Product(id,name,barcode,quantity,status,updatedAt,userId) VALUES('old','Original','01234567',NULL,'DEFECT',CURRENT_TIMESTAMP,'owner');");
   sql.close();
-  const prepared = prepareSnapshot(source, dir);
+  const { path: prepared, droppedProducts } = prepareSnapshot(source, dir);
   const restored = new Database(prepared);
-  const after = restored.prepare("SELECT * FROM Product").get() as any;
-  for (const key of Object.keys(before)) assert.equal(after[key], before[key], key);
-  assert.equal(after.storeId, null); assert.equal(after.version, 0);
+  // A v1.0 export predates departments: its products belonged to a person and now
+  // belong to nobody, which the current schema cannot express.
+  assert.equal(droppedProducts, 1);
+  assert.equal((restored.prepare("SELECT COUNT(*) AS n FROM Product").get() as any).n, 0);
+  assert.equal((restored.prepare("SELECT name FROM User WHERE id='owner'").get() as any).name, "Original");
+  assert.equal((restored.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name='Store'").get() as any).n, 1);
   assert.equal((restored.prepare("SELECT paused FROM IntegrationState").get() as any).paused, 1);
   assert.deepEqual(restored.pragma("foreign_key_check"), []);
   restored.close(); fs.unlinkSync(prepared);
