@@ -44,7 +44,11 @@ test('admin account creation validates access and credentials and preserves exis
   const draft = { name: ' Employee ', email: ' employee@example.invalid ', password: 'fixture-password' };
   try {
     await prisma.user.create({ data: { id: 'owner', email: 'owner@example.invalid', role: 'ADMIN' } });
-    const product = await prisma.product.create({ data: { name: 'Existing', barcode: '001', userId: 'owner', status: 'ACTIVE' } });
+    // A product belongs to a department now, so the fixture owns one and the row
+    // lives in it: the point of the test is that creating an account leaves the
+    // existing row untouched, not that a row can exist without a scope.
+    await prisma.store.create({ data: { id: 'dep', name: 'Отдел' } });
+    const product = await prisma.product.create({ data: { name: 'Existing', barcode: '001', userId: 'owner', storeId: 'dep', status: 'ACTIVE' } });
     assert.equal((await call(draft)).code, 403);
     session = { user: { id: 'employee', role: 'USER' } };
     assert.equal((await call(draft)).code, 403);

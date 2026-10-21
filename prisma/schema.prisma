@@ -62,11 +62,12 @@ model Product {
   updatedAt  DateTime @updatedAt
   userId     String?
   user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  // A department is the only product scope. The column stays nullable for one
-  // migration cycle so legacy rows survive the rollout; no code path writes null
-  // once membership is mandatory. It becomes NOT NULL after the approved purge.
-  storeId    String?
-  store      Store?   @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  // A department is the only product scope: a row without one cannot be seen by
+  // anybody, so the schema now refuses it (see the product_store_required
+  // migration). Legacy rows without a department were removed by the approved
+  // production purge before this constraint was applied.
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Restrict)
   version    Int      @default(0)
   resolution String?
   missing    Boolean  @default(false)

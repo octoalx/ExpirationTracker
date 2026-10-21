@@ -53,6 +53,14 @@ async function seed() {
 
   console.log(`Seeding 100 construction products for user ${user.id}...`);
 
+  // A department is the only product scope, so the seed needs the account's
+  // membership; there is no personal table to put the rows into.
+  const membership = await prisma.storeMembership.findUnique({ where: { userId: user.id } });
+  if (!membership) {
+    console.error(`User ${user.id} belongs to no department. Register a department or join one first.`);
+    process.exit(1);
+  }
+
   const products = constructionProducts.map((name, index) => ({
     name,
     barcode: generateBarcode(index),
@@ -61,11 +69,12 @@ async function seed() {
     isExpired: false,
     quantity: Math.random() > 0.3 ? Math.floor(Math.random() * 100) + 1 : null,
     userId: user.id,
+    storeId: membership.storeId,
   }));
 
   // Remove existing products for this user before seeding
   await prisma.product.deleteMany({
-    where: { userId: user.id }
+    where: { userId: user.id, storeId: membership.storeId }
   });
 
   await prisma.product.createMany({

@@ -26,7 +26,8 @@ export default async function handler(
       await prisma.$transaction(async tx => {
         const member = await tx.storeMembership.findUnique({ where: { userId: String(userId) } });
         if (member?.role === "MANAGER" && await tx.storeMembership.count({ where: { storeId: member.storeId, role: "MANAGER" } }) <= 1) throw new InventoryError(409, "Сначала назначьте другого руководителя через администратора.");
-        await tx.product.deleteMany({ where: { userId: String(userId), storeId: null } });
+        // Every product belongs to a department, so deleting the account leaves the
+        // department table intact: Product.userId is cleared by the relation itself.
         await tx.productClaim.deleteMany({ where: { userId: String(userId) } });
         await tx.telegramButton.deleteMany({ where: { userId: String(userId) } });
         await tx.telegramWarning.deleteMany({ where: { userId: String(userId) } });

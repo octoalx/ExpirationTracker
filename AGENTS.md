@@ -38,10 +38,11 @@ autonomously; ask only for missing material product decisions or authorization.
 
 ## Required invariants
 
-- Private APIs derive identity from the verified NextAuth session. Scope product
-  reads and mutations by that user's current store membership, or personal ownership
-  outside a store. Telegram actions use a confirmed unique account link and recheck
-  membership. Store management requires MANAGER; admin operations require ADMIN.
+- Private APIs derive identity from the verified NextAuth session. Scope every
+  product read and mutation by the caller's current department membership: there is
+  no personal product scope, and the administrator sees no product row. Telegram
+  actions use a confirmed unique account link and recheck membership. Department
+  management requires MANAGER; admin operations require ADMIN.
 - Keep Prisma, credentials and server services out of browser bundles.
 - Never hardcode or log secrets, SMTP passwords, Telegram tokens or session data.
   Environment settings belong in `.env.example`; per-user integrations live in Settings.

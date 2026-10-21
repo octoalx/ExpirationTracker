@@ -90,7 +90,7 @@ export default async function handler(
 
     const results = {
       users: { created: 0, updated: 0, skipped: 0 },
-      products: { created: 0, updated: 0, skipped: 0 },
+      products: { created: 0, updated: 0, skipped: 0, missingDepartment: 0 },
       settings: { created: 0, updated: 0, skipped: 0 },
     };
     let extension;
@@ -157,15 +157,27 @@ export default async function handler(
         for (const product of data.data.products) {
           const userId = product.userId ? userMap.get(product.userId) ?? product.userId : null;
           const userExists = userId ? await transaction.user.findUnique({ where: { id: userId } }) : null;
-          if (!userExists && !product.storeId) {
-            results.products.skipped++;
-            continue;
-          }
           const existing = await transaction.product.findUnique({ where: { id: product.id } });
           const legacyMerge = existing && mode === "merge" && product.storeId === undefined;
-          const operational = legacyMerge ? { storeId: existing.storeId, version: existing.version + 1,
+          // A product belongs to exactly one department and the column is mandatory,
+          // so the department is resolved before anything is written: an archive may
+          // name a department, or a merge may keep the one the row already has.
+          const storeId = legacyMerge ? existing.storeId
+            : typeof product.storeId === "string" && product.storeId
+              ? (await transaction.store.findUnique({ where: { id: product.storeId }, select: { id: true } }))?.id
+              : undefined;
+          if (!storeId) {
+            // Archives from the personal model (v1.0) carry no department, and neither
+            // does a row naming a department this database does not have. The schema
+            // cannot represent such a product, so it is skipped and counted instead of
+            // aborting the whole restore.
+            results.products.skipped++;
+            results.products.missingDepartment++;
+            continue;
+          }
+          const operational = legacyMerge ? { storeId, version: existing.version + 1,
             resolution: existing.resolution, missing: existing.missing, checkedAt: existing.checkedAt,
-            checkedBy: existing.checkedBy, deletedAt: existing.deletedAt } : { storeId: product.storeId ?? null, version: product.version ?? 0,
+            checkedBy: existing.checkedBy, deletedAt: existing.deletedAt } : { storeId, version: product.version ?? 0,
             resolution: product.resolution ?? null, missing: product.missing ?? false,
             checkedAt: product.checkedAt ? new Date(product.checkedAt) : null,
             checkedBy: product.checkedBy ? userMap.get(product.checkedBy) ?? product.checkedBy : null,
