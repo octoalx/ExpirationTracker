@@ -1,5 +1,5 @@
 import { notifySettingsChanged } from "@/lib/inventory-settings";
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useId, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -10,10 +10,13 @@ import {
   Loader2,
   Send,
   Mail,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import IntegrationCard from "@/components/IntegrationCard";
 import TelegramConnect from "@/components/TelegramConnect";
+import StoreTeam from "@/components/store/StoreTeam";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { settingsTabPatch } from "@/lib/settings-draft";
 
@@ -69,12 +72,16 @@ interface Tab {
 
 const tabs: Tab[] = [
   { id: "personal", label: "Личные данные", icon: User },
+  { id: "team", label: "Команда", icon: Users },
   { id: "integrations", label: "Интеграции", icon: Bell },
   { id: "statuses", label: "Статусы", icon: AlertTriangle },
 ];
 
+/** The team tab exists only for an account that belongs to a department. */
+const TEAM_TAB = "team";
+
 /* ── Settings page ── */
-/** User settings page with personal info, integrations, and status thresholds. */
+/** User settings page with personal info, the department team, integrations and status thresholds. */
 const SettingsPage = () => {
   const { data: session, update: updateSession } = useSession();
   const [activeTab, setActiveTab] = useState("personal");
@@ -82,6 +89,8 @@ const SettingsPage = () => {
   const [isTestingEmail, setIsTestingEmail] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [storeRole, setStoreRole] = useState<string | null>(null);
+  const [team, setTeam] = useState<any>(null);
+  const [teamError, setTeamError] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -127,6 +136,17 @@ const SettingsPage = () => {
         }
       }).catch(() => toast.error("Не удалось загрузить настройки. Обновите страницу."));
   }, []);
+
+  /* The team list has its own endpoint and refreshes after every hiring action. */
+  const loadTeam = useCallback(async () => {
+    try {
+      const res = await fetch("/api/store/members");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setTeam(data); setTeamError("");
+    } catch (e) { setTeamError(e instanceof Error ? e.message : "Ошибка сети."); }
+  }, []);
+  useEffect(() => { void loadTeam(); }, [loadTeam]);
 
   const handleSave = async () => {
     const savingTab = activeTab;
@@ -322,7 +342,7 @@ const SettingsPage = () => {
               <h2 className="text-lg font-bold text-foreground">Статусы</h2>
               <p className="text-sm text-muted-foreground">Пороги для срочности товаров</p>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Поля «Срочно» и «Внимание» определяют, какие товары попадают во вкладку «Скоро истекает».</p>
-              {storeRole && <p className="mt-2 text-sm">Для команды действуют общие пороги. <Link href="/store" className="text-blue-700 underline">Управление магазином</Link></p>}
+              {storeRole && <p className="mt-2 text-sm">Для отдела действуют общие пороги, их меняет руководитель во вкладке «Команда». <Link href="/store" className="text-blue-700 underline">Обход и таблица отдела</Link></p>}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="relative rounded-2xl p-px overflow-hidden">
@@ -367,10 +387,25 @@ const SettingsPage = () => {
           </div>
         );
 
+      case "team":
+        return <div className="space-y-5">
+          {teamError && <div role="alert" className="space-y-2">
+            <p className="text-red-700">{teamError}</p>
+            <Button variant="outline" onClick={() => void loadTeam()}>Повторить</Button>
+          </div>}
+          {!team && !teamError && <p role="status">Загружаем команду…</p>}
+          {team && !team.store && <p className="text-sm text-muted-foreground">Вы не входите ни в один отдел, поэтому добавлять сотрудников некуда.</p>}
+          {team?.store && <StoreTeam variant="settings" data={team} refresh={() => void loadTeam()} currentUserId={session?.user?.id} />}
+        </div>;
+
       default:
         return null;
     }
   };
+
+  /* The team tab saves through its own forms, so the shared save bar does not belong there. */
+  const visibleTabs = storeRole ? tabs : tabs.filter(tab => tab.id !== TEAM_TAB);
+  const hasSaveBar = activeTab !== TEAM_TAB;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -389,8 +424,8 @@ const SettingsPage = () => {
 
       {/* Animated tabs */}
       <div className="relative mb-8">
-        <div className="grid grid-cols-3 gap-1 pb-px">
-          {tabs.map((tab) => {
+        <div className={cn("grid gap-1 pb-px", visibleTabs.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
+          {visibleTabs.map((tab) => {
             const active = activeTab === tab.id;
             return (
               <button
@@ -440,7 +475,7 @@ const SettingsPage = () => {
         </AnimatePresence>
 
         {/* Save button */}
-        <div className="mt-8 pt-5 border-t border-slate-200/60 dark:border-slate-700/40">
+        {hasSaveBar && <div className="mt-8 pt-5 border-t border-slate-200/60 dark:border-slate-700/40">
           <p className="mb-3 text-sm text-muted-foreground">Сохраняются только изменённые поля этой вкладки. * — есть несохранённые изменения.</p>
           <button
             onClick={handleSave}
@@ -462,7 +497,7 @@ const SettingsPage = () => {
               "Сохранить эту вкладку"
             )}
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );

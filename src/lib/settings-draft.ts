@@ -1,5 +1,6 @@
 export const settingsTabFields: Record<string, string[]> = {
   personal: [],
+  team: [],
   integrations: ["telegramNotifications", "emailNotifications", "smtpHost", "smtpPort",
     "smtpUser", "smtpPass", "notificationEmail", "urgentNotifyTime", "warningNotifyTime"],
   statuses: ["urgentThreshold", "warningThreshold"],

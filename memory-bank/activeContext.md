@@ -92,6 +92,24 @@ to.
   that file rather than a reverse script. Owner decisions and the verification list
   are in `docs/plans/2026-10-21-brief-department-purge.md`.
 
+## Settings gained a team tab (2026-10-21, branch `local/settings-team-tab`)
+
+Hiring was only reachable at `/store` → «Команда», which the owner could not find.
+Settings now carries a «Команда» tab, rendered by `StoreTeam` with
+`variant="settings"`: hire, reset an employee password, revoke access, rename the
+department and edit its thresholds, all from one screen.
+
+- The tab appears only for an account with a membership (`MANAGER` sees the forms,
+  `EMPLOYEE` a read-only list); a no-department account, the administrator
+  included, does not see it and keeps personal thresholds.
+- Thresholds are saved by `saveDepartmentThresholds()` (`requireManager`, and a
+  support visit is refused) through `POST /api/store/settings`. The `/store` panel
+  had been posting them to that route, which answered 403 — a real defect, now fixed.
+- Department rename is `PUT /api/store/members` → `renameOwnDepartment()`.
+- Verified on `origin/main` @ `f744cfa`: `typecheck`, `build`, `test:app` (102/102)
+  and `check:context` all pass. An earlier red `typecheck`/`build` was only the
+  branch being behind `main` — `75ec4e5` had already fixed the seed.
+
 ## Open threads
 
 1. `.release-version` is written before the image build, so the marker can claim a

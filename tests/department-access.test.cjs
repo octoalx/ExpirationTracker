@@ -144,6 +144,9 @@ test('the administrator runs departments, opens one logged support visit at a ti
   assert.equal((await call(route, 'POST', { operation: 'support', storeId: rows.id })).code, 409);
   const visited = await call(products, 'GET');
   assert.equal(visited.code, 200); assert.deepEqual(visited.data.products.map(p => p.id), [row.id]);
+  // A support visit reads the table but never reconfigures the department.
+  assert.equal((await call('src/pages/api/store/settings.ts', 'POST', { urgentThreshold: 9, warningThreshold: 9 })).code, 403);
+  assert.equal((await db.store.findUniqueOrThrow({ where: { id: rows.id } })).urgentThreshold, 3);
   const events = await db.productEvent.findMany({ where: { action: 'SUPPORT_ACCESS' } });
   assert.equal(events.length, 1); assert.equal(events[0].storeId, rows.id); assert.equal(events[0].productId, null);
   assert.equal((await call(route, 'POST', { operation: 'supportEnd' })).code, 200);

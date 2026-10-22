@@ -129,6 +129,27 @@ test('a manager hires with credentials, resets passwords and revokes access insi
   assert.equal((await call(members, 'POST', { name: 'Again', email: 'new@example.invalid', password: 'fixture-password' })).code, 409);
   assert.equal((await call(settings, 'POST', { urgentThreshold: 5, warningThreshold: 3 })).code, 400);
   assert.equal((await call(settings, 'POST', { urgentThreshold: 1, warningThreshold: 2 })).code, 200);
+  assert.equal((await db.store.findUniqueOrThrow({ where: { id: 'main' } })).urgentThreshold, 1);
+
+  // The manager renames the department from the team tab; the title is validated
+  // and an employee or an account outside the department may not do it.
+  assert.equal((await call(members, 'PUT', { name: '  ' })).code, 400);
+  assert.equal((await call(members, 'PUT', { name: 'Новое имя' })).code, 200);
+  assert.equal((await db.store.findUniqueOrThrow({ where: { id: 'main' } })).name, 'Новое имя');
+  login('employee');
+  assert.equal((await call(members, 'PUT', { name: 'Из сотрудника' })).code, 403);
+  login('outsider');
+  assert.equal((await call(members, 'PUT', { name: 'Из чужого отдела' })).code, 200);
+  assert.equal((await db.store.findUniqueOrThrow({ where: { id: 'main' } })).name, 'Новое имя');
+  assert.equal((await db.store.findUniqueOrThrow({ where: { id: 'second' } })).name, 'Из чужого отдела');
+  await db.store.update({ where: { id: 'second' }, data: { name: 'Second department' } });
+  login('manager');
+
+  // Thresholds belong to the manager of the department, never to its employees.
+  login('employee');
+  assert.equal((await call(settings, 'POST', { urgentThreshold: 2, warningThreshold: 4 })).code, 403);
+  assert.equal((await call(settings, 'GET')).data.role, 'EMPLOYEE');
+  login('manager');
 
   // Password reset belongs to the department manager, and only for employees.
   const reset = 'src/pages/api/store/members/[userId]/password.ts';
