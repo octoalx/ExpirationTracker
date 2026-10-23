@@ -102,8 +102,13 @@ for a batch it could have imported in part.
 2. Все строки битые → `200` с `imported: 0` и списком причин, а не `400`:
    это не сломанный запрос, а нормальный результат «импортировать нечего».
 3. Номера строк в окне — из файла Excel (их даёт парсер). Отказы самого сервера
-   показываются отдельной подписью «Сервер не принял» с позицией в загруженном
+   показываются отдельной подписью «Не приняты строки» с позицией в отправленном
    списке, чтобы не выдавать позицию в списке за номер строки в файле.
+4. **Уточнено на шаге реализации по итогам браузерной проверки:** строки, которые
+   парсер отбросил, до сервера не доходят, поэтому в итоговом окне они считаются
+   в общем числе «не загружено из-за ошибок» и перечисляются вместе с отказами
+   сервера. Без этого повторная загрузка того же файла показывала «импортировано
+   0, уже было 2» — и владелец решил бы, что весь файл загружен.
 
 Для сравнения, до исправления: файл на 500 строк с одной ошибкой → 0 загруженных
 строк. После: 499 загруженных, 1 названная строка с причиной.
@@ -135,9 +140,14 @@ for a batch it could have imported in part.
 - `tests/import-partial-rows.test.cjs` — new suite: AC1, AC2, AC5
 - `tests/import-duplicates.test.cjs` — replace "a failing row leaves no partial
   import" (see Contract change)
+- `tests/simple-excel-api.test.cjs` — the impossible-date assertion moves to the
+  partial rule (see Contract change); added at implementation time, on the same
+  grounds, because the old assertion locked in the same rejected behaviour
 - `package.json` — `test:app` runs the new suite
 
 ## Contract change
+
+Two tests, both locking in the behaviour this defect is about.
 
 `tests/import-duplicates.test.cjs`, test "a failing row leaves no partial
 import" (added in PR #27). It locks in the behaviour this defect is about: a batch
@@ -148,6 +158,15 @@ the duplicate merge (`5 + 3 = 8`) while writing nothing for the invalid row. The
 atomicity assertion is not dropped: it becomes "the invalid row leaves no row of
 its own and no partial write", checked by counting rows and reading the merged
 quantity after the call.
+
+`tests/simple-excel-api.test.cjs`, the line asserting `400` and zero rows for a
+payload holding `expiryDate: '2025-02-29'`. It was written when the endpoint
+validated the batch as a whole and therefore also locked in the defect. It now
+asserts AC1/AC2 on the same payload: `200`, `imported: 1`, `rejected: 1`, the
+reason «Строка 2: некорректная дата годности», one row stored; the rows are
+deleted afterwards so the rest of the suite starts from empty storage. Payload-level
+rejection keeps a test of its own in `tests/import-partial-rows.test.cjs`, so no
+guard is lost by this rewrite.
 
 ## Risks and invariants
 
@@ -187,4 +206,60 @@ changes), browser walk-through.
 
 ## Result and handoff
 
-Not implemented yet: waiting for `Status: APPROVED`.
+Реализовано. `src/lib/inventory-import.ts` получил `partitionInventoryProducts`
+(валидирует по строкам, возвращает `products` и `rejected` с позицией и причиной;
+`validateInventoryProducts` остался как обёртка «весь пакет или ничего» для
+существующих вызовов). `src/pages/api/products/import.ts` валидирует один раз до
+транзакции, гоняет в транзакции только валидные строки, отвечает `200` с
+`imported`, `skipped`, `rejected`, `errors`. `ImportExcelModal` показывает превью
+при частичных ошибках, блок «Строк с ошибкой: N», в итоге — три числа и список
+отклонённых строк.
+
+- AC1 → PASS — `tests/import-partial-rows.test.cjs`, «valid rows are imported when
+  one row is invalid»: пакет из 2 валидных и 1 битой строки даёт `200`,
+  `imported: 2`, в таблице отдела ровно эти 2 строки. RED до правки: тот же тест
+  падал на `AC1: a broken row is not a failed request` (было `400`, 0 строк).
+- AC2 → PASS — «the rejected row is named and writes nothing»: `rejected: 1`,
+  `errors[0]` = «Строка 2: некорректная дата годности», строк для битого
+  штрихкода нет.
+- AC3 → PASS — браузер: файл `partial.xlsx` (3 строки, у третьей 30.02.2026)
+  открылся в превью — «Тип: Простая таблица · Найдено товаров: 2», блок
+  «Строк с ошибкой: 1 — они не загрузятся», «Строка 3: Некорректная дата:
+  30.02.2026»; кнопка «Импортировать 2 товаров» доступна. До правки окно в этой
+  ситуации показывало только ошибку.
+- AC4 → PASS — браузер, локальная сборка (`npm run build` + `npm start`):
+  первый импорт — «Успешно импортировано: 2 товаров», «Не загружено из-за ошибок:
+  1», «Не приняты строки: Строка 3: Некорректная дата: 30.02.2026»; повторный
+  импорт того же файла — «Импортировано 0, уже было 2, не принято 1», в таблице
+  осталось 2 строки. На ширине 360 px окно читается без горизонтальной прокрутки
+  (`scrollWidth` = 360).
+- AC5 → PASS — «payload failures still answer 400» (не список, пустой список,
+  10001 строка → `400`, в базу ничего) и «an all-invalid batch imports nothing and
+  names every row» (`200`, `imported: 0`, `rejected: 3`, три причины).
+- Contract change → `tests/import-duplicates.test.cjs`, «a failing row leaves no
+  row of its own and no partial write» переписан: смешанный пакет даёт `200`,
+  1 импорт и 1 отказ; склейка дубликата в том же пакете с битой строкой даёт
+  `4 + 6 = 10`. `tests/simple-excel-api.test.cjs` — проверка «дата 29.02.2025
+  отвергается» переписана по тому же правилу (было `400` и 0 строк, стало `200`,
+  1 импорт, 1 отказ).
+
+Проверки: `npm run test:app` 111/111 PASS (107 прежних + 4 новых),
+`npm run typecheck` PASS, `npm run build` PASS, `npm run check:context` PASS,
+`npm run test:harness` 13/13 PASS.
+
+Незакрытое:
+
+- В итоговом окне отказы парсера и отказы сервера идут одним списком, без
+  деления по источнику: парсерные строки не доходят до сервера. Различить их
+  можно только по тексту причины. Если понадобится, это отдельная задача.
+- `parseInventory` и `parseCatalog` по-прежнему молча пропускают строки без
+  штрихкода или названия — в список «не приняты» они не попадают (см. Out of
+  scope).
+- `npm run dev` не работает (известная причина, задача №3 списка); проверка UI
+  выполнялась на `npm run build` + `npm start`.
+- Локальная база для браузерной проверки создавалась `npx prisma migrate deploy`
+  (`dev.db` в корне) с тестовым пользователем `owner@local.test`; после проверки
+  удалена, в `.gitignore`.
+
+Следующий шаг: PR с набором AC→проверка из этого раздела; номер задачи №4
+(пятая колонка) — по приоритету владельца.
