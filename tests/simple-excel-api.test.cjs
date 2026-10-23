@@ -52,8 +52,17 @@ test('Excel API imports into empty storage with session ownership and validates 
     assert.equal((await call([item])).code, 401);
     assert.equal(await prisma.product.count(), 0);
     session = { user: { id: 'owner' } };
-    assert.equal((await call([item, { ...item, expiryDate: '2025-02-29' }])).code, 400);
-    assert.equal(await prisma.product.count(), 0);
+    // Rewritten under docs/specs/2026-10-23-import-partial-rows.md: an impossible
+    // date no longer cancels the batch, it is refused and named while the valid
+    // row is imported. Payload-level rejection keeps its own test in
+    // tests/import-partial-rows.test.cjs.
+    const partial = await call([item, { ...item, expiryDate: '2025-02-29' }]);
+    assert.equal(partial.code, 200);
+    assert.equal(partial.data.imported, 1);
+    assert.equal(partial.data.rejected, 1);
+    assert.match(partial.data.errors[0], /Строка 2: некорректная дата годности/);
+    assert.equal(await prisma.product.count(), 1);
+    await prisma.product.deleteMany();
     const result = await call([item, { barcode: '12345678', name: 'Unknown expiry', quantity: 3 }]);
     assert.equal(result.code, 200);
     assert.equal(result.data.imported, 2);
