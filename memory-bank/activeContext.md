@@ -1,6 +1,6 @@
 # Active context
 
-Updated: 2026-10-21
+Updated: 2026-10-23
 
 ## Where the project stands
 
@@ -51,18 +51,11 @@ from `dc07476`. Cause and evidence: `docs/plans/2026-10-14-restore-mobile-invent
 
 ## Simple Excel import keeps final expiry dates (2026-10-20)
 
-Branch `local/fix-simple-import-final-expiry`. The simple Excel table (barcode,
-name, date, optional months) dropped the expiry date for rows without a shelf
-life, because `28719b8` made `expiryFromManufacture` return `null` for a
-missing shelf life. That null is correct for the legacy tab-separated format
-and wrong for the Excel table, where an empty months cell means the date is
-already the final expiry.
-
-- `inventory-import.ts` gains `finalExpiryDate`; calendar validation moved into
-  a shared `parseCalendarDate` helper. `expiryFromManufacture` is unchanged.
-- `excel-parser.ts` uses `finalExpiryDate` for empty months and
-  `expiryFromManufacture` otherwise.
-- Cause and evidence: `docs/plans/2026-10-20-simple-import-final-expiry.md`.
+The Excel table dropped the expiry date for rows without a shelf life, because
+`28719b8` made `expiryFromManufacture` return `null` there; in that format an empty
+months cell means the date is already final. `inventory-import.ts` now carries
+`finalExpiryDate`, and `parseCalendarDate` is shared for validation.
+Details: `docs/plans/2026-10-20-simple-import-final-expiry.md`.
 
 ## Department access model implemented (2026-10-21, branch `local/department-access-model`)
 
@@ -110,6 +103,21 @@ department and edit its thresholds, all from one screen.
   and `check:context` all pass. An earlier red `typecheck`/`build` was only the
   branch being behind `main` — `75ec4e5` had already fixed the seed.
 
+## Spec-driven execution with an approval gate (2026-10-23, merged PR #25)
+
+A task that touches source, schema, scripts, tests or workflows starts as a spec in
+`docs/specs/` and code exists only after the owner sets `Status: APPROVED` with a
+filled `Owner approval` line. The loop, commit hygiene and the five merge questions
+are in `docs/engineering/workflow.md`; the reasoning is ADR-0007.
+
+- `npm run check:spec` (`scripts/check-spec.mjs`) runs in CI on every pull request
+  and fails without an approved spec, without a verification entry per AC, or with a
+  changed file the spec does not list and no `out-of-spec:` line explains it.
+- `AGENTS.md` states the rule and a commit-hygiene section; the contract uses 1951 of
+  its 2000 estimated tokens, so new rules belong in the workflow document.
+- `check:context` enforces the 150-line cap on this file: archive detail in plans.
+- ADR-0001…0007 record the decisions that used to live only inside dated plans.
+
 ## Open threads
 
 1. `.release-version` is written before the image build, so the marker can claim a
@@ -121,6 +129,8 @@ department and edit its thresholds, all from one screen.
 4. The import dialog accepts a fixed four-column table; a fifth column makes the
    file unrecognized, and one invalid row rejects the whole file.
 5. Excel import is create-only, so a repeated upload creates duplicates.
+6. Re-audit the process on 2026-11-06 against the metrics in
+   `docs/engineering/workflow.md`.
 
 ## Operational context
 
