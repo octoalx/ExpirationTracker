@@ -61,7 +61,12 @@ function backtickedPaths(body) {
     const value = match[1].trim().replace(/^\.\//, '');
     // Skip prose, commands, placeholders and anything with whitespace or a marker.
     if (!value || /\s/.test(value) || /[<>{}*]/.test(value)) continue;
-    if (!/^(src|prisma|scripts|tests|nginx|docs|\.github)\//.test(value) && !/^[\w.-]+\.(json|js|mjs|ts|tsx|sh|yml|yaml)$/.test(value)) continue;
+    // A root file is a bare name: Dockerfile, package.json, docker-compose.yml. The
+    // old test required an extension and was case-sensitive, so `Dockerfile` — a file
+    // the gate itself gates — could never be listed: the spec named it and the gate
+    // still reported it unexplained. Root names are matched explicitly now.
+    const rootFile = /^(Dockerfile|docker-compose\.yml|docker-entrypoint\.sh|package\.json|package-lock\.json|next\.config\.js)$/.test(value);
+    if (!/^(src|prisma|scripts|tests|nginx|docs|\.github)\//.test(value) && !rootFile) continue;
     paths.push(value.replace(/\/$/, '/'));
   }
   return paths;
