@@ -113,10 +113,11 @@ The revision is baked into the image (`ARG BUILD_REVISION`) and reported by
 `GET /api/version`; the health check asks the running container instead of reading the
 marker the workflow wrote itself, and the host marker is written only after
 `docker compose up -d`. A fifth column no longer hides the simple table:
-`detectFileType` decides from three header cells. Specs:
-`docs/specs/2026-10-23-release-version-truth.md`, `…-import-fifth-column.md`. The first
-deploy of this workflow needs the previous one to ship the commit once, because the
-running release has no `/api/version` yet.
+`detectFileType` decides from three header cells. `npm run dev` starts again (PR #34):
+the hook builds its two guard modules for development; production keeps the unchanged
+`runtimeRequire` branch. Specs: `docs/specs/2026-10-23-{release-version-truth,import-fifth-column,dev-server-startup}.md`.
+The first deploy of this workflow needs the previous one to ship the commit once,
+because the running release has no `/api/version` yet.
 
 ## Open threads
 
@@ -125,12 +126,6 @@ running release has no `/api/version` yet.
 2. Browser UI and the native iOS date picker remain unverified.
 3. Re-audit the process on 2026-11-06 against the metrics in
    `docs/engineering/workflow.md`.
-4. `npm run dev` fails: the hook's `runtimeRequire` resolves `./lib/prisma` against
-   `.next/server/`. Rejected after testing: `createRequire`, `module.require`,
-   `__non_webpack_require__`, the compiled chunk, `--experimental-require-module`.
-   Left: dev loads the modules via top-level `await import`, or the guard moves out
-   of the hook into a shared bootstrap (a `contract` change). Use
-   `npm run build && npm start` until the owner chooses.
 
 ## Operational context
 
