@@ -7,7 +7,8 @@ Branch: local/<slug>
 Spec gate: `npm run check:spec`
 
 Replace `DRAFT` with `APPROVED` and fill `Owner approval` only after the owner
-approves. Until then no branch, no code. See `docs/engineering/workflow.md`.
+approves. Until then no code and no test edits: the spec is the only file that may
+be committed. See `docs/engineering/workflow.md`.
 
 ## Что изменится для вас
 

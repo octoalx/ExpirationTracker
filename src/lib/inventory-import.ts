@@ -67,6 +67,16 @@ export function parseLegacyInventory(text: string) {
 }
 
 /** Validate the entire payload before issuing any database writes. */
+/**
+ * Quantities merge only when both sides carry one. An empty quantity means
+ * "unknown", so summing it with a number would invent data the import has no
+ * evidence for; the existing value is then left untouched.
+ */
+export function mergedQuantity(existing: number | null, incoming: number | null): number | null {
+  if (existing === null || incoming === null) return existing;
+  return existing + incoming;
+}
+
 export function validateInventoryProducts(input: unknown): InventoryProduct[] {
   if (!Array.isArray(input) || !input.length || input.length > 10000) throw new Error("Нужны от 1 до 10000 товаров");
   return input.map((raw, index) => {
