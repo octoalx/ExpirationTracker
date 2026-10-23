@@ -120,6 +120,9 @@ the situation it exists for.
   and that the health check reads `/api/version`
 - `tests/harness.test.mjs` — cases for both new assertions
 - `tests/version-api.test.ts` — `readRunningRevision` and the handler
+- `scripts/check-spec.mjs` — the gate learned to recognise a bare root file name in a
+  spec's list: it required an extension and matched case-sensitively, so a spec that
+  named `Dockerfile` still failed with «does not list it»
 - `package.json` — `test:app` runs the new suite
 
 ## Contract change
