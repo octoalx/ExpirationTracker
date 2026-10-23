@@ -23,6 +23,8 @@ interface PreviewData {
   fileType: string;
   fileName: string;
   products: ParsedProduct[];
+  /** Rows the file lost while parsing, with their Excel row numbers and reasons. */
+  rowErrors: string[];
 }
 
 type ImportState = "idle" | "previewing" | "uploading" | "success" | "error";
@@ -38,6 +40,9 @@ export default function ImportExcelModal({
   const [file, setFile] = useState<File | null>(null);
   const [importedCount, setImportedCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
+  const [rejectedCount, setRejectedCount] = useState(0);
+  /** Reasons for every refused row: those the parser dropped and those the server refused. */
+  const [rejectedReasons, setRejectedReasons] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,6 +52,8 @@ export default function ImportExcelModal({
     setFile(null);
     setImportedCount(0);
     setSkippedCount(0);
+    setRejectedCount(0);
+    setRejectedReasons([]);
     setErrorMessage("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
@@ -77,22 +84,20 @@ export default function ImportExcelModal({
     try {
       const { parseExcelFile } = await import("@/lib/excel-parser");
       const result = parseExcelFile(await selectedFile.arrayBuffer());
-      if (result.errors.length) {
-        setPreview(null);
-        setState("error");
-        setErrorMessage(result.errors.join("; "));
-        return;
-      }
       const products = result.products;
       const fileType = { inventory: "Инвентаризация", catalog: "Каталог товаров", simple: "Простая таблица" }[result.fileType];
 
+      // A broken row costs only that row: the rest of the file is still importable,
+      // and the dialog names the rows it had to leave out.
       if (products.length === 0) {
         setState("error");
-        setErrorMessage("Не найдено товаров в файле");
+        setErrorMessage(result.errors.length
+          ? `В файле нет строк для импорта. ${result.errors.join("; ")}`
+          : "Не найдено товаров в файле");
         return;
       }
 
-      setPreview({ fileType, fileName: selectedFile.name, products });
+      setPreview({ fileType, fileName: selectedFile.name, products, rowErrors: result.errors });
     } catch {
       setState("error");
       setErrorMessage("Не удалось прочитать файл. Убедитесь что это Excel-файл (.xls или .xlsx)");
@@ -125,11 +130,19 @@ export default function ImportExcelModal({
         setState("success");
         setImportedCount(data.imported);
         setSkippedCount(data.skipped ?? 0);
-        toast.success(
-          data.skipped
-            ? `Импортировано ${data.imported}, уже было ${data.skipped}`
-            : `Импортировано ${data.imported} товаров`,
-        );
+        // A row refused earlier could not even be sent: the parser dropped it
+        // before the request. Report it here, or the owner would see a clean
+        // "imported 0, already 2" and believe the whole file landed.
+        const parserErrors = preview.rowErrors;
+        const rejectedTotal = (data.rejected ?? 0) + parserErrors.length;
+        setRejectedCount(rejectedTotal);
+        setRejectedReasons([...parserErrors, ...(Array.isArray(data.errors) ? data.errors : [])]);
+        const parts = [`Импортировано ${data.imported}`];
+        if (data.skipped) parts.push(`уже было ${data.skipped}`);
+        if (rejectedTotal) parts.push(`не принято ${rejectedTotal}`);
+        const summary = parts.join(", ");
+        if (rejectedTotal) toast(summary, { icon: "⚠️" });
+        else toast.success(summary);
         onImportComplete();
       } else {
         setState("error");
@@ -150,7 +163,7 @@ export default function ImportExcelModal({
             Импорт из Excel
           </DialogTitle>
           <DialogDescription>
-            Загрузите Excel-файл для импорта товаров. Поддерживаются инвентаризация, каталог и простая таблица: первая строка — заголовки; столбцы — штрих-код, название, дата, срок в месяцах. Если срок пустой, дата означает окончание годности; иначе — изготовление. Даты: ДД.ММ.ГГГГ или дата Excel.
+            Загрузите Excel-файл для импорта товаров. Поддерживаются инвентаризация, каталог и простая таблица: первая строка — заголовки; столбцы — штрих-код, название, дата, срок в месяцах. Если срок пустой, дата означает окончание годности; иначе — изготовление. Даты: ДД.ММ.ГГГГ или дата Excel. Строки с ошибкой пропускаются, остальные загружаются.
           </DialogDescription>
         </DialogHeader>
 
@@ -209,6 +222,20 @@ export default function ImportExcelModal({
               </Button>
             </div>
 
+            {preview.rowErrors.length > 0 && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  Строк с ошибкой: {preview.rowErrors.length} — они не загрузятся
+                </p>
+                <ul className="mt-1 max-h-24 overflow-y-auto text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
+                  {preview.rowErrors.map((error, i) => (
+                    <li key={i}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="max-h-60 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg">
               <table className="w-full text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
@@ -265,8 +292,8 @@ export default function ImportExcelModal({
 
         {/* Success */}
         {state === "success" && (
-          <div className="flex flex-col items-center py-8 gap-3">
-            <CheckCircle2 className="h-10 w-10 text-blue-600" />
+          <div className="flex flex-col items-center py-6 gap-3">
+            <CheckCircle2 className={`h-10 w-10 ${rejectedCount > 0 ? "text-amber-500" : "text-blue-600"}`} />
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Успешно импортировано: {importedCount} товаров
             </p>
@@ -274,6 +301,26 @@ export default function ImportExcelModal({
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 Уже были в таблице: {skippedCount}
               </p>
+            )}
+            {rejectedCount > 0 && (
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Не загружено из-за ошибок: {rejectedCount}
+              </p>
+            )}
+            {rejectedReasons.length > 0 && (
+              <div className="w-full p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                  Не приняты строки:
+                </p>
+                <ul className="mt-1 max-h-24 overflow-y-auto text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
+                  {rejectedReasons.map((error, i) => (
+                    <li key={i}>{error}</li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                  Эти строки не попали в таблицу. Исправьте их в файле и загрузите его снова — уже загруженное не удвоится.
+                </p>
+              </div>
             )}
           </div>
         )}
