@@ -87,7 +87,9 @@ state. After: every plan file carries `Status:` and
 
 - `AGENTS.md` — one bullet under `## Context and workflow`
 - `docs/engineering/workflow.md` — phase 0 text plus a new note on session boundaries
-- `docs/plans/*.md` — a `Status:` block under the title (41 files, `TEMPLATE.md` gets the field definition)
+- `docs/plans/` — a `Status:` and `Evidence:` block under the title of each of the 43 plans;
+  `docs/plans/TEMPLATE.md` gets the field definition
+- `scripts/check-plan-status.sh` — new: the census that enforces the field (gated path, hence this spec)
 - `memory-bank/activeContext.md` — one line under the current section
 
 ## Verification plan
