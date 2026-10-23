@@ -137,17 +137,27 @@ test('another department does not count as a duplicate', async (t) => {
   assert.equal(await prisma.product.count({ where: { storeId: 'other' } }), 1);
 });
 
-test('a failing row leaves no partial import', async (t) => {
+// Rewritten under docs/specs/2026-10-23-import-partial-rows.md (Contract change).
+// The old version asserted a whole-batch 400, which is the defect being fixed:
+// since 2026-10-23 a broken row is skipped and named, the valid rows land.
+test('a failing row leaves no row of its own and no partial write', async (t) => {
   const { prisma, call } = await fixture(t);
 
-  const invalid = await call([ITEM, { barcode: '12345678', name: 'Хлеб', expiryDate: '2026-02-30' }]);
-  assert.equal(invalid.code, 400);
-  assert.equal(await prisma.product.count(), 0, 'AC4: validation fails before any write');
+  const mixed = await call([ITEM, { barcode: '12345678', name: 'Хлеб', expiryDate: '2026-02-30' }]);
+  assert.equal(mixed.code, 200, 'a broken row does not cancel the batch');
+  assert.equal(mixed.data.imported, 1, 'the valid row is imported');
+  assert.equal(mixed.data.rejected, 1, 'the broken row is reported');
+  assert.equal(await prisma.product.count(), 1, 'the broken row wrote nothing');
 
-  // An invalid quantity after a valid duplicate must not merge anything either.
-  await call([{ ...ITEM, quantity: 5 }]);
-  const mixed = await call([{ ...ITEM, quantity: 3 }, { barcode: '12345678', name: 'Хлеб', quantity: 0 }]);
-  assert.equal(mixed.code, 400);
-  const row = await prisma.product.findFirst({ where: { storeId: 'dep', barcode: ITEM.barcode } });
-  assert.equal(row.quantity, 5, 'AC4: the rejected batch changed nothing');
+  // The merge still happens when the duplicate arrives in the batch that carries
+  // the broken row; the broken row itself changes nothing.
+  const { prisma: fresh, call: freshCall } = await fixture(t);
+  await freshCall([{ ...ITEM, quantity: 4 }]);
+  const together = await freshCall([{ ...ITEM, quantity: 6 }, { barcode: '22222222', name: 'Кефир', expiryDate: '2026-02-30' }]);
+  assert.equal(together.code, 200);
+  assert.equal(together.data.skipped, 1, 'the valid duplicate is merged');
+  assert.equal(together.data.rejected, 1, 'the broken row is refused');
+  const merged = await fresh.product.findFirst({ where: { storeId: 'dep', barcode: ITEM.barcode } });
+  assert.equal(merged.quantity, 10, '4 + 6 = 10 with a broken row in the same batch');
+  assert.equal(await fresh.product.count({ where: { storeId: 'dep' } }), 1, 'the broken row left no row');
 });
