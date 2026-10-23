@@ -66,7 +66,6 @@ export function parseLegacyInventory(text: string) {
   return { products, excluded, missingShelfLife };
 }
 
-/** Validate the entire payload before issuing any database writes. */
 /**
  * Quantities merge only when both sides carry one. An empty quantity means
  * "unknown", so summing it with a number would invent data the import has no
@@ -77,20 +76,71 @@ export function mergedQuantity(existing: number | null, incoming: number | null)
   return existing + incoming;
 }
 
-export function validateInventoryProducts(input: unknown): InventoryProduct[] {
+/** A row the import refuses, with the 1-based position in the submitted list. */
+export interface RejectedInventoryProduct {
+  position: number;
+  message: string;
+}
+
+/**
+ * Validates one submitted row.
+ * Returns the normalised product, or the reason it cannot be imported.
+ */
+function validateInventoryProduct(raw: unknown, position: number): InventoryProduct | string {
+  if (!raw || typeof raw !== "object" ||
+    typeof (raw as Record<string, unknown>).name !== "string" || !(raw as { name: string }).name.trim() ||
+    (raw as { name: string }).name.length > 500 ||
+    typeof (raw as Record<string, unknown>).barcode !== "string" || !(raw as { barcode: string }).barcode.trim() ||
+    (raw as { barcode: string }).barcode.length > 100) {
+    return `Строка ${position}: некорректное название или штрих-код`;
+  }
+  const { name, barcode } = raw as { name: string; barcode: string };
+  const value = raw as { quantity?: unknown; expiryDate?: unknown };
+  const quantity = value.quantity ?? null;
+  if (quantity !== null && (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity <= 0)) {
+    return `Строка ${position}: некорректное количество`;
+  }
+  const expiryDate = value.expiryDate ?? null;
+  if (expiryDate !== null && (typeof expiryDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate) ||
+    !Number.isFinite(Date.parse(expiryDate)) || new Date(expiryDate).toISOString().slice(0, 10) !== expiryDate)) {
+    return `Строка ${position}: некорректная дата годности`;
+  }
+  return {
+    barcode: barcode.trim(),
+    name: name.trim(),
+    quantity: quantity as number | null,
+    expiryDate: expiryDate as string | null,
+  };
+}
+
+/**
+ * Validates a submitted batch row by row.
+ *
+ * A broken row is skipped with its reason instead of cancelling the batch: one
+ * mistyped date must not cost the manager the whole delivery note. Only the
+ * payload itself (not a list, empty, too large) is rejected as a whole.
+ */
+export function partitionInventoryProducts(input: unknown): {
+  products: InventoryProduct[];
+  rejected: RejectedInventoryProduct[];
+} {
   if (!Array.isArray(input) || !input.length || input.length > 10000) throw new Error("Нужны от 1 до 10000 товаров");
-  return input.map((raw, index) => {
-    if (!raw || typeof raw.name !== "string" || !raw.name.trim() || raw.name.length > 500 ||
-      typeof raw.barcode !== "string" || !raw.barcode.trim() || raw.barcode.length > 100) {
-      throw new Error(`Строка ${index + 1}: некорректное название или штрих-код`);
-    }
-    const quantity = raw.quantity ?? null;
-    if (quantity !== null && (!Number.isInteger(quantity) || quantity <= 0)) throw new Error(`Строка ${index + 1}: некорректное количество`);
-    const expiryDate = raw.expiryDate ?? null;
-    if (expiryDate !== null && (typeof expiryDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate) ||
-      !Number.isFinite(Date.parse(expiryDate)) || new Date(expiryDate).toISOString().slice(0, 10) !== expiryDate)) {
-      throw new Error(`Строка ${index + 1}: некорректная дата годности`);
-    }
-    return { barcode: raw.barcode.trim(), name: raw.name.trim(), quantity, expiryDate };
-  });
+  const products: InventoryProduct[] = [];
+  const rejected: RejectedInventoryProduct[] = [];
+  for (const [index, raw] of input.entries()) {
+    const result = validateInventoryProduct(raw, index + 1);
+    if (typeof result === "string") rejected.push({ position: index + 1, message: result });
+    else products.push(result);
+  }
+  return { products, rejected };
+}
+
+/**
+ * Validates a submitted batch, failing as a whole on the first bad row.
+ * Kept for callers that must reject the entire batch.
+ */
+export function validateInventoryProducts(input: unknown): InventoryProduct[] {
+  const { products, rejected } = partitionInventoryProducts(input);
+  if (rejected.length) throw new Error(rejected[0].message);
+  return products;
 }
