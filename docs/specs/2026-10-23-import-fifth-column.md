@@ -1,7 +1,7 @@
 # An extra column must not make the Excel file unrecognisable
 
-Status: DRAFT
-Owner approval:
+Status: APPROVED
+Owner approval: Alex (owner), 2026-10-23, in chat: «давай исправляй все, выполняй эти пункты» (задача №4 — пятая колонка)
 Type: defect
 Branch: local/import-fifth-column
 Spec gate: `npm run check:spec`

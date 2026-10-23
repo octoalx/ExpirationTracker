@@ -43,10 +43,12 @@ function detectFileType(ws: XLSX.WorkSheet): ExcelFileType | null {
     }
   }
 
-  // A compact table uses fixed columns and arbitrary header labels.
+  // A compact table uses fixed columns and arbitrary header labels. Only the first
+  // four columns are read (parseSimple is bounded to A-D), so extra columns to the
+  // right — a comment, a price, even an empty one — must not change the type: the
+  // sheet's used range says nothing about the table's shape.
   const header = [0, 1, 2].map(c => ws[XLSX.utils.encode_cell({ r: 0, c })]?.v);
-  const rangeForSimple = XLSX.utils.decode_range(ws["!ref"] || "A1");
-  if (rangeForSimple.e.c <= 3 && header.every(value => typeof value === "string" && value.trim()) &&
+  if (header.every(value => typeof value === "string" && value.trim()) &&
       String(header[2]).trim().toLowerCase() !== "доступно") {
     return "simple";
   }
