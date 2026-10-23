@@ -14,12 +14,15 @@ Read additional context only when relevant:
 
 | Need | Context |
 | --- | --- |
+| Do any task: spec, approval, checks, merge | [Workflow](workflow.md) |
 | Start or verify local work | [Development](development.md) |
 | Prepare or run a production release | [Release](release.md) |
 | Update the shared scanner reference | [Catalog updates](catalog-updates.md) |
 | Activate or operate the store assistant | [Telegram](telegram.md) |
 | Resume unfinished work | [Active context](../../memory-bank/activeContext.md) |
-| Plan a significant change | [Plan template](../plans/TEMPLATE.md) |
+| Write a task specification | [Spec templates](../specs/TEMPLATE--feature.md) |
+| Understand why something is the way it is | [Decision records](../adr/README.md) |
+| Record a rollout or release | [Plan template](../plans/TEMPLATE.md) |
 
 ## Adaptation decisions
 

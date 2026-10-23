@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkContext } from '../scripts/check-context.mjs';
+import { checkSpec, gatedFiles } from '../scripts/check-spec.mjs';
 import { runVerification } from '../scripts/verify.mjs';
 import { checkReleaseSource } from '../scripts/release-source.mjs';
 import { checkDeployWorkflow, WORKFLOW_PATH } from '../scripts/deploy-workflow.mjs';
@@ -156,4 +157,87 @@ test('release source must be committed and already on GitHub main', (t) => {
   assert.deepEqual(checkReleaseSource(work), []);
   git(work, 'remote', 'set-url', 'origin', join(work, 'missing.git'));
   assert.match(checkReleaseSource(work).join(), /Cannot fetch/);
+});
+
+function specFixture(t, { status = 'APPROVED', approval = 'Alex, 2026-10-23, in chat', criteria = ['AC1 — the screen shows the team', 'AC2 — the API rejects an outsider'], verified = ['AC1', 'AC2'], files = ['`src/pages/settings.tsx`'], extra = '' } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'expitrack-spec-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'docs/specs'), { recursive: true });
+  writeFileSync(join(root, 'docs/specs/2026-10-23-example.md'), [
+    '# Example',
+    '',
+    `Status: ${status}`,
+    `Owner approval: ${approval}`,
+    'Type: feature',
+    '',
+    '## Acceptance criteria',
+    '',
+    ...criteria.map((line) => `- ${line}`),
+    '',
+    '## Files and signatures (draft)',
+    '',
+    ...files.map((line) => `- ${line}`),
+    '',
+    '## Verification plan',
+    '',
+    ...verified.map((id) => `- ${id} -> tests/example.test.cjs`),
+    '',
+    extra,
+  ].join('\n'));
+  return root;
+}
+
+const EXAMPLE_SPEC = 'docs/specs/2026-10-23-example.md';
+
+test('spec gate asks nothing from a documentation-only change', () => {
+  assert.deepEqual(gatedFiles(['docs/engineering/workflow.md', 'docs/adr/README.md', 'README.md', 'memory-bank/activeContext.md']), []);
+  assert.deepEqual(checkSpec({ root: REPO_ROOT, files: ['docs/engineering/workflow.md'], prBody: '' }), []);
+  assert.deepEqual(gatedFiles(['src/pages/index.tsx', 'prisma/schema.prisma', 'package.json', 'tests/a.test.cjs']), ['src/pages/index.tsx', 'prisma/schema.prisma', 'package.json', 'tests/a.test.cjs']);
+});
+
+test('spec gate fails a source change with no spec reference', (t) => {
+  const root = specFixture(t);
+  const failures = checkSpec({ root, files: ['src/pages/settings.tsx'], prBody: 'Just a fix.' });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /names no spec under docs\/specs/);
+});
+
+test('spec gate rejects an unapproved spec and an empty approval line', (t) => {
+  const draft = specFixture(t, { status: 'DRAFT' });
+  assert.match(checkSpec({ root: draft, files: ['src/pages/settings.tsx'], prBody: `Spec: ${EXAMPLE_SPEC}` }).join(), /expected APPROVED/);
+
+  const empty = specFixture(t, { approval: '<name, YYYY-MM-DD>' });
+  assert.match(checkSpec({ root: empty, files: ['src/pages/settings.tsx'], prBody: `Spec: ${EXAMPLE_SPEC}` }).join(), /no filled "Owner approval/);
+});
+
+test('spec gate requires a verification entry for every acceptance criterion', (t) => {
+  const root = specFixture(t, { verified: ['AC1'] });
+  const failures = checkSpec({ root, files: ['src/pages/settings.tsx'], prBody: `Spec: ${EXAMPLE_SPEC}` });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /AC2 has no entry in the verification plan/);
+
+  const noCriteria = specFixture(t, { criteria: [], verified: [] });
+  assert.match(checkSpec({ root: noCriteria, files: ['src/pages/settings.tsx'], prBody: `Spec: ${EXAMPLE_SPEC}` }).join(), /lists no acceptance criteria/);
+});
+
+test('spec gate rejects a file the spec does not list unless out-of-spec explains it', (t) => {
+  const root = specFixture(t);
+  const body = `Spec: ${EXAMPLE_SPEC}`;
+  const failures = checkSpec({ root, files: ['src/pages/settings.tsx', 'src/lib/server/departments.ts'], prBody: body });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /src\/lib\/server\/departments\.ts is changed/);
+
+  const explained = specFixture(t, { extra: 'out-of-spec: src/lib/server/departments.ts, the handler lives there' });
+  assert.deepEqual(checkSpec({ root: explained, files: ['src/pages/settings.tsx', 'src/lib/server/departments.ts'], prBody: body }), []);
+
+  const explainedInPr = checkSpec({ root, files: ['src/pages/settings.tsx', 'src/lib/server/departments.ts'], prBody: `${body}\nout-of-spec: src/lib/server/departments.ts, shared helper` });
+  assert.deepEqual(explainedInPr, []);
+});
+
+test('spec gate honours the explicit chore override and a missing spec file', (t) => {
+  const root = specFixture(t);
+  assert.deepEqual(checkSpec({ root, files: ['package-lock.json'], prBody: 'No spec required: dependency bump' }), []);
+  assert.match(checkSpec({ root, files: ['package-lock.json'], prBody: '' }).join(), /names no spec/);
+  const missing = checkSpec({ root: REPO_ROOT, files: ['src/pages/settings.tsx'], prBody: 'Spec: docs/specs/1999-01-01-missing.md' });
+  assert.match(missing.join(), /does not exist/);
 });
