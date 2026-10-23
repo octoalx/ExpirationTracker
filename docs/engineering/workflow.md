@@ -32,7 +32,8 @@ the approval gate machine-checkable.
 1. **Spec.** The agent writes `docs/specs/YYYY-MM-DD-<slug>.md` from the matching
    template with `Status: DRAFT`. The first section is in Russian, for the owner:
    what changes for them and how they will see it. Everything else is in English.
-   No branch, no code, no test edits yet.
+   No code and no test edits yet: before approval the spec is the only commit on
+   the branch.
 2. **Approval.** The owner answers `APPROVED` in chat or sets the line himself.
    The agent then writes `Status: APPROVED` and `Owner approval: <who, date,
    where>`. A rejected spec is revised, not argued.
