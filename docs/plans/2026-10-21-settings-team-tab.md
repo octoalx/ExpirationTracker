@@ -1,5 +1,8 @@
 # Settings: a department team tab for the manager
 
+Status: DONE
+Evidence: PR #24 (`6c9938e`)
+
 Branch: `local/settings-team-tab`. Date: 2026-10-21.
 
 ## Goal and acceptance criteria

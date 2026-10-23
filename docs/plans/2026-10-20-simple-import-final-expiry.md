@@ -1,5 +1,8 @@
 # Simple Excel import keeps final expiry dates
 
+Status: DONE
+Evidence: commit `d050f04`, merged as PR #21 (`0de6a25`)
+
 ## Goal and acceptance criteria
 
 A simple Excel table with the columns barcode, name, date and optional shelf

@@ -1,5 +1,8 @@
 # Rollout record: spec-driven execution with a HITL gate
 
+Status: DONE
+Evidence: PR #25 (`4829654`); the gate it introduced is `npm run check:spec`
+
 Branch: `local/spec-driven-execution`. Date: 2026-10-23.
 Specification and accepted decisions: `docs/specs/2026-10-23-spec-driven-execution.md`.
 

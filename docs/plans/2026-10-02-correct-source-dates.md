@@ -1,5 +1,8 @@
 # Correct source inventory dates
 
+Status: PARTIAL
+Evidence: no dedicated commit found; superseded by the import work in `d050f04`
+
 Date: 2026-10-02
 
 ## Goal and acceptance criteria

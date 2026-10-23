@@ -1,5 +1,8 @@
 # Operational statistics and mobile administration — 2026-10-02
 
+Status: PARTIAL
+Evidence: `cc76ef9` snapshot; no dedicated statistics commit found
+
 ## Goal
 Rebuild statistics around actionable expiry monitoring and make administration usable on phones within the approved light design system.
 

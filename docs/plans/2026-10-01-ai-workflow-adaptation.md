@@ -1,5 +1,8 @@
 # Adapt the lean AI engineering workflow
 
+Status: DONE
+Evidence: commit `71c7e17` (the workflow the plan describes is `docs/engineering/workflow.md`)
+
 ## Goal and acceptance criteria
 
 Adapt PureRecipe's engineering approach to ExpirationTracker without changing

@@ -1,5 +1,8 @@
 # Production dialog positioning repair — 2026-10-03
 
+Status: DONE
+Evidence: commits `c04b3ea`, `15f9338`
+
 ## Goal and acceptance
 Repair mobile dialogs that show only their lower-right corner in iOS Brave/Chrome. Verify optimized production CSS and actual candidate UI; normal dashboard refresh must keep dialogs closed, and edit links from statistics must open once without reopening on refresh. Preserve inventory and existing deployment configuration.
 

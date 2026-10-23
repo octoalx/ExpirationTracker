@@ -1,5 +1,8 @@
 # Scanner catalog deployment and workspace cleanup — 2026-10-03
 
+Status: DONE
+Evidence: commit `7166c49`
+
 ## Authorized goal and acceptance
 Owner explicitly authorized deployment and full catalog import on expiry.axnode.xyz,
 and cleanup of work-related clutter. Target: Alex@146.103.42.228:34657,

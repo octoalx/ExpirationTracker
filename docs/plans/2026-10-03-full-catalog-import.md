@@ -1,5 +1,8 @@
 # Full scanner catalog import — 2026-10-03
 
+Status: DONE
+Evidence: commit `7166c49`
+
 ## Goal and acceptance criteria
 Prepare all 444,297 extracted entries for admin-only shared catalog import.
 Validate the full source before writes, submit bounded batches, and upsert by the

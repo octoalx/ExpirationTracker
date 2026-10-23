@@ -1,5 +1,8 @@
 # Продолжение задачи — схема прав ExpirationTracker (отделы)
 
+Status: SUPERSEDED
+Evidence: PR #22 (`0c1a771`); the plan it pointed at is `docs/plans/2026-10-21-department-access-model.md`
+
 Заполнено 2026-10-21 по итогам разбора. Новая сессия видит только этот файл —
 всё нужное внутри, лишнего нет.
 

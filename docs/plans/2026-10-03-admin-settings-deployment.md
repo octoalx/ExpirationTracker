@@ -1,5 +1,8 @@
 # Admin and settings release — 2026-10-03
 
+Status: DONE
+Evidence: commit `0ffc5da`
+
 ## Authorized goal and acceptance
 
 The owner requested ordinary commits and deployment of all current changes. Commit the explicit reviewed application, migration, test and documentation files. Do not push without a push request. Deploy to the previously verified target Alex@146.103.42.228:34657, /home/Alex/ExpirationTracker, https://expiry.axnode.xyz.

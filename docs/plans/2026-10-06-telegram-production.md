@@ -1,5 +1,8 @@
 # Telegram production rollout — 2026-10-06
 
+Status: DONE
+Evidence: commit `235f4e7`
+
 ## Authorization and goal
 
 The owner supplied a BotFather token and explicitly authorized completing the
