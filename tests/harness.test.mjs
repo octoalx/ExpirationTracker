@@ -84,6 +84,13 @@ function deployFixture(t) {
   for (const script of ['release-backup.sh', 'release-healthcheck.sh']) {
     writeFileSync(join(root, 'scripts', script), '#!/usr/bin/env bash\n');
   }
+  // The checker reads the health check to confirm it consults the running
+  // application; the fixture copies the committed one so the workflow and the script
+  // are judged together.
+  writeFileSync(
+    join(root, 'scripts', 'release-healthcheck.sh'),
+    readFileSync(join(REPO_ROOT, 'scripts', 'release-healthcheck.sh')),
+  );
   const source = readFileSync(join(REPO_ROOT, WORKFLOW_PATH), 'utf8');
   writeFileSync(join(root, WORKFLOW_PATH), source);
   return { root, source, write: (text) => writeFileSync(join(root, WORKFLOW_PATH), text) };
@@ -119,6 +126,32 @@ test('CD workflow keeps manual delivery, the environment gate and ordered safety
 
   write(source.replace(rollbackIf, "if: ${{ failure() && inputs.dry_run == false && steps.previous.outputs.previous != '' }}"));
   assert.match(checkDeployWorkflow(root).join(), /must require that the deploy step itself failed/);
+});
+
+test('the release marker cannot stand in for the running revision', (t) => {
+  const { root, source, write } = deployFixture(t);
+  // The marker written before `up -d` only states an intention; the check must not
+  // be able to pass on it while the container still serves the previous build.
+  const deployBlock = source.slice(
+    source.indexOf('Deploy the revision'),
+    source.indexOf('Wait for the app to become healthy'),
+  );
+  const beforeUp = deployBlock.replace(
+    /          docker compose build --build-arg BUILD_REVISION="\$SHA"\n          docker compose up -d\n          printf '%s\\n' "\$SHA" > \.release-version\n/,
+    '          printf \'%s\\n\' "$SHA" > .release-version\n          docker compose build --build-arg BUILD_REVISION="$SHA"\n          docker compose up -d\n',
+  );
+  assert.notEqual(beforeUp, deployBlock, 'the fixture must contain the deploy block it rewrites');
+  write(source.replace(deployBlock, beforeUp));
+  assert.match(checkDeployWorkflow(root).join(), /writes \.release-version before the stack started/);
+
+  // A build without the revision argument produces an image that cannot say what it is.
+  write(source.replace('docker compose build --build-arg BUILD_REVISION="$SHA"', 'docker compose build'));
+  assert.match(checkDeployWorkflow(root).join(), /must build with BUILD_REVISION/);
+
+  // The health check must ask the application, not read the marker the workflow wrote.
+  writeFileSync(join(root, 'scripts', 'release-healthcheck.sh'), '#!/usr/bin/env bash\necho "$(cat .release-version)"\n');
+  write(source);
+  assert.match(checkDeployWorkflow(root).join(), /health check must read \/api\/version/);
 });
 
 test('deploy workflow check rejects a backup taken after the deploy', (t) => {

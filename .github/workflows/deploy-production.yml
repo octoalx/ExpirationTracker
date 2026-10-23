@@ -229,11 +229,13 @@ jobs:
           # files are CRLF; without it every file shows as modified forever.
           git config core.autocrlf false
           git checkout --quiet --force --detach "$SHA"
-          # Recorded before the build so the health check can assert the promoted
-          # revision and a later rollback knows what was running.
-          printf '%s\n' "$SHA" > .release-version
-          docker compose build
+          # The revision goes into the image, so the running application can report
+          # what it is; /api/version reads that copy. The host marker below is written
+          # only after the stack has started - written earlier it would describe an
+          # intention, and the health check used to compare it with itself.
+          docker compose build --build-arg BUILD_REVISION="$SHA"
           docker compose up -d
+          printf '%s\n' "$SHA" > .release-version
           REMOTE
 
       - name: Wait for the app to become healthy
@@ -333,9 +335,11 @@ jobs:
           cd "$REMOTE_DIR"
           git config core.autocrlf false
           git checkout --quiet --force --detach "$PREV"
-          printf '%s\n' "$PREV" > .release-version
-          docker compose build
+          # Same rule as the deploy step: the revision goes into the image, and the
+          # host marker is written only once the stack has started on that revision.
+          docker compose build --build-arg BUILD_REVISION="$PREV"
           docker compose up -d
+          printf '%s\n' "$PREV" > .release-version
           REMOTE
           # Sent from this checkout: the rollback target may be an older revision
           # that never had this script, and the check still has to judge whether the

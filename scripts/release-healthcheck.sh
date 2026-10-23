@@ -50,7 +50,7 @@ check_code() {
   fi
 }
 
-echo "--- 1/4 container state ---"
+echo "--- 1/5 container state ---"
 # State comes from `docker inspect`, not from `docker compose ps` text. Compose
 # renders a padded table whose column widths vary between invocations, so an
 # exact match against that text intermittently fails on a container that is in
@@ -69,16 +69,30 @@ echo "app container ${CID:0:12} status=${STATUS:-unknown} health=${HEALTH:-unkno
 [ "$HEALTH" = "healthy" ]    || fail "app container health is '${HEALTH:-unknown}', expected 'healthy'"
 [ "$RESTARTING" = "false" ]  || fail "app container is in a restart loop"
 
-echo "--- 2/4 promoted revision ---"
+echo "--- 4/5 running revision ---"
+# Asked of the running application, not read from .release-version on the host. The
+# host marker is written by the deploy workflow itself, so comparing it with the
+# workflow's own expectation proves nothing: a container that was never recreated
+# still carries the previous build while the marker already names the new commit.
+# /api/version reads the marker baked into the image at build time, so its answer
+# describes what is actually serving.
 if [ -n "$EXPECTED" ]; then
-  ACTUAL="$(cat .release-version 2>/dev/null | tr -d '\r' || echo '')"
-  echo "expected=$EXPECTED actual=${ACTUAL:-<none>}"
-  [ "$ACTUAL" = "$EXPECTED" ] || fail "host is not running the expected revision"
+  ACTUAL="$(docker compose exec -T app node -e '
+fetch("http://127.0.0.1:" + (process.env.PORT || 3000) + "/api/version", { headers: { "cache-control": "no-cache" } })
+  .then(r => r.json())
+  .then(b => console.log(String(b && b.revision || "unknown")))
+  .catch(() => console.log("unreachable"));
+' 2>/dev/null | tr -d '\r' | tail -1 || echo 'unreachable')"
+  echo "expected=$EXPECTED running=${ACTUAL:-<no answer>}"
+  if [ "${ACTUAL:-}" = "unreachable" ]; then
+    fail "the application did not answer /api/version; cannot prove which revision is running"
+  fi
+  [ "$ACTUAL" = "$EXPECTED" ] || fail "the application reports revision '${ACTUAL:-unknown}' while the promoted revision is '$EXPECTED'; the container is still serving another build"
 else
-  echo "no expected revision supplied; skipping version assertion"
+  echo "no expected revision supplied; skipping the running-revision assertion"
 fi
 
-echo "--- 4/6 database answers and is in WAL mode ---"
+echo "--- 2/5 database answers and is in WAL mode ---"
 # The check that would have caught the 2026-10-13 incident, where login failed with
 # Prisma P1008 while the container reported healthy and both endpoints answered.
 #
@@ -120,12 +134,12 @@ echo "database: integrity=ok users=${DB_USERS} products=${DB_PRODUCTS} journal_m
 # which is exactly how a healthy-looking deploy broke sign-in.
 [ "$DB_MODE" = "wal" ] || fail "journal_mode is '${DB_MODE:-unknown}', expected 'wal'; a concurrent writer would block all reads (the 2026-10-13 sign-in failure)"
 
-echo "--- 5/6 local endpoint (through nginx) ---"
+echo "--- 3/5 local endpoint (through nginx) ---"
 # Through nginx, so the app/upstream wiring is exercised, not just the app port.
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$LOCAL_URL/" || echo '000')"
 check_code "GET ${LOCAL_URL}/" "$CODE"
 
-echo "--- 6/6 public endpoint ---"
+echo "--- 5/5 public endpoint ---"
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$PUBLIC_URL" || echo '000')"
 check_code "GET ${PUBLIC_URL}" "$CODE"
 

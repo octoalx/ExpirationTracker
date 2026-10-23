@@ -102,6 +102,42 @@ export function checkDeployWorkflow(root = ROOT) {
     problems.push('Workflow must report a pre-deploy failure as "nothing was deployed"');
   }
 
+  // The release marker must describe what is running. Written before `up -d` it only
+  // states an intention, and the health check used to compare that file with the
+  // workflow's own expectation - a check that cannot fail when the container was
+  // never recreated. The marker is therefore written after `up -d`, the revision is
+  // baked into the image as a build argument, and the check asks the application.
+  for (const [label, startAt] of [
+    ['deploy', deployAt],
+    ['rollback', rollbackAt],
+  ]) {
+    if (startAt === -1) continue;
+    const endAt = text.indexOf('\n      - name:', startAt + 1);
+    const step = text.slice(startAt, endAt === -1 ? text.length : endAt);
+    const buildAt = step.indexOf('docker compose build');
+    const upAt = step.indexOf('docker compose up');
+    const markerAt = step.indexOf('> .release-version');
+    if (buildAt === -1 || upAt === -1) continue;          // nothing to order
+    if (markerAt === -1) continue;                        // a step that keeps no marker
+    if (markerAt < upAt) {
+      problems.push(`The ${label} step writes .release-version before the stack started; the marker must describe what is running`);
+    }
+    if (!/build[^\n]*--build-arg\s+BUILD_REVISION=/.test(step)) {
+      problems.push(`The ${label} step must build with BUILD_REVISION so the image can report its revision`);
+    }
+  }
+  // The proof of "the release is live" is the application's own answer, and the
+  // check that reads it ships from this checkout.
+  const healthScript = resolve(root, 'scripts/release-healthcheck.sh');
+  if (!existsSync(healthScript)) {
+    problems.push('scripts/release-healthcheck.sh is missing, so nothing proves which revision is running');
+  } else if (!/api\/version/.test(readFileSync(healthScript, 'utf8'))) {
+    problems.push('The health check must read /api/version; a marker file written by the workflow cannot prove what is running');
+  }
+  if (!/EXPECTED_REVISION/.test(text)) {
+    problems.push('The deploy workflow must pass the promoted revision to the health check');
+  }
+
   for (const script of ['scripts/release-backup.sh', 'scripts/release-healthcheck.sh']) {
     if (!text.includes(script)) problems.push(`Workflow does not call ${script}`);
     else if (!existsSync(resolve(root, script))) problems.push(`Workflow calls ${script}, which does not exist`);
