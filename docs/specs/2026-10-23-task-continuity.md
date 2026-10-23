@@ -1,7 +1,7 @@
 # Task continuity: a new task starts as a new session
 
-Status: DRAFT
-Owner approval:
+Status: APPROVED
+Owner approval: Alex, 2026-10-23, Telegram — authorised the whole scope ("всё сразу": the AGENTS.md rule, the plan statuses, the Hermes behaviour) before this spec file existed; the spec was written alongside the work and is retroactive, see "Problem".
 Type: ops
 Branch: local/task-continuity
 Spec gate: `npm run check:spec`
@@ -94,7 +94,7 @@ state. After: every plan file carries `Status:` and
 
 - AC1 → `grep -n "new session" AGENTS.md` returns the bullet; read it back.
 - AC2 → `grep -n "session" docs/engineering/workflow.md` in the phase 0 block; read it back.
-- AC3 → `bash scripts/check-plan-status.sh` (new, see below) exits 0 and prints `41 plans, 0 without status`.
+- AC3 → `bash scripts/check-plan-status.sh` (new, see below) exits 0 and prints `OK — 43 plans`.
 - AC4 → the same script fails a `DONE`/`PARTIAL`/`SUPERSEDED` plan whose evidence pointer is empty.
 - AC5 → `npm run check:context` passes, `wc -l memory-bank/activeContext.md` ≤ 150.
 - Gate → `npm run check:spec -- --files docs/specs/2026-10-23-task-continuity.md` reports
