@@ -1,5 +1,8 @@
 # Replace working inventory from the new CSV
 
+Status: ABANDONED
+Evidence: none found in git log — no CSV commit exists
+
 Date: 2026-10-02
 
 ## Goal and acceptance criteria

@@ -1,5 +1,8 @@
 # Mobile product editing — 2026-10-03
 
+Status: DONE
+Evidence: commit `4e3cf91`
+
 ## Goal and acceptance criteria
 - Opening edit does not focus an input or overflow horizontally on phones.
 - Manufacture-based products retain their source date, duration and unit; editing

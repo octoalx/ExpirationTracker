@@ -1,5 +1,8 @@
 # Shared barcode catalog import — 2026-10-03
 
+Status: DONE
+Evidence: commit `7166c49`
+
 ## Goal and acceptance criteria
 Administrators import inventory and product-catalog Excel documents into a shared
 barcode/name reference, with preview and validation before writes. All authenticated

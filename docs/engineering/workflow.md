@@ -24,11 +24,15 @@ the approval gate machine-checkable.
 
 ## The loop
 
-0. **Classify.** The owner describes the task in words. The agent labels it
-   `defect`, `feature`, `contract` (API, schema, invariants) or `ops` (CI, CD,
-   scripts, documentation). The label fixes which sections the spec needs and
-   which checks apply. A task that changes API shape, the Prisma schema or an
-   invariant is always `contract`, never `feature`.
+0. **Classify, in a new session.** The owner describes the task in words and the
+   agent labels it `defect`, `feature`, `contract` (API, schema, invariants) or
+   `ops` (CI, CD, scripts, documentation), which fixes the spec's sections and
+   checks. API shape, Prisma schema or an invariant: always `contract`.
+   Classification reads the repository, not a chat:
+   `memory-bank/activeContext.md` (≤150 lines, the current state),
+   `git log --oneline -15` and `gh pr list` (what landed), and the plans named
+   there (each carries `Status:` and `Evidence:`). One task runs in one session;
+   the next opens a new one, because a transcript cannot be audited like a commit.
 1. **Spec.** The agent writes `docs/specs/YYYY-MM-DD-<slug>.md` from the matching
    template with `Status: DRAFT`. The first section is in Russian, for the owner:
    what changes for them and how they will see it. Everything else is in English.
@@ -53,8 +57,27 @@ the approval gate machine-checkable.
    spec, one PR. The spec gate (`npm run check:spec`) runs in CI.
 8. **Merge.** Only the owner merges, answering five questions in the PR.
 9. **After merge.** Update `memory-bank/activeContext.md` within its line cap and
-   archive the rest into the dated plan. Delete the branch. A release is a
-   separate explicit authorization and is never part of the merge.
+   archive the rest into the dated plan, then set that plan's `Status:` and
+   `Evidence:` lines (merge commit or PR number). Delete the branch. A release is
+   a separate explicit authorization and is never part of the merge.
+
+## Session boundary
+
+The task's state lives in the repository, because that is the only place the next
+session is guaranteed to read. Chat history is not state: it does not survive into
+a new conversation, it cannot be diffed, and nothing in it is checkable.
+
+- A new task starts in a new session, which opens by reading
+  `memory-bank/activeContext.md`, `git log`, open pull requests and the task's plan.
+- A finished task is closed by writing those three records, not by summarising
+  the conversation. The test: could a session that never saw this chat tell
+  "done" from "not done" using only the repository? If not, the records are
+  incomplete, however long the chat was.
+- A handoff document produced outside the repository (`…-continuation.md` on the
+  Desktop, a pasted brief) is a courtesy copy at best. It is never the mechanism,
+  and an agent must not write one in place of updating `activeContext.md` and the
+  plan. If a brief is genuinely useful for pasting into a new chat, it must point
+  at the in-repo records rather than restate them.
 
 ## What the gate checks
 

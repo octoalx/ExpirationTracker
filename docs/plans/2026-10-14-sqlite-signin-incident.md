@@ -1,5 +1,8 @@
 # SQLite sign-in incident and the hardening that followed
 
+Status: DONE
+Evidence: commit `5dc9f7d`
+
 Dated: 2026-10-14. Covers the production sign-in failure of 2026-10-13 and every
 change made in response. Written after the fixes were verified on the live host.
 

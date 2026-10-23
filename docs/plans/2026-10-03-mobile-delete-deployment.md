@@ -1,5 +1,8 @@
 # Mobile deletion and pagination deployment — 2026-10-03
 
+Status: DONE
+Evidence: commit `972c77e`
+
 ## Goal and acceptance
 Deploy commit 425e0e0 mobile UI files to the existing expiry.axnode.xyz application.
 Use verified target Alex@146.103.42.228:34657 and /home/Alex/ExpirationTracker.

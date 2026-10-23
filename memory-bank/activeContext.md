@@ -119,6 +119,12 @@ the hook builds its two guard modules for development; production keeps the unch
 The first deploy of this workflow needs the previous one to ship the commit once,
 because the running release has no `/api/version` yet.
 
+## Task continuity (2026-10-23)
+
+One task = one session; state comes from this file, `git log` and open PRs, never a
+chat. Closing a task updates this file and the plan's `Status:`/`Evidence:`
+(`scripts/check-plan-status.sh`). Spec: `docs/specs/2026-10-23-task-continuity.md`.
+
 ## Open threads
 
 1. Feature checks removed during the production sync are restored one at a time,

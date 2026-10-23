@@ -1,5 +1,8 @@
 # Mobile panels deployment — 2026-10-03
 
+Status: DONE
+Evidence: commit `cc76ef9` snapshot plus `4e3cf91`
+
 ## Goal and acceptance
 Deploy the owner's requested mobile add/scan fixes to the existing expiry.axnode.xyz service. Preserve users, inventory, catalog, settings, Cloudflare Access and scheduling. Require release checks, successful Linux build, isolated candidate authentication/API checks, production health and database reconciliation.
 

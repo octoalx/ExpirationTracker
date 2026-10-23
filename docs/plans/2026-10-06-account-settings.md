@@ -1,5 +1,8 @@
 # Account settings — 2026-10-06
 
+Status: DONE
+Evidence: commit `d4909d5`
+
 ## Goal and acceptance criteria
 
 Users can update their name and login email and change their password in Settings.
