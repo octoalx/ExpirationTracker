@@ -85,9 +85,10 @@ is unaffected, which is why the fix belongs to the simple-table branch only.
 ## Files and signatures (draft)
 
 - `src/lib/excel-parser.ts` — `detectFileType` stops requiring `range.e.c <= 3`
-  and decides from the header row's first four cells instead
-- `tests/simple-excel-import.test.ts` — case for a five-column file (AC1) and for
-  a five-column file with a broken date (AC3)
+  and decides from the header row's first three cells (A–C) alone, since that is
+  all it ever validated
+- `tests/simple-excel-import.test.ts` — case for a five-column file (AC1), a
+  five-column file with a broken date (AC3), and an unrecognised sheet (AC2)
 
 ## Contract change
 
@@ -122,4 +123,28 @@ changes), browser walk-through.
 
 ## Result and handoff
 
-Not implemented yet: waiting for `Status: APPROVED`.
+Реализовано в `src/lib/excel-parser.ts`: `detectFileType` больше не смотрит на
+`range.e.c` и решает по первым трём ячейкам заголовка — это ровно то, что читает
+`parseSimple` и что проверялось раньше.
+
+- AC1 → PASS — `tests/simple-excel-import.test.ts`, «a fifth column does not hide
+  the simple table»: пятая колонка со строкой, числом и пустая — во всех трёх
+  случаях `fileType: "simple"`, ошибок нет, товары те же 2 строки из A–D.
+  RED до правки (тот же тест): `AC1: a "комментарий" fifth column keeps the type`.
+- AC2 → PASS — «an unrecognised sheet still answers with the type error» (пусто в
+  товарах, текст ошибки прежний) и существующий тест каталога «legacy catalog and
+  inventory…» остаётся зелёным: заголовок «Штрих-код» по-прежнему даёт `catalog`.
+- AC3 → PASS — «a broken cell in a five-column file reports the same row as in a
+  four-column file»: первая отклонённая строка — «Строка 3: …» в обоих файлах,
+  строка, где заполнена только колонка примечания, остаётся строкой 4, принятые
+  товары совпадают.
+- Браузер: файл `five-columns.xlsx` (5 колонок, у третьей строки 30.02.2026) →
+  превью «Тип: Простая таблица · Найдено товаров: 2», «Строк с ошибкой: 1»,
+  «Строка 4: Некорректная дата: 30.02.2026»; импорт → «Успешно импортировано: 2»,
+  «Не загружено из-за ошибок: 1».
+
+Проверки: `npm run test:app` 114/114 PASS (111 + 3 новых), `npm run typecheck` PASS,
+`npm run build` PASS, `npm run check:context` PASS, `npm run test:harness` 13/13 PASS.
+
+Незакрытое: колонки правее D по-прежнему не читаются и не сохраняются (так и
+задумано, см. Out of scope); `parseInventory`/`parseCatalog` без изменений.
