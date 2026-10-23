@@ -33,21 +33,11 @@ Facts worth not rediscovering:
 
 ## Mobile interface restored (2026-10-14)
 
-The mobile-first inventory screen had been removed by `28719b8` (PR #7, the
-production-aligned sync) and was restored on branch `local/restore-mobile-inventory`
-from `dc07476`. Cause and evidence: `docs/plans/2026-10-14-restore-mobile-inventory.md`.
-
-- The regression was markup, not styling: `src/styles/globals.css` is byte-identical
-  between `dc07476` and `HEAD`, so every mobile rule survived as dead CSS while the
-  components that applied it were replaced.
-- `MobileProductList.tsx` had no importer at `HEAD`; the dashboard rendered the
-  desktop table at every width.
-- `tests/inventory-thresholds.test.cjs` had to be restored too: its `HEAD` version
-  (rewritten by `c657690`, PR #10) documented the post-regression
-  `getExpiryStatus` signature with no `referenceDate`.
-- Local `node_modules/better-sqlite3` is ABI 137 (Node 24), so the full suite runs
-  under Node 24, not Node 22. Under Node 22 the 34 database tests fail with
-  `ERR_DLOPEN_FAILED` before any assertion.
+`28719b8` (PR #7, a production-aligned sync) replaced the mobile-first lineage with an
+older tree, so the dashboard rendered the desktop table at every width for eight days.
+It was restored from `dc07476`, together with the assertions removed alongside it.
+Details: `docs/plans/2026-10-14-restore-mobile-inventory.md`.
+Local `better-sqlite3` is ABI 137 (Node 24): the suite runs under Node 24, not 22.
 
 ## Simple Excel import keeps final expiry dates (2026-10-20)
 
@@ -118,6 +108,14 @@ are in `docs/engineering/workflow.md`; the reasoning is ADR-0007.
 - `check:context` enforces the 150-line cap on this file: archive detail in plans.
 - ADR-0001…0007 record the decisions that used to live only inside dated plans.
 
+## Excel import no longer duplicates (2026-10-23, merged PR #27)
+
+A repeated upload doubled the department table. `POST /api/products/import` now looks
+up the same barcode and expiry date inside the transaction and, on a match, sums the
+quantity when both sides carry one (`mergedQuantity`) instead of creating a row, and
+both the response and the dialog report how many rows were already there. Verified in a
+browser: the second upload of the same file kept the table at three rows.
+
 ## Open threads
 
 1. `.release-version` is written before the image build, so the marker can claim a
@@ -131,6 +129,9 @@ are in `docs/engineering/workflow.md`; the reasoning is ADR-0007.
 5. Excel import is create-only, so a repeated upload creates duplicates.
 6. Re-audit the process on 2026-11-06 against the metrics in
    `docs/engineering/workflow.md`.
+7. `npm run dev` fails: the instrumentation hook resolves `./lib/prisma` through
+   `runtimeRequire`, which works in the built app and not in the dev bundle. Use
+   `npm run build && npm start`, and set `NEXTAUTH_SECRET` for `next start`.
 
 ## Operational context
 
