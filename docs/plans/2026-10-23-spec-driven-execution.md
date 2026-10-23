@@ -32,7 +32,8 @@ No application code, schema, migration, notification or UI behaviour changed.
 ## Verification (actual results)
 
 - `npm run check:context` → PASS (contract budget, documentation links).
-- `npm run test:harness` → 12/12 PASS, including six new cases for the gate:
+- `npm run test:harness` → 13/13 PASS, including six new cases for the gate and
+  one for the active-context cap:
   documentation-only skip, missing spec reference, unapproved spec, empty
   approval line, unmapped acceptance criterion, unlisted file with and without an
   `out-of-spec:` line, chore override and a missing spec file.
@@ -45,11 +46,11 @@ No application code, schema, migration, notification or UI behaviour changed.
 
 ## Unresolved and next step
 
-- `AGENTS.md` is deliberately untouched: the contract amendments (one task = one
-  spec, no mixed commits, no working-tree sync commits, test-as-spec rule,
-  `activeContext.md` line cap) are a separate commit awaiting owner approval. Until
-  it lands, the gate is enforced by CI while the contract does not yet state the
-  rule in prose.
+- The contract amendments landed as a second commit on the same branch (AC7):
+  `AGENTS.md` now states the spec rule, commit hygiene and the 150-line cap on
+  `memory-bank/activeContext.md`, and `check:context` enforces the cap. The
+  amendment leaves 49 estimated tokens of headroom in the contract budget, so any
+  further rule has to go into `docs/engineering/workflow.md` instead.
 - Branch protection and required-review settings are unchanged; the merge policy
   is documented, applying it remains a human action.
 - The 24 pull requests merged before this date predate the gate and are not

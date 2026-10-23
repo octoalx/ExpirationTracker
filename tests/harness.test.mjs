@@ -30,6 +30,16 @@ test('context check catches missing contract, oversized context and broken links
   assert.deepEqual(checkContext(root), ['Missing AGENTS.md']);
 });
 
+test('context check enforces the active-context line cap', (t) => {
+  const root = fixture(t);
+  const active = join(root, 'memory-bank/activeContext.md');
+  mkdirSync(join(root, 'memory-bank'), { recursive: true });
+  writeFileSync(active, Array.from({ length: 150 }, () => 'line').join('\n') + '\n');
+  assert.deepEqual(checkContext(root), []);
+  writeFileSync(active, Array.from({ length: 151 }, () => 'line').join('\n') + '\n');
+  assert.match(checkContext(root).join(), /150-line cap \(151\)/);
+});
+
 test('developer skips absent app tools; release fails closed without running them', (t) => {
   const root = fixture(t);
   let calls = 0;

@@ -51,13 +51,15 @@ decisions live only inside dated plans.
   inside dated plans, plus this process decision, each with status and consequences.
 - AC6 — `npm run test:harness` covers the gate's pass and fail paths, including
   the `No spec required:` override and an unapproved spec.
+- AC7 — `AGENTS.md` states the spec rule, commit hygiene and the 150-line cap on
+  the active context, and `npm run check:context` enforces that cap; the
+  amendments land as a separate commit.
 
 ## Out of scope
 
 - No change to application code, Prisma schema, migrations, notifications or UI.
-- No change to `AGENTS.md` in this commit: the contract amendments (one task =
-  one spec, no mixed commits, no working-tree sync commits, test-as-spec rule,
-  active-context line cap) are a separate commit awaiting its own approval.
+- The contract amendments reach `AGENTS.md` as their own commit on this branch
+  (AC7), not mixed into the tooling commit.
 - No branch protection or repository setting change; the merge policy is written
   down here, applying it stays a human action.
 - No reorganisation of the existing 46 files in `docs/plans/`.
@@ -77,6 +79,8 @@ decisions live only inside dated plans.
 - `docs/adr/0005-release-is-manual.md`
 - `docs/adr/0006-cron-stays-in-europe-minsk.md`
 - `docs/adr/0007-spec-first-with-an-approved-spec-gate.md`
+- `AGENTS.md` — spec rule, commit hygiene, 150-line cap on the active context
+- `scripts/check-context.mjs` — `checkContext` gains the active-context line cap
 - `scripts/check-spec.mjs` — `checkSpec({ root, files, prBody })` returning failures, plus CLI
 - `tests/harness.test.mjs` — cases for the gate
 - `package.json` — `check:spec` script
@@ -114,6 +118,9 @@ gains new cases; no existing assertion is edited.
   PASS (documentation-only skip); the workflow file contains the gate step
 - AC5 → `npm run check:context` link walk over `docs/adr/`
 - AC6 → `npm run test:harness` full run
+- AC7 → `npm run check:context` on this branch plus the harness case "context check
+  enforces the active-context line cap", and a negative control that a 151-line
+  active context fails
 
 Standing checks: `npm run check:context`, `npm run test:harness`, `npm run typecheck`.
 `npm run test:app` is not affected (no application code changed) but is run once for
@@ -132,7 +139,10 @@ the record.
   (`--files docs/engineering/workflow.md`), and `.github/workflows/engineering.yml`
   gained the `spec` job conditional on `pull_request`.
 - AC5 → PASS — `docs/adr/0001..0007` plus index; `check:context` walk clean.
-- AC6 → PASS — `npm run test:harness` 12/12 (6 pre-existing, 6 new), 0 fail.
+- AC6 → PASS — `npm run test:harness` 13/13 (7 pre-existing, 6 new), 0 fail.
+- AC7 → PASS — `AGENTS.md` amended in its own commit; `check:context` reports PASS
+  at 1951 of its 2000 estimated tokens, and the cap case fails a 151-line active
+  context.
 
 End-to-end evidence for the gate on this change: with the PR body naming this spec
 `node scripts/check-spec.mjs --base origin/main` reports "spec gate satisfied for 4

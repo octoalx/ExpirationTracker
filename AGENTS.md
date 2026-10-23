@@ -14,16 +14,19 @@ autonomously; ask only for missing material product decisions or authorization.
 - Translate the request into a goal and observable acceptance criteria.
 - Read only relevant files. Start with this contract; use
   `docs/engineering/README.md` for routing, not as mandatory background reading.
-- Small fixes need a short plan in chat. Multi-component features, API changes,
-  migrations and scheduling changes need a dated plan in `docs/plans/` with
-  acceptance criteria, risks and verification before implementation.
+- Follow `docs/engineering/workflow.md`. A task that touches source, schema, scripts,
+  tests or workflows starts as a spec in `docs/specs/`, and code exists only after the
+  owner sets `Status: APPROVED` with a filled `Owner approval`. One task = one branch =
+  one spec = one pull request; a file outside the spec's list stops the work until it is
+  listed or marked `out-of-spec: <path>, <reason>`. Rollout and release records stay in
+  `docs/plans/`.
 - Implement the smallest coherent change. Confirm suspected causes against code.
 - Work directly for routine tasks. Delegate only when explicitly requested by
   the owner; keep delegated tasks bounded and avoid overlapping edits.
 - Review the diff and run fresh checks before reporting completion. Report
   failures, skips and unverified behavior accurately; never equate SKIP with PASS.
-- Update `memory-bank/activeContext.md` at meaningful milestones, keeping it
-  concise. Load it only when resuming work. Archive detailed history in plans.
+- Update `memory-bank/activeContext.md` at meaningful milestones within its 150-line
+  cap (`check:context`). Load it only when resuming work; archive detail in plans.
 
 ## Project map
 
@@ -63,12 +66,22 @@ autonomously; ask only for missing material product decisions or authorization.
 - Dev loop: run the nearest behavioral test for changed logic.
 - Task completion: touched tests, relevant static checks and diff review. For
   contract/tooling changes run `npm run check:context` and `npm run test:harness`.
+  `npm run check:spec` gates a pull request and must pass locally before pushing.
   For TypeScript changes run `npm run typecheck` after dependencies are installed.
 - Release preparation: `npm run verify:release` plus the checks and manual
   evidence in `docs/engineering/release.md`. The gate currently fails closed for
   missing application tests or dependencies. A local report is not release approval.
 - Do not run an interactive `next lint` setup as verification. The current lint
   command has no committed ESLint configuration; establish it in a separate task.
+
+## Commit hygiene
+
+- One concern per commit: a feature, a formatting or LF sweep, a process document and
+  this contract are separate commits.
+- Never a commit that replaces the working tree with another revision ("sync",
+  "baseline"). Restore with revert or cherry-pick and name the revision; 28719b8 is why.
+- Behaviour and its test change together only when the spec has a `Contract change`
+  section arguing why the old assertion was wrong.
 
 ## Git and production
 
@@ -97,4 +110,5 @@ Describe deployment as done only after the workflow's health check passes.
 ## Completion
 
 Report the outcome, significant files, executed checks with results, and remaining
-limitations in concise Russian. Describe practical effects rather than tool history.
+limitations in concise Russian, one line per acceptance criterion (SKIP is never PASS).
+Describe practical effects rather than tool history.
