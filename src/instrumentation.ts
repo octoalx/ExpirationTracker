@@ -16,6 +16,14 @@
  * (2026-10-14). Reaching for the module through a function whose argument webpack
  * cannot evaluate keeps the native dependency out of the bundler's graph, while the
  * NEXT_RUNTIME guard below still ensures it only ever executes on the server.
+ *
+ * Why development needs `createDevLoader` (2026-10-23, PR #34): there is no build
+ * step in dev, the hook is executed straight from `.next/server/instrumentation.js`,
+ * and every id below is resolved against that directory. Node looks for `./lib/prisma`
+ * next to the bundle, finds nothing, and `npm run dev` died with "Cannot find module
+ * './lib/prisma'". The ids stay exactly as they are here — the dev loader builds the
+ * two guard modules itself and answers the same ids. Production takes the original
+ * branch, unchanged.
  */
 type NodeRequire = (id: string) => unknown;
 
@@ -25,13 +33,74 @@ function runtimeRequire(id: string): unknown {
   return runtime(id);
 }
 
+/** A module the hook loads at startup, by the id the production path uses. */
+const DEV_GUARD_MODULES = ["./lib/prisma", "./lib/server/sqlite-health"] as const;
+
+/**
+ * Development-only loader: compiles the guard modules and hands them back by id.
+ *
+ * The dev server never compiles these modules, because the hook loads them at runtime
+ * on purpose (the header explains why), and Node cannot load a TypeScript source that
+ * imports a sibling by a path without an extension. So the hook makes the CommonJS
+ * build itself — once — with the `typescript` package that is already installed, into
+ * `.next/server/dev-lib`, rewriting relative imports to `.ts` paths. Nothing is
+ * written outside `.next`, which every dev run throws away anyway.
+ *
+ * Only development reaches this code; the production and edge branches keep the
+ * original `runtimeRequire` and its ids.
+ */
+function createDevLoader(): NodeRequire {
+  // The bundler must not trace these: webpack would try to bundle `node:fs` itself.
+  const runtime = eval("require") as NodeRequire;
+  const nodePath = runtime("node:path") as { resolve: (...parts: string[]) => string; join: (...parts: string[]) => string };
+  // The two guard modules are replaced by fakes in tests/instrumentation.test.cjs;
+  // everything else below is the real Node API.
+  const nodeFs = runtime("node:fs") as {
+    readFileSync: (path: string, encoding: string) => string;
+    writeFileSync: (path: string, data: string) => void;
+    mkdirSync: (path: string, options: { recursive: boolean }) => void;
+  };
+  const nodeModule = runtime("node:module") as { createRequire: (from: string) => NodeRequire };
+  const repoRoot = nodePath.resolve(process.cwd());
+  const load = nodeModule.createRequire(nodePath.resolve(repoRoot, "package.json"));
+  const ts = load("typescript") as {
+    ModuleKind: { CommonJS: number };
+    ScriptTarget: { ES2022: number };
+    transpileModule: (source: string, options: { fileName: string; compilerOptions: unknown }) => { outputText: string };
+  };
+
+  const outDir = nodePath.join(repoRoot, ".next/server/dev-lib");
+  nodeFs.mkdirSync(outDir, { recursive: true });
+  for (const id of DEV_GUARD_MODULES) {
+    const sourceFile = nodePath.join(repoRoot, "src", `${id.replace(/^\.\//, "")}.ts`);
+    const compiled = ts.transpileModule(nodeFs.readFileSync(sourceFile, "utf8"), {
+      fileName: sourceFile,
+      // Without the module target the emit keeps ESM syntax, which Node then loads as
+      // ESM — where an extensionless relative import and a default import both break.
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+    }).outputText;
+    // Node resolves a CommonJS `require("./x")` by extension; the sources use `./x`.
+    const withExtensions = compiled.replace(
+      /require\("(\.[^"]*)"\)/g,
+      (match: string, target: string) => (target.endsWith(".ts") ? match : `require("${target}.ts")`),
+    );
+    const target = nodePath.join(outDir, `${id.replace(/^\.\//, "")}.ts`);
+    nodeFs.mkdirSync(nodePath.join(target, ".."), { recursive: true });
+    nodeFs.writeFileSync(target, withExtensions);
+  }
+
+  return (id: string) => load(nodePath.join(outDir, `${id.replace(/^\.\//, "")}.ts`));
+}
+
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
-  const { resolvePrismaDbPath } = runtimeRequire("./lib/prisma") as {
+  const load: NodeRequire = process.env.NODE_ENV === "development" ? createDevLoader() : runtimeRequire;
+
+  const { resolvePrismaDbPath } = load("./lib/prisma") as {
     resolvePrismaDbPath: () => string;
   };
-  const { prepareDatabaseForStartup } = runtimeRequire("./lib/server/sqlite-health") as {
+  const { prepareDatabaseForStartup } = load("./lib/server/sqlite-health") as {
     prepareDatabaseForStartup: (dbPath: string) => {
       quarantinedTo: string | null;
       journal: { path: string; reason: string };
