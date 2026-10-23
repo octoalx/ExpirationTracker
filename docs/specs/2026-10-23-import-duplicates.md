@@ -37,11 +37,20 @@ is create-only, so a repeated upload creates duplicates»).
 Тест, который фиксирует дефект до исправления (создаётся на шаге реализации, вывод
 вставляется сюда дословно):
 
+Снято на ветке до правки, дословно:
+
 ```
 $ node --import tsx --test tests/import-duplicates.test.cjs
-not ok 1 - a repeated import does not create a second row for the same barcode and date
-  expected 1 row, got 2
+ℹ tests 5
+ℹ pass 1
+ℹ fail 4
 ```
+
+Красные утверждения: `the first import has nothing to skip` (actual `undefined`,
+expected `0`) — поля `skipped` в ответе нет; и `expected 0, actual 1` — повторная
+загрузка создавала вторую строку. Единственный зелёный тест — «another department
+does not count as a duplicate», он проходит и до правки, потому что дедупликации
+нет вовсе.
 
 ## Acceptance criteria
 
@@ -84,6 +93,7 @@ not ok 1 - a repeated import does not create a second row for the same barcode a
   или эквивалентный помощник для правила из AC3
 - `src/components/ImportExcelModal.tsx` — показывает созданные и пропущенные
 - `tests/import-duplicates.test.cjs` — новый набор: AC1, AC2, AC3, AC4
+- `package.json` — `test:app` runs the new suite
 
 ## Contract change
 
@@ -116,5 +126,29 @@ check:context`, `npm run test:harness`, `npm run check:spec`.
 
 ## Result and handoff
 
-Заполняется после реализации: по строке на каждый AC со статусом PASS/FAIL/SKIP и
-доказательством. SKIP не равен PASS.
+Реализовано в `src/pages/api/products/import.ts`: внутри той же транзакции перед
+созданием ищется строка с тем же `storeId`, `barcode` и `expiryDate` в статусе
+`ACTIVE` без `deletedAt`; при совпадении количество складывается через
+`mergedQuantity()` (только если обе стороны его знают) и пишется событие
+`IMPORT_MERGE`. Ответ получил поле `skipped`, окно импорта показывает оба числа.
+
+- AC1 → PASS — `tests/import-duplicates.test.cjs`, «a repeated import does not
+  create a second row…»: второй и третий импорт дают `imported 0`, `skipped 2` / `1`,
+  в базе остаётся 2 строки
+- AC2 → PASS — «a different expiry date stays a separate batch»: две строки с датами
+  2026-11-20 и 2026-12-20
+- AC3 → PASS — «quantities are summed only when both are present»: 5 + 3 = 8, пустое
+  входящее количество не меняет 8, пустое существующее остаётся `null`
+- AC4 → PASS — «a failing row leaves no partial import»: пакет с невалидной строкой
+  отвечает 400 и не создаёт ничего; отклонённый пакет не изменил количество 5
+- AC5 → SKIP — браузерная проверка окна импорта не выполнялась (нет доступа к
+  рабочему окружению с файлом Excel в этой сессии); текст проверен в коде и тестом
+  не покрывается. SKIP не равен PASS.
+
+Проверки: `npm run test:app` 107/107 PASS (102 прежних + 5 новых), `npm run
+typecheck` PASS, `npm run build` PASS, `npm run check:context` и `npm run
+test:harness` PASS, `npm run check:spec` PASS с телом PR.
+
+Незакрытое: AC5 требует ручного прогона на экране импорта; событие `IMPORT_MERGE`
+пока не отображается отдельной подписью в истории, если понадобится — отдельная
+задача. Следующий шаг: браузерная проверка окна импорта менеджером.

@@ -3,13 +3,15 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 
-import { validateInventoryProducts } from "../../../lib/inventory-import";
+import { mergedQuantity, validateInventoryProducts } from "../../../lib/inventory-import";
 import { inventoryScope, recordEvent } from "@/lib/server/inventory";
 import { apiFailure } from "@/lib/server/api";
 import { expiredOn } from "@/lib/expiry-calendar";
 
 interface ImportResponse {
   imported: number;
+  /** Rows left untouched because the department already has the same barcode and expiry date. */
+  skipped: number;
   errors: string[];
   message?: string;
 }
@@ -38,11 +40,28 @@ export default async function handler(
     }
 
     const userId = session.user.id;
-    const created = await prisma.$transaction(async tx => {
+    const imported = await prisma.$transaction(async tx => {
       const { membership } = await inventoryScope(tx, userId);
       const rows = [];
+      let skipped = 0;
       for (const p of products) {
         const expiryDate = p.expiryDate ? new Date(`${p.expiryDate}T00:00:00.000Z`) : null;
+        // A repeated upload must not duplicate the table: the same barcode with the
+        // same expiry date inside this department is the same batch. Another date
+        // stays a separate row, because that is another delivery.
+        const existing = await tx.product.findFirst({
+          where: { storeId: membership.storeId, barcode: p.barcode, expiryDate, status: "ACTIVE", deletedAt: null },
+          select: { id: true, storeId: true, quantity: true },
+        });
+        if (existing) {
+          const quantity = mergedQuantity(existing.quantity, p.quantity);
+          if (quantity !== existing.quantity) {
+            await tx.product.update({ where: { id: existing.id }, data: { quantity } });
+          }
+          await recordEvent(tx, { userId, source: "WEB" }, existing, "IMPORT_MERGE", { barcode: p.barcode, quantity });
+          skipped += 1;
+          continue;
+        }
         const product = await tx.product.create({
           data: {
             name: p.name,
@@ -57,11 +76,12 @@ export default async function handler(
         await recordEvent(tx, { userId, source: "WEB" }, product, "IMPORT", { product });
         rows.push(product);
       }
-      return rows;
+      return { rows, skipped };
     });
 
     return res.status(200).json({
-      imported: created.length,
+      imported: imported.rows.length,
+      skipped: imported.skipped,
       errors: [],
     });
   } catch (error) {

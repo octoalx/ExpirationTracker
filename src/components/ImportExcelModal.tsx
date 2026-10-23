@@ -37,6 +37,7 @@ export default function ImportExcelModal({
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [importedCount, setImportedCount] = useState(0);
+  const [skippedCount, setSkippedCount] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,6 +46,7 @@ export default function ImportExcelModal({
     setPreview(null);
     setFile(null);
     setImportedCount(0);
+    setSkippedCount(0);
     setErrorMessage("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
@@ -122,7 +124,12 @@ export default function ImportExcelModal({
       if (res.ok) {
         setState("success");
         setImportedCount(data.imported);
-        toast.success(`Импортировано ${data.imported} товаров`);
+        setSkippedCount(data.skipped ?? 0);
+        toast.success(
+          data.skipped
+            ? `Импортировано ${data.imported}, уже было ${data.skipped}`
+            : `Импортировано ${data.imported} товаров`,
+        );
         onImportComplete();
       } else {
         setState("error");
@@ -263,6 +270,11 @@ export default function ImportExcelModal({
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Успешно импортировано: {importedCount} товаров
             </p>
+            {skippedCount > 0 && (
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Уже были в таблице: {skippedCount}
+              </p>
+            )}
           </div>
         )}
 
