@@ -108,13 +108,14 @@ are in `docs/engineering/workflow.md`; the reasoning is ADR-0007.
 - `check:context` enforces the 150-line cap on this file: archive detail in plans.
 - ADR-0001…0007 record the decisions that used to live only inside dated plans.
 
-## Excel import no longer duplicates (2026-10-23, merged PR #27)
+## Excel import: no duplicates, and a broken row costs only itself (2026-10-23)
 
-A repeated upload doubled the department table. `POST /api/products/import` now looks
-up the same barcode and expiry date inside the transaction and, on a match, sums the
-quantity when both sides carry one (`mergedQuantity`) instead of creating a row, and
-both the response and the dialog report how many rows were already there. Verified in a
-browser: the second upload of the same file kept the table at three rows.
+PR #27 stopped a repeated upload from doubling the table (same barcode + same expiry
+date inside the department merges, `mergedQuantity`). PR #29 stopped a single broken
+row from cancelling the file: `partitionInventoryProducts` validates row by row, the
+endpoint answers 200 with `imported`/`skipped`/`rejected`/`errors`, and the dialog
+previews a partly broken file, then shows imported / already present / rejected with
+the reasons. Specs: `docs/specs/2026-10-23-import-{duplicates,partial-rows}.md`.
 
 ## Open threads
 
@@ -125,11 +126,10 @@ browser: the second upload of the same file kept the table at three rows.
    time, never in bulk.
 3. Browser UI and the native iOS date picker remain unverified.
 4. The import dialog accepts a fixed four-column table; a fifth column makes the
-   file unrecognized, and one invalid row rejects the whole file.
-5. Excel import is create-only, so a repeated upload creates duplicates.
-6. Re-audit the process on 2026-11-06 against the metrics in
+   file unrecognized (`detectFileType` requires `range.e.c <= 3`).
+5. Re-audit the process on 2026-11-06 against the metrics in
    `docs/engineering/workflow.md`.
-7. `npm run dev` fails: the instrumentation hook resolves `./lib/prisma` through
+6. `npm run dev` fails: the instrumentation hook resolves `./lib/prisma` through
    `runtimeRequire`, which works in the built app and not in the dev bundle. Use
    `npm run build && npm start`, and set `NEXTAUTH_SECRET` for `next start`.
 
