@@ -13,7 +13,7 @@ Production is deployed by GitHub Actions and is healthy.
 - **The rollback path is no longer theoretical.** Run `38512003826` failed in the
   image build and the workflow automatically restored the previous revision; the
   site kept serving and no data was touched.
-- **Production matches Git.** The host working tree has zero differences from the
+- **Production matches Git**: the host tree has zero differences from the deployed revision.
   deployed revision, so `allow_dirty` is no longer needed for a normal deploy.
 - **The 2026-10-13 sign-in failure is prevented, and the prevention is verified on
   the live host**: planting a corrupt `dev.db-journal` and restarting the app makes
@@ -24,28 +24,19 @@ Facts worth not rediscovering:
 
 - The production database runs in **WAL**. A non-WAL database lets one writer block
   every reader, which is what broke sign-in. The app asserts WAL on every startup.
-- A deploy on this VPS takes **8-25 minutes** (2 cores, 1.9 GB RAM). A long build is
-  normal, not a failure.
-- The database is a single ~98 MB SQLite file. Every deploy takes a verified
-  snapshot first, and the deploy refuses to continue without one.
+- A deploy takes 8-25 minutes (2 cores, 1.9 GB RAM); a long build is normal. Every
+  deploy takes a verified SQLite snapshot first and refuses to continue without one.
 - Node 22 is required for local checks (Node 26 breaks `better-sqlite3`): use
   `bash .verification/run-verify-release.sh`.
 
-## Mobile interface restored (2026-10-14)
+## Mobile restored, simple expiry fixed (2026-10-14, 2026-10-20)
 
-`28719b8` (PR #7, a production-aligned sync) replaced the mobile-first lineage with an
-older tree, so the dashboard rendered the desktop table at every width for eight days.
-It was restored from `dc07476`, together with the assertions removed alongside it.
-Details: `docs/plans/2026-10-14-restore-mobile-inventory.md`.
-Local `better-sqlite3` is ABI 137 (Node 24): the suite runs under Node 24, not 22.
-
-## Simple Excel import keeps final expiry dates (2026-10-20)
-
-The Excel table dropped the expiry date for rows without a shelf life, because
-`28719b8` made `expiryFromManufacture` return `null` there; in that format an empty
-months cell means the date is already final. `inventory-import.ts` now carries
-`finalExpiryDate`, and `parseCalendarDate` is shared for validation.
-Details: `docs/plans/2026-10-20-simple-import-final-expiry.md`.
+`28719b8` replaced the mobile-first lineage with an older tree (desktop table at every
+width for eight days); `dc07476` restored it with its assertions — see
+`docs/plans/2026-10-14-restore-mobile-inventory.md`. That sync also made the simple
+Excel table drop final expiry dates; `finalExpiryDate` in `inventory-import.ts` fixed
+it — see `docs/plans/2026-10-20-simple-import-final-expiry.md`. Local
+`better-sqlite3` is ABI 137: the suite runs under Node 24, not 22.
 
 ## Department access model implemented (2026-10-21, branch `local/department-access-model`)
 
@@ -77,10 +68,9 @@ to.
 
 ## Settings gained a team tab (2026-10-21, branch `local/settings-team-tab`)
 
-Hiring was only reachable at `/store` → «Команда», which the owner could not find.
-Settings now carries a «Команда» tab, rendered by `StoreTeam` with
-`variant="settings"`: hire, reset an employee password, revoke access, rename the
-department and edit its thresholds, all from one screen.
+Hiring was only reachable at `/store` → «Команда». Settings now carries a «Команда»
+tab (`StoreTeam`, `variant="settings"`): hire, reset a password, revoke access,
+rename the department and edit thresholds from one screen.
 
 - The tab appears only for an account with a membership (`MANAGER` sees the forms,
   `EMPLOYEE` a read-only list); a no-department account, the administrator
@@ -90,15 +80,15 @@ department and edit its thresholds, all from one screen.
   had been posting them to that route, which answered 403 — a real defect, now fixed.
 - Department rename is `PUT /api/store/members` → `renameOwnDepartment()`.
 - Verified on `origin/main` @ `f744cfa`: `typecheck`, `build`, `test:app` (102/102)
-  and `check:context` all pass. An earlier red `typecheck`/`build` was only the
-  branch being behind `main` — `75ec4e5` had already fixed the seed.
+  and `check:context` pass. An earlier red `typecheck`/`build` was only the branch
+  being behind `main` — `75ec4e5` had already fixed the seed.
 
 ## Spec-driven execution with an approval gate (2026-10-23, merged PR #25)
 
 A task that touches source, schema, scripts, tests or workflows starts as a spec in
-`docs/specs/` and code exists only after the owner sets `Status: APPROVED` with a
-filled `Owner approval` line. The loop, commit hygiene and the five merge questions
-are in `docs/engineering/workflow.md`; the reasoning is ADR-0007.
+`docs/specs/`; code exists only after the owner sets `Status: APPROVED` with a filled
+`Owner approval`. The loop, commit hygiene and the five merge questions are in
+`docs/engineering/workflow.md`; the reasoning is ADR-0007.
 
 - `npm run check:spec` (`scripts/check-spec.mjs`) runs in CI on every pull request
   and fails without an approved spec, without a verification entry per AC, or with a
@@ -110,28 +100,37 @@ are in `docs/engineering/workflow.md`; the reasoning is ADR-0007.
 
 ## Excel import: no duplicates, and a broken row costs only itself (2026-10-23)
 
-PR #27 stopped a repeated upload from doubling the table (same barcode + same expiry
-date inside the department merges, `mergedQuantity`). PR #29 stopped a single broken
-row from cancelling the file: `partitionInventoryProducts` validates row by row, the
-endpoint answers 200 with `imported`/`skipped`/`rejected`/`errors`, and the dialog
-previews a partly broken file, then shows imported / already present / rejected with
-the reasons. Specs: `docs/specs/2026-10-23-import-{duplicates,partial-rows}.md`.
+PR #27 stopped a repeated upload from doubling the table (same barcode + expiry date
+in the department merges, `mergedQuantity`). PR #29 stopped a broken row from
+cancelling the file: `partitionInventoryProducts` validates row by row, the endpoint
+answers 200 with `imported`/`skipped`/`rejected`/`errors`, and the dialog previews a
+partly broken file and then shows the three numbers. Specs:
+`docs/specs/2026-10-23-import-{duplicates,partial-rows}.md`.
+
+## Release proof and the fifth column (2026-10-23, merged PR #31, #32)
+
+The revision is baked into the image (`ARG BUILD_REVISION`) and reported by
+`GET /api/version`; the health check asks the running container instead of reading the
+marker the workflow wrote itself, and the host marker is written only after
+`docker compose up -d`. A fifth column no longer hides the simple table:
+`detectFileType` decides from three header cells. Specs:
+`docs/specs/2026-10-23-release-version-truth.md`, `…-import-fifth-column.md`. The first
+deploy of this workflow needs the previous one to ship the commit once, because the
+running release has no `/api/version` yet.
 
 ## Open threads
 
-1. `.release-version` is written before the image build, so the marker can claim a
-   new revision while the container still serves the old one. The check has been
-   honest in practice but does not yet prove it.
-2. Feature checks removed during the production sync are restored one feature at a
-   time, never in bulk.
-3. Browser UI and the native iOS date picker remain unverified.
-4. The import dialog accepts a fixed four-column table; a fifth column makes the
-   file unrecognized (`detectFileType` requires `range.e.c <= 3`).
-5. Re-audit the process on 2026-11-06 against the metrics in
+1. Feature checks removed during the production sync are restored one at a time,
+   never in bulk.
+2. Browser UI and the native iOS date picker remain unverified.
+3. Re-audit the process on 2026-11-06 against the metrics in
    `docs/engineering/workflow.md`.
-6. `npm run dev` fails: the instrumentation hook resolves `./lib/prisma` through
-   `runtimeRequire`, which works in the built app and not in the dev bundle. Use
-   `npm run build && npm start`, and set `NEXTAUTH_SECRET` for `next start`.
+4. `npm run dev` fails: the hook's `runtimeRequire` resolves `./lib/prisma` against
+   `.next/server/`. Rejected after testing: `createRequire`, `module.require`,
+   `__non_webpack_require__`, the compiled chunk, `--experimental-require-module`.
+   Left: dev loads the modules via top-level `await import`, or the guard moves out
+   of the hook into a shared bootstrap (a `contract` change). Use
+   `npm run build && npm start` until the owner chooses.
 
 ## Operational context
 
