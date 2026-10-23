@@ -13,6 +13,14 @@ FROM deps AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV DATABASE_URL="file:./dev.db"
+# Revision this image is built from, passed by the CD workflow. It is baked into the
+# image so the running application can report what it *is*, which is the only honest
+# answer to "is the release live?". The host marker the workflow also keeps is
+# rewritten by the next checkout and describes an intention, not a container.
+ARG BUILD_REVISION=unknown
+# Build context is the repository. A host `.release-version` must never be baked in:
+# it belongs to the host, not to this build.
+RUN rm -f .release-version && printf '%s\n' "$BUILD_REVISION" > .release-version
 COPY . .
 RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN DISABLE_BACKGROUND_JOBS=true npm run build
@@ -47,6 +55,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./package.json
+# The revision this image was built from; /api/version reports it, the deploy health
+# check compares it with the revision it promoted.
+COPY --from=builder /app/.release-version ./.release-version
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/scripts ./scripts
 COPY docker-entrypoint.sh /usr/local/bin/
