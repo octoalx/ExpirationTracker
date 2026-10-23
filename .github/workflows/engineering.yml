@@ -6,6 +6,20 @@ on:
 permissions:
   contents: read
 jobs:
+  spec:
+    # Deterministic human-in-the-loop gate: no source change reaches review
+    # without a specification the owner already approved. Documentation-only pull
+    # requests pass without one; chores opt out with "No spec required: <reason>".
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require an approved spec for source changes
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/check-spec.mjs --base origin/${{ github.base_ref }}
   tooling:
     strategy:
       matrix:

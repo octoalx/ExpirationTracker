@@ -28,6 +28,11 @@ export function checkContext(root = ROOT) {
     }
   }
   checkLinks(contract);
+  const active = resolve(root, 'memory-bank/activeContext.md');
+  if (existsSync(active)) {
+    const lines = readFileSync(active, 'utf8').replace(/\s+$/, '').split(/\r?\n/).length;
+    if (lines > 150) failures.push(`memory-bank/activeContext.md exceeds the 150-line cap (${lines})`);
+  }
   walk(resolve(root, 'docs'));
   walk(resolve(root, 'memory-bank'));
   return failures;
