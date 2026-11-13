@@ -1,15 +1,13 @@
-import { useState, useCallback, useRef } from "react";
-import { FileSpreadsheet, Upload, Loader2, CheckCircle2, AlertCircle, X, Trash2 } from "lucide-react";
+import React, { useState, useCallback, useRef } from "react";
+import { FileSpreadsheet, Upload, Loader2, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 
 import type { ParsedProduct } from "@/lib/excel-parser";
 
@@ -154,170 +152,143 @@ export default function ImportExcelModal({
     }
   }, [preview, onImportComplete]);
 
+  const foundCount = preview?.products.length ?? 0;
+  const errorCount = preview?.rowErrors.length ?? 0;
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent
+        className="work-panel product-dialog sm:max-w-lg max-h-[90dvh] overflow-y-auto"
+        aria-describedby="import-description"
+      >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-blue-600" />
-            Импорт из Excel
-          </DialogTitle>
-          <DialogDescription>
-            Загрузите Excel-файл для импорта товаров. Поддерживаются инвентаризация, каталог и простая таблица: первая строка — заголовки; столбцы — штрих-код, название, дата, срок в месяцах. Если срок пустой, дата означает окончание годности; иначе — изготовление. Даты: ДД.ММ.ГГГГ или дата Excel. Строки с ошибкой пропускаются, остальные загружаются.
+          <DialogTitle>Импорт из Excel</DialogTitle>
+          <DialogDescription id="import-description" className="text-[13px] leading-5 text-dash-ink-2">
+            Поддерживаются инвентаризация, каталог и простая таблица: первая строка — заголовки;
+            столбцы — штрих-код, название, дата, срок в месяцах. Если срок пустой, дата означает
+            окончание годности; иначе — изготовление. Даты: ДД.ММ.ГГГГ или дата Excel.
+            Строки с ошибкой пропускаются, остальные загружаются.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Idle / File Drop Zone */}
+        {/* File picker: one zone, one click, no nested disclosures. */}
         {(state === "idle" || state === "error") && (
-          <div
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="h-10 w-10 mx-auto text-slate-400 mb-3" />
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Перетащите файл сюда или нажмите для выбора
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Поддерживаются .xls и .xlsx
-            </p>
+          <div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
+              className="import-drop"
+            >
+              <Upload aria-hidden="true" className="size-8" />
+              <span className="import-drop-title">Перетащите файл сюда или нажмите для выбора</span>
+              <span className="import-drop-hint">Поддерживаются .xls и .xlsx</span>
+            </button>
             <input
               ref={fileInputRef}
               type="file"
               accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="hidden"
+              className="sr-only"
               onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleFileSelect(f);
+                const selected = e.target.files?.[0];
+                if (selected) handleFileSelect(selected);
               }}
             />
           </div>
         )}
 
-        {/* Error message */}
         {state === "error" && errorMessage && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
-            <p className="text-sm text-red-700 dark:text-red-400">{errorMessage}</p>
-          </div>
+          <p role="alert" className="form-error"><AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />{errorMessage}</p>
         )}
 
-        {/* Preview */}
         {state === "previewing" && preview && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  {preview.fileName}
-                </p>
-                <p className="text-xs text-slate-500">
-                  Тип: <span className="font-medium text-blue-600">{preview.fileType}</span>
-                  {" · "}
-                  Найдено товаров: <span className="font-medium">{preview.products.length}</span>
-                </p>
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="import-summary">
+              <div className="min-w-0">
+                <p className="import-file-name">{preview.fileName}</p>
+                <p className="import-file-meta">Тип: <strong>{preview.fileType}</strong></p>
               </div>
-              <Button variant="ghost" size="sm" onClick={reset}>
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="import-counts">
+                <span>Найдено строк: <strong>{foundCount}</strong></span>
+                <span className={errorCount > 0 ? "import-count-error" : undefined}>Строк с ошибкой: <strong>{errorCount}</strong></span>
+              </div>
             </div>
 
-            {preview.rowErrors.length > 0 && (
-              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <p className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  Строк с ошибкой: {preview.rowErrors.length} — они не загрузятся
+            {errorCount > 0 && (
+              <div className="import-warning">
+                <p className="import-warning-title">
+                  <AlertCircle aria-hidden="true" className="size-4 shrink-0" />
+                  Строк с ошибкой: {errorCount} — они не загрузятся
                 </p>
-                <ul className="mt-1 max-h-24 overflow-y-auto text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
-                  {preview.rowErrors.map((error, i) => (
-                    <li key={i}>{error}</li>
-                  ))}
+                <ul className="import-warning-list">
+                  {preview.rowErrors.map((error, i) => <li key={i}>{error}</li>)}
                 </ul>
               </div>
             )}
 
-            <div className="max-h-60 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
+            <div className="import-table-wrap">
+              <table className="import-table">
+                <caption className="sr-only">Предпросмотр строк файла</caption>
+                <thead>
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-slate-500">Штрихкод</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-500">Наименование</th>
-                    <th className="px-3 py-2 text-right font-medium text-slate-500">Кол-во</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-500">Годен до</th>
-                    <th className="w-8"></th>
+                    <th scope="col">Штрихкод</th>
+                    <th scope="col">Наименование</th>
+                    <th scope="col" className="text-right">Кол-во</th>
+                    <th scope="col">Годен до</th>
+                    <th scope="col"><span className="sr-only">Действие</span></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                <tbody>
                   {preview.products.slice(0, 50).map((p, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 group">
-                      <td className="px-3 py-1.5 font-mono text-slate-600 dark:text-slate-400">
-                        {p.barcode}
-                      </td>
-                      <td className="px-3 py-1.5 text-slate-800 dark:text-slate-200 max-w-[200px] truncate">
-                        {p.name}
-                      </td>
-                      <td className="px-3 py-1.5 text-right text-slate-600 dark:text-slate-400">
-                        {p.quantity ?? "—"}
-                      </td>
-                      <td className="px-3 py-1.5">{p.expiryDate ? p.expiryDate.split("-").reverse().join(".") : "—"}</td>
-                      <td className="px-1 py-1.5">
+                    <tr key={i}>
+                      <td className="import-cell-code">{p.barcode}</td>
+                      <td className="import-cell-name">{p.name}</td>
+                      <td className="text-right tabular-nums">{p.quantity ?? "—"}</td>
+                      <td className="tabular-nums">{p.expiryDate ? p.expiryDate.split("-").reverse().join(".") : "—"}</td>
+                      <td>
                         <button
+                          type="button"
                           onClick={() => removeProduct(i)}
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 text-red-400 hover:text-red-600 transition-opacity"
-                          title="Удалить"
+                          aria-label={`Убрать строку ${i + 1}`}
+                          className="import-row-remove"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 aria-hidden="true" className="size-4" />
                         </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {preview.products.length > 50 && (
-                <p className="text-xs text-center text-slate-500 py-2">
-                  ... и ещё {preview.products.length - 50} товаров
-                </p>
+              {foundCount > 50 && (
+                <p className="import-more">… и ещё {foundCount - 50} строк</p>
               )}
             </div>
           </div>
         )}
 
-        {/* Uploading */}
         {state === "uploading" && (
-          <div className="flex flex-col items-center py-8 gap-3">
-            <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
-            <p className="text-sm text-slate-600 dark:text-slate-400">Импортируем товары...</p>
-          </div>
+          <p role="status" className="flex items-center justify-center gap-3 py-8 text-dash-ink-2">
+            <Loader2 aria-hidden="true" className="size-6 animate-spin text-dash-accent" />
+            Импортируем товары…
+          </p>
         )}
 
-        {/* Success */}
         {state === "success" && (
-          <div className="flex flex-col items-center py-6 gap-3">
-            <CheckCircle2 className={`h-10 w-10 ${rejectedCount > 0 ? "text-amber-500" : "text-blue-600"}`} />
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <div className="flex flex-col gap-2 py-2">
+            <p className="flex items-center gap-2 text-[15px] font-bold text-dash-ink">
+              <CheckCircle2 aria-hidden="true" className={`size-6 ${rejectedCount > 0 ? "text-dash-amber-ink" : "text-dash-accent"}`} />
               Успешно импортировано: {importedCount} товаров
             </p>
-            {skippedCount > 0 && (
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Уже были в таблице: {skippedCount}
-              </p>
-            )}
-            {rejectedCount > 0 && (
-              <p className="text-sm text-amber-700 dark:text-amber-400">
-                Не загружено из-за ошибок: {rejectedCount}
-              </p>
-            )}
+            {skippedCount > 0 && <p className="text-[13px] text-dash-ink-2">Уже были в таблице: {skippedCount}</p>}
+            {rejectedCount > 0 && <p className="text-[13px] font-semibold text-dash-amber-ink">Не загружено из-за ошибок: {rejectedCount}</p>}
             {rejectedReasons.length > 0 && (
-              <div className="w-full p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
-                  Не приняты строки:
-                </p>
-                <ul className="mt-1 max-h-24 overflow-y-auto text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
-                  {rejectedReasons.map((error, i) => (
-                    <li key={i}>{error}</li>
-                  ))}
+              <div className="import-warning">
+                <p className="import-warning-title">Не приняты строки:</p>
+                <ul className="import-warning-list">
+                  {rejectedReasons.map((error, i) => <li key={i}>{error}</li>)}
                 </ul>
-                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                <p className="import-warning-foot">
                   Эти строки не попали в таблицу. Исправьте их в файле и загрузите его снова — уже загруженное не удвоится.
                 </p>
               </div>
@@ -325,20 +296,23 @@ export default function ImportExcelModal({
           </div>
         )}
 
-        {/* Footer */}
-        <DialogFooter>
+        <div className="product-dialog-actions">
           {state === "previewing" && preview && (
-            <Button onClick={handleImport} className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Upload className="h-4 w-4 mr-2" />
-              Импортировать {preview.products.length} товаров
-            </Button>
+            <button type="button" className="dialog-action-secondary" onClick={reset}>Другой файл</button>
+          )}
+          {state === "previewing" && preview && (
+            <button type="button" className="primary-action dialog-action-primary" onClick={handleImport}>
+              <Upload aria-hidden="true" className="size-4" />
+              Импортировать {foundCount} товаров
+            </button>
           )}
           {state === "success" && (
-            <Button onClick={() => handleClose(false)} className="bg-blue-600 hover:bg-blue-700 text-white">
-              Закрыть
-            </Button>
+            <button type="button" className="primary-action dialog-action-primary" onClick={() => handleClose(false)}>Закрыть</button>
           )}
-        </DialogFooter>
+          {(state === "idle" || state === "error") && (
+            <button type="button" className="dialog-action-secondary" onClick={() => handleClose(false)}>Отмена</button>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

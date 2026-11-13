@@ -527,9 +527,12 @@ const Dashboard = () => {
 
   const content = (
     <div className="inventory-page mx-auto flex w-full max-w-7xl flex-col gap-4 md:gap-5">
-      <header className="flex items-center justify-between gap-3">
-        <h1 className="flex items-center gap-3 work-page-title">Товары</h1>
-        <Button variant="outline" onClick={openAdd} className="min-h-11 gap-2"><Plus className="size-4" /><span>Добавить</span></Button>
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="work-page-title">Товары</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="min-h-11 gap-2"><FileSpreadsheet aria-hidden="true" className="size-4" /><span>Импорт из Excel</span></Button>
+          <Button onClick={openAdd} className="min-h-11 gap-2"><Plus aria-hidden="true" className="size-4" /><span>Добавить</span></Button>
+        </div>
       </header>
       <DashboardSummary
         expired={stats.expired}
@@ -777,23 +780,16 @@ const Dashboard = () => {
             <DialogTitle>Добавить товар</DialogTitle>
           </DialogHeader>
 
-          <details>
-          <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-slate-700">Добавить несколько товаров из файла</summary>
-          <p className="mb-3 text-sm text-slate-600">Загрузите список из Excel вместо ручного ввода каждого товара.</p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setAddModalOpen(false);
-              setIsImportOpen(true);
-            }}
-            className="flex items-center justify-center gap-2 w-full h-[46px] border-blue-200 text-blue-700 hover:bg-blue-50"
+          {/* On a phone the header holds one button, so the file route is a plain row here. */}
+          <button
+            type="button"
+            className="entry-link md:hidden self-start"
+            onClick={() => { setAddModalOpen(false); setIsImportOpen(true); }}
           >
-            <FileSpreadsheet className="size-5! text-blue-600 shrink-0"/>
             Импорт из Excel
-          </Button>
-          </details>
+          </button>
 
-          <AddProductForm onProductAdded={addProduct} initialBarcode={initialBarcode} />
+          <AddProductForm onProductAdded={addProduct} initialBarcode={initialBarcode} onCancel={() => setAddModalOpen(false)} />
         </DialogContent>
       </Dialog>
 

@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { expiryLabel, expiryDisplay } from "@/lib/expiry-calendar";
-import { Loader2, Barcode, Package, Calendar, X, Hash } from "lucide-react";
+import React, { useRef, useState, type FormEvent } from "react";
+import { expiryLabel } from "@/lib/expiry-calendar";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { Product } from "@prisma/client";
+import type { Product } from "@prisma/client";
+import { format, parseISO } from "date-fns";
 import { calculateExpiryDate, type ShelfLifeUnit } from "@/lib/shelf-life";
 import { useKeyboardInset } from "@/lib/keyboard-inset";
+import { fieldError, validateProductForm, type ProductFormError } from "@/lib/product-form";
 
 interface EditProductFormProps {
   product: Product;
@@ -14,7 +16,7 @@ interface EditProductFormProps {
   onCancel: () => void;
 }
 
-/** Inline form for editing an existing product's barcode, name, quantity, and expiry date. */
+/** Dialog form for an existing record; the field order matches the add dialog. */
 export default function EditProductForm({
   product,
   onProductUpdated,
@@ -28,22 +30,40 @@ export default function EditProductForm({
     expiryLabel(product.expiryDate) ?? ""
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [dateInputType, setDateInputType] = useState(product.manufacturingDate ? "manufacture" : "expiry");
+  const [dateInputType, setDateInputType] = useState<"expiry" | "manufacture">(product.manufacturingDate ? "manufacture" : "expiry");
   const [manufacturingDate, setManufacturingDate] = useState(product.manufacturingDate ?? "");
   const [shelfLife, setShelfLife] = useState(String(product.shelfLife ?? ""));
   const [shelfLifeUnit, setShelfLifeUnit] = useState<ShelfLifeUnit>((product.shelfLifeUnit as ShelfLifeUnit) || "months");
+  const [errors, setErrors] = useState<ProductFormError[]>([]);
+  const [serverError, setServerError] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
   const calculatedExpiry = calculateExpiryDate(manufacturingDate, shelfLife, shelfLifeUnit);
+  const barcodeError = fieldError(errors, "barcode");
+  const nameError = fieldError(errors, "name");
+  const manufactureError = fieldError(errors, "manufacture");
+  const shelfLifeError = fieldError(errors, "shelfLife");
+  const quantityError = fieldError(errors, "quantity");
+
+  const focusFirstError = (found: ReadonlyArray<ProductFormError>) => {
+    const ids: Record<string, string> = { barcode: "edit-barcode", name: "edit-name", manufacture: "edit-manufacture", shelfLife: "edit-duration", quantity: "edit-quantity" };
+    const id = ids[found[0]?.field ?? ""];
+    if (id) formRef.current?.querySelector<HTMLInputElement>(`#${id}`)?.focus();
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      toast.error("Введите название продукта");
-      return;
-    }
-    if (dateInputType === "manufacture" && !calculatedExpiry) {
-      toast.error("Укажите дату изготовления и положительный целый срок хранения.");
-      return;
-    }
+    const found = validateProductForm({
+      barcode,
+      name,
+      mode: dateInputType,
+      manufacturingDate,
+      shelfLife,
+      shelfLifeUnit,
+      quantity: quantity === "" ? "" : String(quantity),
+    });
+    setErrors(found);
+    setServerError("");
+    if (found.length > 0) { focusFirstError(found); return; }
 
     setIsLoading(true);
     try {
@@ -66,126 +86,142 @@ export default function EditProductForm({
         const updated = await res.json();
         toast.success("Товар обновлен");
         onProductUpdated(updated);
-      } else {
-        const error = await res.json();
-        toast.error(error.message || "Ошибка при обновлении");
+        return;
       }
-    } catch (error) {
-      toast.error("Ошибка при обновлении товара");
-      console.error(error);
+      const payload = await res.json().catch(() => null);
+      setServerError(payload?.message ?? payload?.error ?? "Не удалось сохранить изменения. Проверьте поля и повторите.");
+    } catch {
+      setServerError("Ошибка сети. Проверьте подключение и повторите сохранение.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="product-entry min-w-0 space-y-6">
-      {/* Barcode */}
-      <div>
-        <label htmlFor="edit-barcode" className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-          <Barcode size={14} />
-          Штрих-код
-        </label>
-        <input
-          id="edit-barcode"
-          type="text"
-          value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-          placeholder="Например: 4601234567890"
-        />
-      </div>
+    <form ref={formRef} onSubmit={handleSubmit} noValidate className="product-entry flex min-w-0 flex-col gap-5">
+      <fieldset disabled={isLoading} className="flex min-w-0 flex-col gap-4">
+        {/* 1. Barcode */}
+        <div className="min-w-0">
+          <label htmlFor="edit-barcode">Штрих-код</label>
+          <input
+            id="edit-barcode"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={barcode}
+            placeholder="Например: 4601234567890"
+            aria-invalid={barcodeError ? true : undefined}
+            aria-describedby={barcodeError ? "edit-barcode-error" : undefined}
+            onChange={(e) => { setBarcode(e.target.value); setErrors([]); }}
+          />
+          {barcodeError && <p id="edit-barcode-error" className="field-error">{barcodeError}</p>}
+        </div>
 
-      {/* Product name */}
-      <div>
-        <label htmlFor="edit-name" className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-          <Package size={14} />
-          Название продукта
-        </label>
-        <input
-          id="edit-name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-          placeholder="Введите название"
-          required
-        />
-      </div>
+        {/* 2. Name */}
+        <div className="min-w-0">
+          <label htmlFor="edit-name">Название товара</label>
+          <input
+            id="edit-name"
+            type="text"
+            value={name}
+            placeholder="Например: Герметик силиконовый"
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={nameError ? "edit-name-error" : undefined}
+            onChange={(e) => { setName(e.target.value); setErrors([]); }}
+          />
+          {nameError && <p id="edit-name-error" className="field-error">{nameError}</p>}
+        </div>
 
-      {/* Quantity */}
-      <div>
-        <label htmlFor="edit-quantity" className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-          <Hash size={14} />
-          Количество <span className="text-slate-400 font-normal normal-case">(опционально)</span>
-        </label>
-        <input
-          id="edit-quantity"
-          type="number"
-          min="1"
-          value={quantity}
-          onChange={(e) => {
-            const val = e.target.value;
-            setQuantity(val === "" ? "" : parseInt(val, 10));
-          }}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-          placeholder="Например: 5"
-        />
-      </div>
+        {/* 3. Expiry route */}
+        <div className="min-w-0">
+          <span className="entry-label">Срок годности</span>
+          <div className="entry-segment" role="group" aria-label="Способ указания срока">
+            <button type="button" aria-pressed={dateInputType === "expiry"} onClick={() => { setDateInputType("expiry"); setErrors([]); }}>Годен до</button>
+            <button type="button" aria-pressed={dateInputType === "manufacture"} onClick={() => { setDateInputType("manufacture"); setErrors([]); }}>Изготовлен</button>
+          </div>
+        </div>
 
-      {/* Expiry date */}
-      <div className="entry-segment" role="group" aria-label="Способ указания срока">
-        <button type="button" aria-pressed={dateInputType === "expiry"} onClick={() => setDateInputType("expiry")}>Годен до</button>
-        <button type="button" aria-pressed={dateInputType === "manufacture"} onClick={() => setDateInputType("manufacture")}>Изготовлен</button>
-      </div>
-      {dateInputType === "manufacture" ? <>
-        <div><label htmlFor="edit-manufacture">Дата изготовления</label><input id="edit-manufacture" type="date" required value={manufacturingDate} onChange={event => setManufacturingDate(event.target.value)} /></div>
-        <div><label htmlFor="edit-duration">Срок хранения</label><div className="entry-duration flex gap-2"><input id="edit-duration" type="number" min="1" step="1" required value={shelfLife} onChange={event => setShelfLife(event.target.value)} /><div className="entry-segment flex-1" role="group" aria-label="Единицы срока">{([["days", "Дни"], ["weeks", "Недели"], ["months", "Месяцы"]] as const).map(([unit, label]) => <button key={unit} type="button" aria-pressed={shelfLifeUnit === unit} onClick={() => setShelfLifeUnit(unit)}>{label}</button>)}</div></div></div>
-        <p role="status">Годен до: {calculatedExpiry ? expiryDisplay(calculatedExpiry) : "Укажите дату и срок"}</p>
-      </> :
-      <div>
-        <label htmlFor="edit-expiry" className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-          <Calendar size={14} />
-          Срок годности (необязательно)
-        </label>
-        <input
-          id="edit-expiry"
-          type="date"
-          value={expiryDate}
-          onChange={(e) => setExpiryDate(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-        />
-      </div>}
+        {/* 4. Dates for the chosen route */}
+        {dateInputType === "manufacture" ? <>
+          <div className="min-w-0">
+            <label htmlFor="edit-manufacture">Дата изготовления</label>
+            <input
+              id="edit-manufacture"
+              type="date"
+              value={manufacturingDate}
+              aria-invalid={manufactureError ? true : undefined}
+              aria-describedby={manufactureError ? "edit-manufacture-error" : undefined}
+              onChange={(event) => { setManufacturingDate(event.target.value); setErrors([]); }}
+            />
+            {manufactureError && <p id="edit-manufacture-error" className="field-error">{manufactureError}</p>}
+          </div>
+          <div className="entry-duration min-w-0">
+            <div className="min-w-0">
+              <label htmlFor="edit-duration">Срок хранения</label>
+              <input
+                id="edit-duration"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                step="1"
+                value={shelfLife}
+                placeholder="6"
+                aria-invalid={shelfLifeError ? true : undefined}
+                aria-describedby={shelfLifeError ? "edit-duration-error" : undefined}
+                onChange={(event) => { setShelfLife(event.target.value); setErrors([]); }}
+              />
+            </div>
+            <div className="entry-segment" role="group" aria-label="Единицы срока">
+              {([["days", "Дни"], ["weeks", "Недели"], ["months", "Месяцы"]] as const).map(([unit, label]) => (
+                <button key={unit} type="button" aria-pressed={shelfLifeUnit === unit} onClick={() => setShelfLifeUnit(unit)}>{label}</button>
+              ))}
+            </div>
+            {shelfLifeError && <p id="edit-duration-error" className="field-error">{shelfLifeError}</p>}
+          </div>
+          <div className="expiry-preview" role="status" aria-live="polite">
+            <span>Годен до</span>
+            <strong>{calculatedExpiry ? format(parseISO(calculatedExpiry), "dd.MM.yyyy") : "Укажите дату и срок"}</strong>
+            {calculatedExpiry && <CheckCircle2 aria-hidden="true" className="size-5" />}
+          </div>
+        </> : <div className="min-w-0">
+          <label htmlFor="edit-expiry">Дата окончания срока <span className="field-optional">(необязательно)</span></label>
+          <input
+            id="edit-expiry"
+            type="date"
+            value={expiryDate}
+            onChange={(e) => setExpiryDate(e.target.value)}
+          />
+        </div>}
 
-      {/* Separator */}
-      <div className="border-t border-slate-100 my-4" />
+        {/* 5. Quantity */}
+        <div className="min-w-0">
+          <label htmlFor="edit-quantity">Количество <span className="field-optional">(необязательно)</span></label>
+          <input
+            id="edit-quantity"
+            type="number"
+            inputMode="numeric"
+            min="1"
+            step="1"
+            value={quantity}
+            placeholder="Например: 5"
+            aria-invalid={quantityError ? true : undefined}
+            aria-describedby={quantityError ? "edit-quantity-error" : undefined}
+            onChange={(e) => {
+              const value = e.target.value;
+              setQuantity(value === "" ? "" : parseInt(value, 10));
+              setErrors([]);
+            }}
+          />
+          {quantityError && <p id="edit-quantity-error" className="field-error">{quantityError}</p>}
+        </div>
+      </fieldset>
 
-      {/* Action buttons */}
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isLoading}
-          className="flex-1 py-3.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-all disabled:opacity-60"
-        >
-          <span className="flex items-center justify-center gap-2">
-            <X className="h-4 w-4" />
-            Отмена
-          </span>
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="flex-1 bg-[#1554b5] hover:bg-[#12479a] text-white font-semibold py-3.5 rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {isLoading ? (
-            <span className="flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Сохранение...
-            </span>
-          ) : (
-            "Сохранить"
-          )}
+      {serverError && <p role="alert" className="form-error"><AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />{serverError}</p>}
+
+      <div className="product-dialog-actions">
+        <button type="button" className="dialog-action-secondary" disabled={isLoading} onClick={onCancel}>Отмена</button>
+        <button type="submit" className="primary-action dialog-action-primary" disabled={isLoading}>
+          {isLoading ? <><Loader2 className="size-5 animate-spin" />Сохранение…</> : "Сохранить"}
         </button>
       </div>
     </form>
