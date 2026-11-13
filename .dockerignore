@@ -25,3 +25,4 @@ backups/
 .verification/
 outputs/
 tsconfig.tsbuildinfo
+.release-version
