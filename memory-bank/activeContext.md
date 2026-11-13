@@ -119,6 +119,12 @@ the hook builds its two guard modules for development; production keeps the unch
 The first deploy of this workflow needs the previous one to ship the commit once,
 because the running release has no `/api/version` yet.
 
+## Dashboard: phone-first toolbar, phone sign-out (2026-11-13, spec `2026-11-13-mobile-signout-desktop-scan`)
+
+The scanner is a phone tool: `useIsDesktop()` (`src/lib/media-query.ts`, Tailwind `md`) keeps the
+«Сканировать товар» button, its dialog and the add-form camera button out of the desktop render;
+search and manual barcode entry stay everywhere. The phone header carries a sibling 44 px sign-out.
+
 ## Open threads
 
 1. Feature checks removed during the production sync are restored one at a time,

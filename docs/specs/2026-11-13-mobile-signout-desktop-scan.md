@@ -16,23 +16,27 @@ Spec gate: `npm run check:spec`
 
 ## Acceptance criteria
 
-- AC1 — на ширине 1440 на `/dashboard` нет кнопки «Сканировать товар» и нельзя открыть модалку сканера ни одним способом; поиск и ручной ввод штрих-кода работают.
-- AC2 — на ширине 375 кнопка «Сканировать товар» есть, открывает модалку сканера, камера запускается.
-- AC3 — на ширине 375 в шапке есть кнопка выхода с доступным именем; нажатие закрывает сессию, переводит на `/auth/signin`, и `/api/products` после этого отвечает 401.
-- AC4 — на ширине 1440 выход из бокового меню работает как раньше.
-- AC5 — `npm run typecheck`, `npm run test:app`, `npm run build` зелёные.
+- AC1 — at 1440 on `/dashboard` there is no «Сканировать товар» button in the DOM at all, the scanner dialog is not rendered and no control on the page opens it; the add-product dialog also has no camera button at the barcode field. Search by name/barcode and manual barcode entry still work.
+- AC2 — at 375 the «Сканировать товар» button is present, opens the scanner dialog and starts the camera; the add-product dialog keeps its camera button.
+- AC3 — at 375 the phone header has a sign-out control with an accessible name; pressing it ends the session, lands on `/auth/signin`, and `/api/products` answers 401 afterwards.
+- AC4 — at 1440 the sidebar sign-out works as before.
+- AC5 — `npm run typecheck`, `npm run test:app`, `npm run build` are green.
 
 ## Out of scope
 
-- Остальные экраны и модалки, кроме удаления сканера с десктопа.
-- Изменение API, схемы, прав.
-- Дизайн шапки телефона сверх добавления кнопки выхода.
+- Remaining screens and dialogs beyond removing the scanner from the desktop.
+- API, schema and permission changes.
+- Phone header design beyond adding the sign-out button.
 
-## Files and signatures (draft)
+## Files and signatures
 
-- `src/pages/dashboard.tsx` — кнопка и модалка сканера только до `md`
-- `src/components/MobileHeader.tsx` — кнопка выхода рядом со ссылкой на настройки
-- `src/components/AddProductForm.tsx` — кнопка-сканер у поля «Штрих-код» только до `md` (если открывает ту же камеру)
+- `src/pages/dashboard.tsx` — `useIsDesktop` gates the «Сканировать товар» button and the whole scanner `Dialog`; a resize to `md` closes the scanner.
+- `src/components/AddProductForm.tsx` — the camera button at the «Штрих-код» field is phone-only; the manual field and catalog lookup stay on every width.
+- `src/components/MobileHeader.tsx` — the profile row is rebuilt as a container with the `/settings` link and a sibling sign-out `button` (44×44 minimum) calling `signOut({ callbackUrl: "/auth/signin" })`.
+- `src/lib/media-query.ts` — new `useIsDesktop()` hook and `DESKTOP_QUERY` (`(min-width: 768px)`, Tailwind `md`); starts `false` so SSR and hydration agree on the phone-first markup.
+- `tests/mobile-product-flow.test.ts` — source checks for both rules above.
+
+`/settings` has no scanner entry point (checked `src/pages/settings.tsx`), so nothing there is touched.
 
 Any file needed beyond this list is added here with an `out-of-spec:` note.
 
@@ -48,12 +52,19 @@ none
 
 ## Verification plan
 
-- AC1 → браузерный проход 1440: снимок, поиск в DOM «Сканировать товар» = 0
-- AC2 → браузерный проход 375: снимок, клик открывает модалку
-- AC3 → браузерный проход 375: клик по выходу, `location.pathname` = `/auth/signin`, `GET /api/products` = 401
-- AC4 → браузерный проход 1440: выход из бокового меню
-- AC5 → команды
+- AC1 → browser at 1440: `document.body.innerText` / `querySelectorAll` count for «Сканировать товар» = 0, no `[role=dialog]` with that title, add-product dialog has no camera button; search and manual barcode entries still render. Screenshot `redesign/dashboard-1440-no-scan.png`.
+- AC2 → browser at 375: button found, click opens the dialog, camera element present. Screenshot `redesign/dashboard-375-scan.png`.
+- AC3 → browser at 375: click the header sign-out, `location.pathname` = `/auth/signin`, then `fetch("/api/products")` = 401. Screenshot `redesign/mobile-header-signout-375.png`, evidence `redesign/log-signout-check.txt`.
+- AC4 → browser at 1440: sidebar «Выйти» still ends the session (code path unchanged, verified by the same 401 check after clicking it).
+- AC5 → `npm run typecheck`, `npm run test:app`, `npm run build`.
 
 ## Result and handoff
 
-- AC1 → PENDING
+- AC1 → PASS — at 1440 «Сканировать» occurs 0 times in `document.body.innerText`, 0 scanner buttons, `[role=dialog]` count 0; the add-product dialog shows 0 elements with `aria-label="Сканировать штрих-код"` while `#add-barcode` and «Найти название в каталоге» stay; search «Цемент» narrowed 8 → 2 rows. `redesign/dashboard-1440-no-scan.png`.
+- AC2 → PASS — at 375 the button (343×52) is present, a click opens the dialog with `<video>`; the walk-through browser has no camera, so the panel shows «Камера не найдена. Введите штрих-код вручную.» — the dialog and the manual field work. `redesign/dashboard-375-scan.png`.
+- AC3 → PASS — header sign-out is a sibling `button` (44×44, `aria-label="Выйти из аккаунта: <имя>"`, not inside the `/settings` link); a click lands on `/auth/signin`, the session cookie is empty, `fetch("/api/products")` = 401. `redesign/mobile-header-signout-375.png`, `redesign/log-signout-check.txt`.
+- AC4 → PASS — at 1440 the sidebar «Выйти» ends the session at `/auth/signin` and `/api/products` = 401 afterwards.
+- AC5 → PASS — typecheck 0 errors; `test:app` 132 tests, 132 pass, 0 fail; `build` completed (dashboard 56.1 kB / 215 kB first load).
+
+Not verified: a real phone camera stream (the test browser has no capture device) and iOS/Android Safari behaviour; both go through the unchanged `BarcodeCamera`.
+
