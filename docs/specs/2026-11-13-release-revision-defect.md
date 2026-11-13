@@ -62,4 +62,9 @@ none
 
 ## Result and handoff
 
-- AC1 → PENDING
+- AC1 → PASS. `.dockerignore` исключает `.release-version`, запись ревизии идёт после `COPY . .`; образ выпуска `d0b701e` сообщает `d0b701e` (было: `6c9938e` при хосте на `1a1a362`).
+- AC2 → PASS. `tests/release-revision-build.test.ts`: на старом `Dockerfile` — 1 падение (RED), после правки — 3/3 pass; набор зарегистрирован в `test:app`.
+- AC3 → PASS. Запуск `43500090396` (`deploy-production.yml`, ref `d0b701e`) — все шаги зелёные, включая «Health check the deployed revision»; `ssh cloudvps curl http://localhost:8881/api/version` → `{"revision":"d0b701e90dacfd42fd50d1c57d8dcdf7eacc303e"}`; `.release-version` на хосте совпадает; контейнер `Up (healthy)`; публичный адрес отвечает 302 (Cloudflare Access, ожидаемо).
+- AC4 → PASS. `npm run typecheck` — 0 ошибок; `npm run test:app` — 173 теста, 173 pass; `npm run build` — успешно.
+
+Ограничения: первый запуск (`43496722442`) упал на этом дефекте и вернул старую сборку; база не пострадала, снимок `expitrack-pre-deploy-20261113T195540Z-1a1a36279cbf.db` лежит в `backups/`. Проверка «изнутри контейнера по страницам» не делалась: все маршруты за авторизацией отдают 307.
