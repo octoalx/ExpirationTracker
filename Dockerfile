@@ -19,9 +19,11 @@ ENV DATABASE_URL="file:./dev.db"
 # rewritten by the next checkout and describes an intention, not a container.
 ARG BUILD_REVISION=unknown
 # Build context is the repository. A host `.release-version` must never be baked in:
-# it belongs to the host, not to this build.
-RUN rm -f .release-version && printf '%s\n' "$BUILD_REVISION" > .release-version
+# it belongs to the host, not to this build — hence the `.dockerignore` entry. The
+# file is written *after* `COPY . .`, otherwise the copy overwrites the argument
+# with the host's stale marker and every image reports the previous release.
 COPY . .
+RUN rm -f .release-version && printf '%s\n' "$BUILD_REVISION" > .release-version
 RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN DISABLE_BACKGROUND_JOBS=true npm run build
 RUN npm rebuild better-sqlite3
