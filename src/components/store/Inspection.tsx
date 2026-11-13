@@ -2,8 +2,21 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { expiryBadge } from "@/components/products/ProductTableEnhanced";
+import { getExpiryStatus, cn } from "@/lib/utils";
+import { expiryDisplay } from "@/lib/expiry-calendar";
 
-const labels = { CHECKED: "Проверен, ещё на полке", MISSING: "Не найден", SOLD: "Полностью продан", REMOVED: "Снят с полки", DEFECT: "Брак" };
+const labels = {
+  CHECKED: "Проверен, ещё на полке",
+  MISSING: "Не найден",
+  SOLD: "Полностью продан",
+  REMOVED: "Снят с полки",
+  DEFECT: "Брак",
+};
+
+/** Confirmation is required for results that close the whole record. */
+const CLOSING = ["SOLD", "REMOVED", "DEFECT"];
 export default function Inspection({ data, refresh }: { data: any; refresh: () => void }) {
   const { data: session } = useSession();
   const [mode, setMode] = useState("risk");
@@ -23,36 +36,107 @@ export default function Inspection({ data, refresh }: { data: any; refresh: () =
     } catch (e) { setError(e instanceof Error ? e.message : "Ошибка сети."); refresh(); }
     finally { setBusy(""); }
   };
-  return <section className="space-y-4">
-    <div className="work-surface space-y-3 p-4">
-      <h2 className="text-lg font-semibold">Обход полок</h2>
-      <p>Просрочено: {data.counts.expired} · Срочно: {data.counts.urgent} · Внимание: {data.counts.warning}</p>
-      <p className="text-sm text-muted-foreground">Сегодня проверено: {data.counts.checked} · Завершено: {data.counts.resolved}. Проверка наличия сохраняет риск до решения.</p>
-      <div className="flex flex-wrap gap-2">{[["risk", "По риску"], ["missing", `Не найдены (${data.counts.missing})`], ["unknown", `Без срока (${data.counts.unknown})`]].map(([key, label]) =>
-        <Button key={key} variant={mode === key ? "default" : "outline"} aria-pressed={mode === key} onClick={() => { setMode(key); setConfirmation(null); }}>{label}</Button>)}</div>
-    </div>
-    {error && <p role="alert" className="text-red-700">{error}</p>}
-    {!rows.length && <p role="status" className="work-surface p-5">В этой очереди нет записей. Актуальные риски остаются видны в таблице.</p>}
-    {rows.map((p: any) => <article key={p.id} className="work-surface space-y-3 p-4 sm:p-5">
-      <h3 className="break-words text-lg font-semibold">{p.name}</h3>
-      <p className="text-sm">{p.barcode} · Срок: {p.expiryDate?.slice(0, 10) ?? "не указан"} · Количество: {p.quantity ?? "не указано"}</p>
-      <p className={p.daysLeft !== null && p.daysLeft < 0 ? "font-medium text-red-700" : "text-sm"}>{p.daysLeft === null ? "Нужно уточнить срок на упаковке" : p.daysLeft < 0 ? `Просрочено на ${-p.daysLeft} дн.` : p.daysLeft === 0 ? "Истекает сегодня" : `До окончания: ${p.daysLeft} дн.`}{p.missing ? " · не найден на полке" : ""}</p>
-      {p.checkedAt && <p className="text-sm text-muted-foreground">Проверен: {p.checkedByName} · {new Date(p.checkedAt).toLocaleString("ru-RU", { timeZone: "Europe/Minsk" })}</p>}
-      {p.claim && <p role="status" className="text-sm">Проверяет: {p.claim.name}. Закреплено до {new Date(p.claim.expiresAt).toLocaleTimeString("ru-RU", { timeZone: "Europe/Minsk", hour: "2-digit", minute: "2-digit" })}.</p>}
-      <div className="flex flex-wrap gap-2">
-        {!p.claim && <Button disabled={!!busy} onClick={() => void mutate(p)}>Взять на проверку</Button>}
-        {p.claim?.userId === session?.user?.id && <>
-          {Object.entries(labels).map(([result, label]) => <Button key={result} variant="outline" disabled={!!busy} onClick={() => {
-            if (["SOLD", "REMOVED", "DEFECT"].includes(result)) setConfirmation({ product: p, result }); else void mutate(p, result);
-          }}>{label}</Button>)}
-          <Button variant="outline" disabled={!!busy} onClick={() => void mutate(p, undefined, true)}>Освободить</Button>
-        </>}
-        <Link className="inline-flex min-h-11 items-center px-2 text-blue-700 underline" href={`/dashboard?edit=${encodeURIComponent(p.id)}`}>Исправить данные</Link>
+  const counts = data.counts;
+  const modes = [
+    { id: "risk", label: "По риску" },
+    { id: "missing", label: `Не найдены (${counts.missing})` },
+    { id: "unknown", label: `Без срока (${counts.unknown})` },
+  ];
+  const badgeFor = (product: any) => product.daysLeft === null ? null
+    : expiryBadge(getExpiryStatus(product.expiryDate, data.store?.urgentThreshold, data.store?.warningThreshold), product.daysLeft);
+  const confirmed = confirmation?.product;
+  return <section className="flex flex-col gap-4 md:gap-5">
+    <div className="rounded-xl border border-dash-line bg-dash-panel p-4 md:p-5">
+      <h2 className="text-base font-extrabold leading-5 text-dash-ink">Обход полок</h2>
+      <div role="group" aria-label="Сводка обхода" className="mt-3 grid grid-cols-3 overflow-hidden rounded-[10px] border border-dash-line">
+        {[
+          { label: "Просрочено", value: counts.expired, valueClass: "text-dash-expired" },
+          { label: "Срочно", value: counts.urgent, valueClass: "text-dash-expired" },
+          { label: "Внимание", value: counts.warning, valueClass: "text-dash-amber-ink" },
+        ].map((cell, index) => <div
+          key={cell.label}
+          className={cn("flex flex-col justify-between gap-1 px-3 py-3 md:px-5 md:py-4", index < 2 && "border-r border-dash-line")}
+        >
+          <span className="text-[12px] font-bold leading-4 text-dash-ink-2 md:text-sm md:leading-5">{cell.label}</span>
+          <span className={cn("text-[28px] font-extrabold leading-9 tabular-nums md:text-[40px] md:leading-[48px]", cell.valueClass)}>{cell.value}</span>
+        </div>)}
       </div>
-      {confirmation?.product.id === p.id && <div className="space-y-2 rounded-lg border p-3" role="group" aria-label="Подтверждение результата">
-        <p>{labels[confirmation.result]}: {p.name}, срок {p.expiryDate?.slice(0, 10) ?? "не указан"}? Будет обработана вся запись.</p>
-        <div className="flex flex-wrap gap-2"><Button disabled={!!busy} onClick={() => void mutate(confirmation.product, confirmation.result)}>Подтвердить</Button><Button variant="outline" onClick={() => setConfirmation(null)}>Отмена</Button></div>
-      </div>}
-    </article>)}
+      <p className="mt-3 text-[13px] font-semibold leading-5 text-dash-muted">Сегодня проверено: {counts.checked} · Завершено: {counts.resolved}. Проверка наличия сохраняет риск до решения.</p>
+      <div role="group" aria-label="Режим обхода" className="mt-3 flex gap-1 rounded-[10px] border border-dash-line bg-dash-surface p-[3px]">
+        {modes.map(item => <button
+          key={item.id}
+          type="button"
+          aria-pressed={mode === item.id}
+          onClick={() => { setMode(item.id); setConfirmation(null); }}
+          className={cn(
+            "inline-flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-[7px] px-2 text-[13px] font-semibold transition-colors",
+            mode === item.id ? "bg-dash-accent text-white" : "text-dash-ink-2 hover:text-dash-ink",
+          )}
+        >{item.label}</button>)}
+      </div>
+    </div>
+    {error && <p role="alert" className="rounded-xl border border-dash-expired bg-dash-expired-soft px-4 py-3 text-[13px] font-semibold leading-5 text-dash-expired">{error}</p>}
+    {!rows.length && <p role="status" className="rounded-xl border border-dash-line bg-dash-panel px-4 py-5 text-sm leading-5 text-dash-ink-2">В этой очереди нет записей. Актуальные риски остаются видны в таблице.</p>}
+    {rows.map((p: any) => {
+      const badge = badgeFor(p);
+      const overdue = p.daysLeft !== null && p.daysLeft < 0;
+      return <article key={p.id} className="rounded-xl border border-dash-line bg-dash-panel p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="order-2 min-w-0 flex-1 md:order-1">
+            <h3 className="break-words text-[15px] font-bold leading-5 text-dash-ink md:text-base">{p.name}</h3>
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[13px] font-medium leading-5 tabular-nums text-dash-muted">
+              <span className="break-all">{p.barcode}</span>
+              <span aria-hidden="true">·</span>
+              <span>Количество: {p.quantity ?? "не указано"}</span>
+            </p>
+          </div>
+          <div className="order-1 flex w-full shrink-0 flex-wrap items-center justify-between gap-2 md:order-2 md:w-auto md:flex-col md:items-end md:gap-1">
+            <span className="text-[22px] font-extrabold leading-7 tabular-nums text-dash-ink md:text-base md:leading-5">
+              {p.expiryDate ? expiryDisplay(p.expiryDate) : "не указан"}
+            </span>
+            <span className="flex flex-wrap items-center gap-2">
+              {badge && <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-bold leading-4", badge.className)}>{badge.label}</span>}
+              {p.missing && <span className="inline-flex items-center rounded-full bg-dash-surface px-2.5 py-1 text-[12px] font-bold leading-4 text-dash-ink-2">{labels.MISSING}</span>}
+            </span>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-col gap-1">
+          <p className={cn("text-[13px] font-semibold leading-5", overdue ? "text-dash-expired" : "text-dash-ink-2")}>
+            {p.daysLeft === null ? "Нужно уточнить срок на упаковке" : p.daysLeft < 0 ? `Просрочено на ${-p.daysLeft} дн.` : p.daysLeft === 0 ? "Истекает сегодня" : `До окончания: ${p.daysLeft} дн.`}
+          </p>
+          {p.checkedAt && <p className="text-[13px] leading-5 text-dash-muted">Проверен: {p.checkedByName} · {new Date(p.checkedAt).toLocaleString("ru-RU", { timeZone: "Europe/Minsk" })}</p>}
+          {p.claim && <p role="status" className="text-[13px] leading-5 text-dash-muted">Проверяет: {p.claim.name}. Закреплено до {new Date(p.claim.expiresAt).toLocaleTimeString("ru-RU", { timeZone: "Europe/Minsk", hour: "2-digit", minute: "2-digit" })}.</p>}
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-2 md:flex md:flex-wrap">
+          {!p.claim && <Button disabled={!!busy} className="justify-start md:justify-center" onClick={() => void mutate(p)}>Взять на проверку</Button>}
+          {p.claim?.userId === session?.user?.id && <>
+            {Object.entries(labels).map(([result, label]) => <Button key={result} variant="outline" className="justify-start md:justify-center" disabled={!!busy} onClick={() => {
+              if (CLOSING.includes(result)) setConfirmation({ product: p, result }); else void mutate(p, result);
+            }}>{label}</Button>)}
+            <Button variant="outline" className="justify-start md:justify-center" disabled={!!busy} onClick={() => void mutate(p, undefined, true)}>Освободить</Button>
+          </>}
+          <Link className="inline-flex min-h-11 items-center px-1 text-sm font-semibold text-dash-accent" href={`/dashboard?edit=${encodeURIComponent(p.id)}`}>Исправить данные</Link>
+        </div>
+      </article>;
+    })}
+    <Dialog open={!!confirmation} onOpenChange={open => { if (!open) setConfirmation(null); }}>
+      <DialogContent className="work-panel product-dialog product-entry sm:max-w-md" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>{confirmation && confirmed
+            ? `${labels[confirmation.result]}: ${confirmed.name}, срок ${confirmed.expiryDate ? expiryDisplay(confirmed.expiryDate) : "не указан"}? Будет обработана вся запись.`
+            : "Подтверждение результата"}</DialogTitle>
+        </DialogHeader>
+        <div className="product-dialog-actions">
+          <button type="button" className="dialog-action-secondary" onClick={() => setConfirmation(null)}>Отмена</button>
+          <button
+            type="button"
+            className="primary-action dialog-action-primary"
+            disabled={!!busy}
+            onClick={() => { if (confirmation) void mutate(confirmation.product, confirmation.result); }}
+          >Подтвердить</button>
+        </div>
+      </DialogContent>
+    </Dialog>
   </section>;
 }
+
