@@ -9,6 +9,20 @@
     --color-expiry-ink: #8a520e;
     --color-expiry-soft: #fff7e6;
     --color-expiry-border: #f0d49a;
+    /* Dashboard "Пульт" palette (redesign/DIRECTIONS.md, direction C). */
+    --color-dash-panel: #ffffff;
+    --color-dash-surface: #f6f8fa;
+    --color-dash-line: #dde2e8;
+    --color-dash-control: #76828f;
+    --color-dash-ink: #151a21;
+    --color-dash-ink-2: #424d59;
+    --color-dash-muted: #56626e;
+    --color-dash-accent: #1554b5;
+    --color-dash-soft: #eaf1fc;
+    --color-dash-expired: #b42318;
+    --color-dash-expired-soft: #fdeeec;
+    --color-dash-amber-ink: #8a520e;
+    --color-dash-amber-bar: #b7791f;
     --font-heading: "Manrope", ui-sans-serif, system-ui, sans-serif;
     --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);

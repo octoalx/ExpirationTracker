@@ -110,11 +110,11 @@ export function DashboardProducts() {
   );
 
   const handleConsume = useCallback(
-    async (product: Product) => {
+    async (product: Product, status: "ACTIVE" | "ARCHIVED" | "DEFECT") => {
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "ARCHIVED", version: product.version }),
+        body: JSON.stringify({ status, version: product.version }),
       });
       if (res.ok) updateProduct(await res.json());
     },
@@ -385,7 +385,7 @@ export function DashboardProducts() {
                 warningThreshold={settings?.warningThreshold}
                 onProductEdit={handleEdit}
                 onProductDelete={handleDelete}
-                onProductConsume={handleConsume}
+                onProductStatusChange={handleConsume}
                 onSelectionChange={setBulkIds}
                 actionBar={actionBar}
               />
