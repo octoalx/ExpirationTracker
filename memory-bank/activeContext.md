@@ -68,20 +68,10 @@ to.
 
 ## Settings gained a team tab (2026-10-21, branch `local/settings-team-tab`)
 
-Hiring was only reachable at `/store` → «Команда». Settings now carries a «Команда»
-tab (`StoreTeam`, `variant="settings"`): hire, reset a password, revoke access,
-rename the department and edit thresholds from one screen.
-
-- The tab appears only for an account with a membership (`MANAGER` sees the forms,
-  `EMPLOYEE` a read-only list); a no-department account, the administrator
-  included, does not see it and keeps personal thresholds.
-- Thresholds are saved by `saveDepartmentThresholds()` (`requireManager`, and a
-  support visit is refused) through `POST /api/store/settings`. The `/store` panel
-  had been posting them to that route, which answered 403 — a real defect, now fixed.
-- Department rename is `PUT /api/store/members` → `renameOwnDepartment()`.
-- Verified on `origin/main` @ `f744cfa`: `typecheck`, `build`, `test:app` (102/102)
-  and `check:context` pass. An earlier red `typecheck`/`build` was only the branch
-  being behind `main` — `75ec4e5` had already fixed the seed.
+`StoreTeam` also renders inside Settings (`variant="settings"`): hire, reset a password,
+revoke access, rename the department and edit thresholds. The tab appears only for an
+account with a membership; thresholds go through `saveDepartmentThresholds()`
+(`requireManager`) — `/store` had posted them to a route that answered 403, now fixed.
 
 ## Spec-driven execution with an approval gate (2026-10-23, merged PR #25)
 
@@ -124,6 +114,16 @@ because the running release has no `/api/version` yet.
 The scanner is a phone tool: `useIsDesktop()` (`src/lib/media-query.ts`, Tailwind `md`) keeps the
 «Сканировать товар» button, its dialog and the add-form camera button out of the desktop render;
 search and manual barcode entry stay everywhere. The phone header carries a sibling 44 px sign-out.
+
+## Dashboard, its dialogs, then store and stats (2026-11-13)
+
+The dashboard moved to direction C «Пульт»: `DashboardSummary` (three cells that also filter),
+FEFO groups, one delete toast with undo (`src/lib/pending-delete.ts`), export of the current
+filter; its add, edit and import dialogs took the `product-dialog-*` tokens. `/store` and
+`/stats` share that shell (`max-w-7xl`, `work-page-title`, dash panels): the walk summary is a
+cell strip, the statistics indicators are four cells of the same block, and `/store` has no
+`window.confirm/prompt/alert` — the closing result, the password reset and the revocation each
+open the application dialog. Specs: `docs/specs/2026-11-13-{dashboard-redesign,dashboard-dialogs,store-and-stats-redesign}.md`.
 
 ## Open threads
 
