@@ -7,12 +7,15 @@ import BarcodeCamera from "./BarcodeCamera";
 import { calculateExpiryDate, type ShelfLifeUnit } from "@/lib/shelf-life";
 import { interactionFeedback } from "@/lib/interaction-feedback";
 import { useKeyboardInset } from "@/lib/keyboard-inset";
+import { useIsDesktop } from "@/lib/media-query";
 
 interface AddProductFormProps { onProductAdded: (product: Product) => void; initialBarcode?: string }
 
 /** Focused registration with catalog lookup and an explicit calculated-date preview. */
 export default function AddProductForm({ onProductAdded, initialBarcode = "" }: AddProductFormProps) {
   useKeyboardInset();
+  /** Same rule as the dashboard: the camera entry point exists on the phone only. */
+  const isDesktop = useIsDesktop();
   const [barcode, setBarcode] = useState(initialBarcode);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -44,6 +47,7 @@ export default function AddProductForm({ onProductAdded, initialBarcode = "" }: 
   }, []);
   useEffect(() => { if (initialBarcode) void lookupBarcode(initialBarcode); return () => { barcodeVersion.current++; }; }, [initialBarcode, lookupBarcode]);
   const closeCamera = useCallback(() => setCameraOpen(false), []);
+  useEffect(() => { if (isDesktop) setCameraOpen(false); }, [isDesktop]);
   const onDetected = useCallback((code: string) => { setBarcode(code); setName(""); setCameraOpen(false); interactionFeedback("scan"); void lookupBarcode(code); }, [lookupBarcode]);
   const calculatedExpiry = calculateExpiryDate(manufacturingDate, shelfLife, shelfLifeUnit);
   const selectedExpiry = dateInputType === "manufacture" ? calculatedExpiry : expiryDate;
@@ -63,7 +67,7 @@ export default function AddProductForm({ onProductAdded, initialBarcode = "" }: 
   return <form onSubmit={handleSubmit} className="product-entry space-y-5">
     <fieldset disabled={isLoading} className="space-y-5">
       <details open={!initialBarcode}><summary className="min-h-11 cursor-pointer py-2 text-sm text-slate-600">Штрих-код{barcode && ` · ${barcode}`}</summary><div><label htmlFor="add-barcode">Штрих-код</label><div className="flex gap-2"><input id="add-barcode" inputMode="numeric" value={barcode} placeholder="Введите или отсканируйте код" onChange={event => { barcodeVersion.current++; setLookingUp(false); setBarcode(event.target.value); setName(""); setCatalogMessage(""); }} />
-        <button type="button" aria-label="Сканировать штрих-код" className="entry-icon" disabled={cameraOpen || isLookingUp} onClick={() => setCameraOpen(true)}><ScanBarcode /></button></div>
+        {!isDesktop && <button type="button" aria-label="Сканировать штрих-код" className="entry-icon md:hidden" disabled={cameraOpen || isLookingUp} onClick={() => setCameraOpen(true)}><ScanBarcode /></button>}</div>
         <button type="button" className="entry-link" disabled={isLookingUp || !barcode.trim()} onClick={() => void lookupBarcode(barcode)}>{isLookingUp ? "Поиск названия…" : "Найти название в каталоге"}</button>
         {cameraOpen && <BarcodeCamera onDetected={onDetected} onClose={closeCamera} />}
       </div></details>

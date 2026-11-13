@@ -57,3 +57,27 @@ test("mobile filter row no longer renders the reset cross button", () => {
   assert.ok(!dashboardSource.includes('className="max-md:sr-only"'));
   assert.ok(!dashboardSource.includes('<X aria-hidden="true" className="size-6 md:hidden"'));
 });
+
+test("the barcode scanner is a phone entry point and leaves the desktop render", () => {
+  assert.ok(dashboardSource.includes('import { useIsDesktop } from "@/lib/media-query";'));
+  assert.match(dashboardSource, /\{!isDesktop && <button type="button" onClick=\{openScan\}/);
+  assert.ok(!dashboardSource.includes('md:w-auto"><ScanBarcode'));
+  assert.match(dashboardSource, /\{!isDesktop && <Dialog open=\{scanOpen\}/);
+  assert.ok(dashboardSource.includes("if (isDesktop) closeScan();"));
+  const addFormSource = readFileSync("src/components/AddProductForm.tsx", "utf8");
+  assert.match(addFormSource, /\{!isDesktop && <button type="button" aria-label="Сканировать штрих-код"/);
+  assert.ok(addFormSource.includes("if (isDesktop) setCameraOpen(false);"));
+  assert.ok(addFormSource.includes('id="add-barcode"'));
+});
+
+test("the phone header offers sign-out next to the settings link instead of nesting it", () => {
+  const headerSource = readFileSync("src/components/MobileHeader.tsx", "utf8");
+  assert.ok(headerSource.includes('import { signOut } from "next-auth/react";'));
+  assert.ok(headerSource.includes('signOut({ callbackUrl: "/auth/signin" })'));
+  const linkStart = headerSource.indexOf('<Link href="/settings"');
+  const settingsLink = headerSource.slice(linkStart, headerSource.indexOf("</Link>", linkStart));
+  assert.ok(linkStart > 0 && settingsLink.length > 0);
+  assert.ok(!settingsLink.includes("<button"));
+  assert.match(headerSource, /aria-label=\{`Выйти из аккаунта: \$\{accountName\}`\}/);
+  assert.ok(headerSource.includes("min-h-11 min-w-11"));
+});

@@ -12,6 +12,7 @@ import { interactionFeedback } from "@/lib/interaction-feedback";
 import { groupByExpiryStatus, groupExpiringFirst, sliceGroups, sortProductsByExpiry } from "@/lib/days-left";
 import { createPendingDeletes, type PendingDeletes } from "@/lib/pending-delete";
 import { expiryDays } from "@/lib/expiry-calendar";
+import { useIsDesktop } from "@/lib/media-query";
 import toast from "react-hot-toast";
 import AddProductForm from "../components/AddProductForm";
 import EditProductForm from "../components/EditProductForm";
@@ -354,6 +355,9 @@ const Dashboard = () => {
   const closeCamera = useCallback(() => setScanCameraOpen(false), []);
   const openScan = () => { setScanError(""); setScanCode(""); setScanOpen(true); setScanCameraOpen(true); };
   const openAdd = () => { setInitialBarcode(""); setAddModalOpen(true); };
+  /** The scanner is a phone tool: on a computer the button, the dialog and the camera do not exist. */
+  const isDesktop = useIsDesktop();
+  useEffect(() => { if (isDesktop) closeScan(); }, [isDesktop, closeScan]);
 
   const updateProduct = (updatedProduct: Product) => {
     setProducts((prev) =>
@@ -565,7 +569,8 @@ const Dashboard = () => {
             )}
           </div>
 
-          <button type="button" onClick={openScan} className="primary-action w-full md:w-auto"><ScanBarcode className="size-6" />Сканировать товар</button>
+          {/* Phone-only: the camera is the first way in on a handset, and there is none on a desktop. */}
+          {!isDesktop && <button type="button" onClick={openScan} className="primary-action w-full md:hidden"><ScanBarcode className="size-6" />Сканировать товар</button>}
         </div>
 
         {scannedBarcode && <div role="status" className="scan-result flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-900"><span>Штрих-код <strong className="tabular-nums">{scannedBarcode}</strong> · Показаны записи по этому коду</span><button className="min-h-11 font-medium underline underline-offset-4" onClick={resetFilters}>Все товары</button></div>}
@@ -751,7 +756,8 @@ const Dashboard = () => {
         onItemsPerPageChange={setItemsPerPage}
       />
 
-      <Dialog open={scanOpen} onOpenChange={open => { if (!open) closeScan(); }}>
+      {/* Scanner dialog stays out of the desktop render: nothing on a computer may open the camera. */}
+      {!isDesktop && <Dialog open={scanOpen} onOpenChange={open => { if (!open) closeScan(); }}>
         <DialogContent className="work-panel product-dialog sm:max-w-lg max-h-[90dvh] overflow-y-auto" aria-describedby="scan-description" onOpenAutoFocus={event => { if (window.matchMedia("(max-width: 767px)").matches) event.preventDefault(); }}>
           <DialogHeader><DialogTitle>Сканировать товар</DialogTitle></DialogHeader>
           <p id="scan-description" className="text-sm text-slate-600">Найдём записи по штрих-коду. Если товара нет в списке, откроем добавление.</p>
@@ -763,7 +769,7 @@ const Dashboard = () => {
             <button disabled={scanBusy || !scanCode.trim()} className="primary-action w-full">{scanBusy ? <><Loader2 className="size-5 animate-spin" />Проверяем товары…</> : "Найти товар"}</button>
           </form>
         </DialogContent>
-      </Dialog>
+      </Dialog>}
       {/* Add product dialog */}
       <Dialog open={isAddModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="work-panel product-dialog sm:max-w-lg max-h-[90dvh] overflow-y-auto" aria-describedby={undefined} onOpenAutoFocus={event => { event.preventDefault(); if (!window.matchMedia("(max-width: 767px)").matches) document.getElementById(initialBarcode ? "add-expiry" : "add-barcode")?.focus(); }}>
