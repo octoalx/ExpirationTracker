@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Users, Shield, User, Trash2, ChevronLeft, ChevronRight, 
-  Loader2, Search, Key, X, Eye, EyeOff, UserPlus
+import { motion } from "framer-motion";
+import {
+  Users, Shield, User, Trash2, ChevronLeft, ChevronRight,
+  Loader2, Search, Key, Eye, EyeOff, UserPlus
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { roleLabel } from "@/lib/admin-labels";
+import ConfirmAction from "@/components/admin/ConfirmAction";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface UserWithStats {
   id: string;
@@ -19,6 +20,27 @@ interface UserWithStats {
   _count?: {
     products: number;
   };
+}
+
+/** The dashboard field look: control border, a 44 px target, the same focus ring. */
+const FIELD =
+  "w-full min-w-0 min-h-11 rounded-[10px] border border-dash-control bg-white px-3 py-2 text-[15px] leading-5 text-dash-ink transition-colors placeholder:text-dash-muted focus-visible:border-dash-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-accent/35 disabled:cursor-not-allowed disabled:border-dash-line disabled:bg-dash-surface disabled:text-dash-ink-2";
+
+const ICON_ACTION =
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-[10px] text-dash-ink-2 transition-colors hover:bg-dash-surface hover:text-dash-ink disabled:opacity-55";
+
+/** The role as a person reads it; the database keeps USER/ADMIN. */
+function RolePill({ role }: { role: string }) {
+  const admin = role === "ADMIN";
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-bold leading-4",
+      admin ? "bg-dash-soft text-dash-accent" : "bg-dash-surface text-dash-ink-2",
+    )}>
+      {admin ? <Shield className="size-3" aria-hidden="true" /> : <User className="size-3" aria-hidden="true" />}
+      {roleLabel(role)}
+    </span>
+  );
 }
 
 /** Admin tab for account creation, search, role changes, deletion and password reset. */
@@ -40,6 +62,10 @@ export default function UsersTab() {
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [resetting, setResetting] = useState(false);
+
+  // Deletion is confirmed in the app dialog instead of the browser's confirm.
+  const [deleteTarget, setDeleteTarget] = useState<UserWithStats | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -97,7 +123,7 @@ export default function UsersTab() {
         body: JSON.stringify({ role: newRole }),
       });
       if (res.ok) {
-        toast.success(`Роль изменена на ${newRole}`);
+        toast.success(`Роль изменена: ${roleLabel(newRole)}`);
         fetchUsers();
       } else {
         toast.error("Ошибка изменения роли");
@@ -107,22 +133,24 @@ export default function UsersTab() {
     }
   };
 
-  const handleDelete = async (userId: string, userName: string | null) => {
-    if (!confirm(`Удалить пользователя ${userName || userId}? Все товары будут удалены!`)) {
-      return;
-    }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
+      const res = await fetch(`/api/admin/users/${deleteTarget.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
-        toast.success("Пользователь удален");
+        toast.success("Пользователь удалён");
+        setDeleteTarget(null);
         fetchUsers();
       } else {
         toast.error("Ошибка удаления");
       }
     } catch {
       toast.error("Ошибка сети");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -149,7 +177,7 @@ export default function UsersTab() {
       });
 
       if (res.ok) {
-        toast.success(`Пароль для ${selectedUser.name || selectedUser.email} изменен`);
+        toast.success(`Пароль для ${selectedUser.name || selectedUser.email} изменён`);
         setResetModalOpen(false);
         setSelectedUser(null);
         setNewPassword("");
@@ -171,47 +199,69 @@ export default function UsersTab() {
   );
 
   const paginatedUsers = filteredUsers.slice((page - 1) * limit, page * limit);
+  const totalPagesShown = Math.max(1, Math.ceil(filteredUsers.length / limit));
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
+      <p role="status" className="flex items-center justify-center gap-2 rounded-xl border border-dash-line bg-dash-panel py-10 text-[13px] leading-5 text-dash-muted">
+        <Loader2 className="size-4 animate-spin text-dash-accent" aria-hidden="true" />
+        Загружаем пользователей…
+      </p>
     );
   }
 
   return (
     <div className="space-y-4">
-      <Button type="button" aria-expanded={createOpen} aria-controls="create-account-form" disabled={creating}
-        onClick={() => { setCreateOpen(!createOpen); setCreateError(""); setDraft({ name: "", email: "", password: "", role: "USER" }); }}>
-        <UserPlus className="size-4" />{createOpen ? "Закрыть форму" : "Создать учётную запись"}
-      </Button>
-      {createOpen && <form id="create-account-form" onSubmit={handleCreate} className="space-y-4 border-b border-slate-200 pb-5">
-        <h2 className="text-lg font-bold">Новая учётная запись</h2>
-        <fieldset disabled={creating} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
-          <label className="min-w-0 space-y-1.5 text-sm font-semibold">Имя
-            <Input className="min-h-11" name="name" autoComplete="off" required maxLength={120} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />
-          </label>
-          <label className="min-w-0 space-y-1.5 text-sm font-semibold">Email
-            <Input className="min-h-11" name="email" type="email" autoComplete="off" required maxLength={254} value={draft.email} onChange={e => setDraft({ ...draft, email: e.target.value })} />
-          </label>
-          <label className="min-w-0 space-y-1.5 text-sm font-semibold">Пароль
-            <Input className="min-h-11" name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={72} aria-describedby="account-password-hint" value={draft.password} onChange={e => setDraft({ ...draft, password: e.target.value })} />
-            <span id="account-password-hint" className="block text-xs font-normal text-slate-600">Минимум 8 символов; максимум 72 латинских символа или 36 кириллических.</span>
-          </label>
-          <label className="min-w-0 space-y-1.5 text-sm font-semibold">Роль
-            <select className="block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base focus-visible:outline-2 focus-visible:outline-blue-700" name="role" value={draft.role} onChange={e => setDraft({ ...draft, role: e.target.value })}>
-              <option value="USER">Сотрудник</option><option value="ADMIN">Администратор</option>
-            </select>
-          </label>
-        </fieldset>
-        {createError && <p role="alert" className="text-sm text-red-700">{createError}</p>}
-        <Button type="submit" disabled={creating}>{creating && <Loader2 className="size-4 animate-spin" />}{creating ? "Создание…" : "Создать"}</Button>
-      </form>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          aria-expanded={createOpen}
+          aria-controls="create-account-form"
+          disabled={creating}
+          onClick={() => { setCreateOpen(!createOpen); setCreateError(""); setDraft({ name: "", email: "", password: "", role: "USER" }); }}
+          className="dialog-action-secondary gap-2"
+        >
+          <UserPlus className="size-4" aria-hidden="true" />
+          {createOpen ? "Закрыть форму" : "Создать учётную запись"}
+        </button>
+      </div>
+
+      {createOpen && (
+        <form id="create-account-form" onSubmit={handleCreate} className="space-y-4 rounded-xl border border-dash-line bg-dash-panel p-4 md:p-5">
+          <h2 className="text-[15px] font-extrabold leading-5 text-dash-ink">Новая учётная запись</h2>
+          <fieldset disabled={creating} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="min-w-0">
+              <span className="mb-1.5 block text-[13px] font-semibold leading-5 text-dash-ink-2">Имя</span>
+              <input className={FIELD} name="name" autoComplete="off" required maxLength={120} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />
+            </label>
+            <label className="min-w-0">
+              <span className="mb-1.5 block text-[13px] font-semibold leading-5 text-dash-ink-2">Email</span>
+              <input className={FIELD} name="email" type="email" autoComplete="off" required maxLength={254} value={draft.email} onChange={e => setDraft({ ...draft, email: e.target.value })} />
+            </label>
+            <label className="min-w-0">
+              <span className="mb-1.5 block text-[13px] font-semibold leading-5 text-dash-ink-2">Пароль</span>
+              <input className={FIELD} name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={72} aria-describedby="account-password-hint" value={draft.password} onChange={e => setDraft({ ...draft, password: e.target.value })} />
+              <span id="account-password-hint" className="mt-1.5 block text-[13px] leading-5 text-dash-muted">Минимум 8 символов; максимум 72 латинских символа или 36 кириллических.</span>
+            </label>
+            <label className="min-w-0">
+              <span className="mb-1.5 block text-[13px] font-semibold leading-5 text-dash-ink-2">Роль</span>
+              <select className={FIELD} name="role" value={draft.role} onChange={e => setDraft({ ...draft, role: e.target.value })}>
+                <option value="USER">Сотрудник</option><option value="ADMIN">Администратор</option>
+              </select>
+            </label>
+          </fieldset>
+          {createError && <p role="alert" className="field-error">{createError}</p>}
+          <button type="submit" disabled={creating} className="primary-action gap-2 text-[15px]">
+            {creating && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+            {creating ? "Создание…" : "Создать"}
+          </button>
+        </form>
+      )}
+
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <Input
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dash-muted" aria-hidden="true" />
+        <input
           aria-label="Поиск пользователей"
           placeholder="Поиск по имени или email..."
           value={searchTerm}
@@ -219,224 +269,209 @@ export default function UsersTab() {
             setSearchTerm(e.target.value);
             setPage(1);
           }}
-          className="pl-9"
+          className={cn(FIELD, "pl-9")}
         />
       </div>
 
+      {/* Phone: cards keep the account readable without a table */}
       <div className="space-y-3 md:hidden">
-        {paginatedUsers.length === 0 && <p className="work-surface p-5 text-sm text-slate-600">Пользователей не найдено</p>}
-        {paginatedUsers.map(user => <article key={user.id} className="work-surface p-4">
-          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words text-base font-bold">{user.name || "Без имени"}</h2><p className="mt-1 break-all text-sm text-slate-600">{user.email || "Email не указан"}</p><p className="mt-1 text-sm text-slate-600">{user.membership ? `Отдел «${user.membership.store.name}» · ${user.membership.role === "MANAGER" ? "руководитель" : "сотрудник"}` : "Без отдела — таблиц не видит"}</p></div><span className={cn("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", user.role === "ADMIN" ? "bg-blue-50 text-blue-800" : "bg-slate-100 text-slate-700")}>{user.role === "ADMIN" ? "Админ" : "Сотрудник"}</span></div>
-          <details className="mt-3 border-t border-slate-200 pt-2"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-blue-700">Управление доступом</summary><div className="flex flex-col gap-2">
-            <Button variant="outline" onClick={() => handleRoleChange(user.id, user.role === "ADMIN" ? "USER" : "ADMIN")}>{user.role === "ADMIN" ? "Снять права администратора" : "Назначить администратором"}</Button>
-            <Button variant="outline" onClick={() => openResetModal(user)}><Key className="size-4" />Сбросить пароль</Button>
-            <Button variant="outline" className="text-red-700" onClick={() => handleDelete(user.id, user.name)}><Trash2 className="size-4" />Удалить пользователя</Button>
-          </div></details>
-        </article>)}
+        {paginatedUsers.length === 0 && <p role="status" className="rounded-xl border border-dash-line bg-dash-panel p-4 text-sm leading-5 text-dash-ink-2">Пользователей не найдено</p>}
+        {paginatedUsers.map(user => (
+          <article key={user.id} className="rounded-xl border border-dash-line bg-dash-panel p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="break-words text-[15px] font-bold leading-5 text-dash-ink">{user.name || "Без имени"}</h2>
+                <p className="mt-1 break-all text-[13px] leading-5 text-dash-ink-2">{user.email || "Email не указан"}</p>
+                <p className="mt-1 text-[13px] leading-5 text-dash-ink-2">{user.membership ? `Отдел «${user.membership.store.name}» · ${user.membership.role === "MANAGER" ? "руководитель" : "сотрудник"}` : "Без отдела — таблиц не видит"}</p>
+              </div>
+              <RolePill role={user.role} />
+            </div>
+            <details className="mt-3 border-t border-dash-line pt-2">
+              <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-semibold text-dash-accent">Управление доступом</summary>
+              <div className="mt-1 flex flex-col gap-2">
+                <button type="button" className="dialog-action-secondary" onClick={() => handleRoleChange(user.id, user.role === "ADMIN" ? "USER" : "ADMIN")}>
+                  {user.role === "ADMIN" ? "Снять права администратора" : "Назначить администратором"}
+                </button>
+                <button type="button" className="dialog-action-secondary gap-2" onClick={() => openResetModal(user)}>
+                  <Key className="size-4" aria-hidden="true" />Сбросить пароль
+                </button>
+                <button type="button" className="dialog-action-danger gap-2" onClick={() => setDeleteTarget(user)}>
+                  <Trash2 className="size-4" aria-hidden="true" />Удалить пользователя
+                </button>
+              </div>
+            </details>
+          </article>
+        ))}
       </div>
-      {/* Table */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white overflow-hidden">
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-sm">
+
+      {/* Desktop: the accounts table */}
+      <div className="hidden overflow-hidden rounded-xl border border-dash-line bg-dash-panel md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                <th className="px-4 py-3 text-left font-medium text-slate-600 dark:text-slate-400">Пользователь</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600 dark:text-slate-400">Email</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600 dark:text-slate-400">Отдел</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600 dark:text-slate-400">Роль</th>
-                <th className="px-4 py-3 text-right font-medium text-slate-600 dark:text-slate-400">Действия</th>
+              <tr className="border-b border-dash-line bg-dash-surface">
+                <th className="px-4 py-2.5 text-left text-[12px] font-bold leading-4 text-dash-muted">Пользователь</th>
+                <th className="px-4 py-2.5 text-left text-[12px] font-bold leading-4 text-dash-muted">Email</th>
+                <th className="px-4 py-2.5 text-left text-[12px] font-bold leading-4 text-dash-muted">Отдел</th>
+                <th className="px-4 py-2.5 text-left text-[12px] font-bold leading-4 text-dash-muted">Роль</th>
+                <th className="px-4 py-2.5 text-right text-[12px] font-bold leading-4 text-dash-muted">Действия</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody>
               {paginatedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-slate-500">
-                    <Users className="h-12 w-12 mx-auto mb-3 opacity-40" />
+                  <td colSpan={5} className="px-4 py-12 text-center text-sm text-dash-muted">
+                    <Users className="mx-auto mb-3 size-10 opacity-40" aria-hidden="true" />
                     <p>Пользователей не найдено</p>
                   </td>
                 </tr>
               ) : (
                 paginatedUsers.map((user) => (
-                <motion.tr
-                  key={user.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="rounded-lg bg-slate-100 dark:bg-slate-800 p-1.5">
-                        <User className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                  <motion.tr
+                    key={user.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="border-b border-dash-line transition-colors last:border-0 hover:bg-dash-surface"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-dash-soft text-dash-accent">
+                          <User className="size-4" aria-hidden="true" />
+                        </span>
+                        <span className="font-semibold text-dash-ink">{user.name || "Без имени"}</span>
                       </div>
-                      <span className="font-medium">{user.name || "Без имени"}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{user.email || "—"}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{user.membership ? `${user.membership.store.name} · ${user.membership.role === "MANAGER" ? "руководитель" : "сотрудник"}` : "без отдела"}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-                        user.role === "ADMIN"
-                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                          : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
-                      )}
-                    >
-                      {user.role === "ADMIN" ? <Shield className="h-3 w-3" /> : <User className="h-3 w-3" />}
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRoleChange(user.id, user.role === "ADMIN" ? "USER" : "ADMIN")}
-                        className={cn(
-                          "text-xs",
-                          user.role === "ADMIN"
-                            ? "text-slate-600 hover:text-slate-900"
-                            : "text-blue-600 hover:text-blue-900"
-                        )}
-                      >
-                        {user.role === "ADMIN" ? "Сделать USER" : "Сделать ADMIN"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openResetModal(user)}
-                        className="text-amber-600 hover:text-amber-900"
-                        title="Сбросить пароль" aria-label={`Сбросить пароль ${user.name || user.email || "пользователя"}`}
-                      >
-                        <Key className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(user.id, user.name)}
-                        aria-label={`Удалить ${user.name || user.email || "пользователя"}`}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </motion.tr>
-              ))
+                    </td>
+                    <td className="px-4 py-3 text-dash-ink-2">{user.email || "—"}</td>
+                    <td className="px-4 py-3 text-dash-ink-2">{user.membership ? `${user.membership.store.name} · ${user.membership.role === "MANAGER" ? "руководитель" : "сотрудник"}` : "без отдела"}</td>
+                    <td className="px-4 py-3"><RolePill role={user.role} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleRoleChange(user.id, user.role === "ADMIN" ? "USER" : "ADMIN")}
+                          className="inline-flex min-h-11 items-center rounded-[10px] px-2.5 text-[13px] font-semibold text-dash-accent transition-colors hover:bg-dash-soft"
+                        >
+                          {user.role === "ADMIN" ? "Снять права администратора" : "Назначить администратором"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openResetModal(user)}
+                          className={cn(ICON_ACTION, "text-dash-accent hover:bg-dash-soft hover:text-dash-accent")}
+                          title="Сбросить пароль" aria-label={`Сбросить пароль ${user.name || user.email || "пользователя"}`}
+                        >
+                          <Key className="size-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(user)}
+                          aria-label={`Удалить ${user.name || user.email || "пользователя"}`}
+                          className={cn(ICON_ACTION, "text-dash-expired hover:bg-dash-expired-soft hover:text-dash-expired")}
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-1 border-t border-slate-200 dark:border-slate-700 px-4 py-3">
+          <div className="flex items-center justify-center gap-1 border-t border-dash-line px-4 py-2">
             <button
+              type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+              aria-label="Предыдущая страница"
+              className={ICON_ACTION}
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="size-4" aria-hidden="true" />
             </button>
-            <span className="text-sm text-slate-600 dark:text-slate-400 px-3">
-              {page} / {Math.max(1, Math.ceil(filteredUsers.length / limit))}
+            <span className="px-3 text-[13px] leading-5 tabular-nums text-dash-ink-2">
+              {page} / {totalPagesShown}
             </span>
             <button
-              onClick={() => setPage((p) => Math.min(Math.ceil(filteredUsers.length / limit), p + 1))}
-              disabled={page >= Math.ceil(filteredUsers.length / limit)}
-              className="min-h-11 min-w-11 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPagesShown, p + 1))}
+              disabled={page >= totalPagesShown}
+              aria-label="Следующая страница"
+              className={ICON_ACTION}
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="size-4" aria-hidden="true" />
             </button>
           </div>
         )}
       </div>
 
       {/* Summary */}
-      <div className="flex items-center gap-4 text-sm text-slate-500">
-        <div className="flex items-center gap-1">
-          <Users className="h-4 w-4" />
-          <span>Всего: {filteredUsers.length}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Shield className="h-4 w-4 text-blue-600" />
-          <span>Admin: {users.filter((u) => u.role === "ADMIN").length}</span>
-        </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] leading-5 text-dash-muted">
+        <span className="inline-flex items-center gap-1">
+          <Users className="size-4" aria-hidden="true" />
+          Всего: {filteredUsers.length}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Shield className="size-4 text-dash-accent" aria-hidden="true" />
+          Администраторов: {users.filter((u) => u.role === "ADMIN").length}
+        </span>
       </div>
 
-      {/* Password Reset Modal */}
-      <AnimatePresence>
-        {resetModalOpen && selectedUser && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => setResetModalOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl"
+      {/* Password reset */}
+      <Dialog open={resetModalOpen && !!selectedUser} onOpenChange={(open) => { if (!open) setResetModalOpen(false); }}>
+        <DialogContent className="work-panel product-dialog product-entry sm:max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Сброс пароля</DialogTitle>
+          </DialogHeader>
+          <p className="text-[13px] leading-5 text-dash-ink-2">
+            Пользователь: <span className="font-semibold text-dash-ink">{selectedUser?.name || selectedUser?.email}</span>
+          </p>
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Новый пароль (мин. 6 символов)"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              aria-label="Новый пароль"
+              className={cn("pr-12")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+              className="absolute right-0.5 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-dash-muted transition-colors hover:text-dash-ink"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Сброс пароля</h3>
-                <button
-                  onClick={() => setResetModalOpen(false)}
-                  className="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
+              {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+            </button>
+          </div>
+          <div className="product-dialog-actions">
+            <button type="button" className="dialog-action-secondary" onClick={() => setResetModalOpen(false)}>
+              Отмена
+            </button>
+            <button
+              type="button"
+              className="primary-action dialog-action-primary gap-2 text-[15px]"
+              onClick={handleResetPassword}
+              disabled={resetting || newPassword.length < 6}
+            >
+              {resetting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Key className="size-4" aria-hidden="true" />}
+              {resetting ? "Сохранение..." : "Сбросить пароль"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                Пользователь: <span className="font-medium">{selectedUser.name || selectedUser.email}</span>
-              </p>
-
-              <div className="relative mb-4">
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Новый пароль (мин. 6 символов)"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setResetModalOpen(false)}
-                >
-                  Отмена
-                </Button>
-                <Button
-                  className="flex-1 bg-[#1554b5] hover:bg-[#12479a] text-white"
-                  onClick={handleResetPassword}
-                  disabled={resetting || newPassword.length < 6}
-                >
-                  {resetting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Key className="h-4 w-4 mr-2" />
-                  )}
-                  {resetting ? "Сохранение..." : "Сбросить пароль"}
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ConfirmAction
+        open={!!deleteTarget}
+        title={`Удалить пользователя ${deleteTarget?.name || deleteTarget?.email || ""}?`}
+        description="Все товары будут удалены. Действие необратимо."
+        confirmLabel="Удалить пользователя"
+        busy={deleting}
+        danger
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void handleDelete()}
+      />
     </div>
   );
 }

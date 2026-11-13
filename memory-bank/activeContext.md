@@ -68,20 +68,10 @@ to.
 
 ## Settings gained a team tab (2026-10-21, branch `local/settings-team-tab`)
 
-Hiring was only reachable at `/store` → «Команда». Settings now carries a «Команда»
-tab (`StoreTeam`, `variant="settings"`): hire, reset a password, revoke access,
-rename the department and edit thresholds from one screen.
-
-- The tab appears only for an account with a membership (`MANAGER` sees the forms,
-  `EMPLOYEE` a read-only list); a no-department account, the administrator
-  included, does not see it and keeps personal thresholds.
-- Thresholds are saved by `saveDepartmentThresholds()` (`requireManager`, and a
-  support visit is refused) through `POST /api/store/settings`. The `/store` panel
-  had been posting them to that route, which answered 403 — a real defect, now fixed.
-- Department rename is `PUT /api/store/members` → `renameOwnDepartment()`.
-- Verified on `origin/main` @ `f744cfa`: `typecheck`, `build`, `test:app` (102/102)
-  and `check:context` pass. An earlier red `typecheck`/`build` was only the branch
-  being behind `main` — `75ec4e5` had already fixed the seed.
+`StoreTeam` also renders inside Settings (`variant="settings"`): hire, reset a password,
+revoke access, rename the department and edit thresholds. The tab appears only for an
+account with a membership; thresholds go through `saveDepartmentThresholds()`
+(`requireManager`) — `/store` had posted them to a route that answered 403, now fixed.
 
 ## Spec-driven execution with an approval gate (2026-10-23, merged PR #25)
 
@@ -119,6 +109,15 @@ the hook builds its two guard modules for development; production keeps the unch
 The first deploy of this workflow needs the previous one to ship the commit once,
 because the running release has no `/api/version` yet.
 
+## Dashboard, dialogs, store, stats, settings, admin (2026-11-13)
+
+Design refresh on direction C «Пульт» with the phone list from «Полка»: `DashboardSummary` (three cells
+that also filter), FEFO groups, one delete toast with undo, export of the current filter; add, edit and
+import dialogs on `product-dialog-*`; `/store`, `/stats`, `/settings` and `/admin` on the same shell
+(`max-w-7xl`, `work-page-title`, dash panels). No `window.confirm/prompt/alert` in the app; admin roles
+read «Сотрудник / Администратор»; `/admin/issues` removed. Scanner stays a phone tool via `useIsDesktop()`
+(`src/lib/media-query.ts`, Tailwind `md`), the phone header carries a sibling 44 px sign-out.
+Specs: `docs/specs/2026-11-13-*.md`; report: `redesign/REPORT-REDESIGN.md`.
 ## Task continuity (2026-10-23)
 
 One task = one session; state comes from this file, `git log` and open PRs, never a

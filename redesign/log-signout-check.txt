@@ -1,0 +1,12 @@
+{
+ "ac3_phone": {
+  "path": "/auth/signin",
+  "cookie_after": "",
+  "products_status": 401
+ },
+ "ac4_desktop_sidebar": {
+  "path": "/auth/signin",
+  "cookies": "",
+  "products_status": 401
+ }
+}

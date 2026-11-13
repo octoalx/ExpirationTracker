@@ -9,6 +9,20 @@
     --color-expiry-ink: #8a520e;
     --color-expiry-soft: #fff7e6;
     --color-expiry-border: #f0d49a;
+    /* Dashboard "Пульт" palette (redesign/DIRECTIONS.md, direction C). */
+    --color-dash-panel: #ffffff;
+    --color-dash-surface: #f6f8fa;
+    --color-dash-line: #dde2e8;
+    --color-dash-control: #76828f;
+    --color-dash-ink: #151a21;
+    --color-dash-ink-2: #424d59;
+    --color-dash-muted: #56626e;
+    --color-dash-accent: #1554b5;
+    --color-dash-soft: #eaf1fc;
+    --color-dash-expired: #b42318;
+    --color-dash-expired-soft: #fdeeec;
+    --color-dash-amber-ink: #8a520e;
+    --color-dash-amber-bar: #b7791f;
     --font-heading: "Manrope", ui-sans-serif, system-ui, sans-serif;
     --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
@@ -294,7 +308,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .primary-action:hover { background: #12479a; }
 .primary-action:active { transform: translateY(1px) scale(.985); }
 .primary-action:disabled { opacity: .55; cursor: wait; transform: none; }
-.product-entry { font-size: 16px; }
+/* ─── Dialogs: "Пульт" tokens (redesign/DIRECTIONS.md, direction C) ───── */
+.product-entry { font-size: 14px; line-height: 20px; color: #151a21; }
 /* Keep centering in one transform: production CSS optimization can merge
    individual translate resets without overriding Tailwind's translate utility. */
 .dialog-surface { top: 50%; left: 50%; transform: translate(-50%, -50%); }
@@ -307,23 +322,104 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Keep native WebKit date values aligned after the system picker confirms a date. */
 .product-entry input[type="date"]::-webkit-date-and-time-value { min-height: 1.5em; text-align: left; }
 .product-entry input[type="date"]::-webkit-datetime-edit { padding: 0; }
-.product-entry label { display: block; margin-bottom: .5rem; color: #334155; font-size: 14px; font-weight: 550; }
-.product-entry input {
-  min-width: 0; width: 100%; min-height: 48px; padding: .75rem .9rem;
-  border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #111827;
-  font-size: 16px; font-variant-numeric: tabular-nums;
+.product-entry label, .product-entry .entry-label {
+  display: block; margin-bottom: 6px; color: #424d59; font-size: 13px; font-weight: 600; line-height: 20px;
 }
-.product-entry input::placeholder { color: #64748b; }
+.product-entry input {
+  min-width: 0; width: 100%; min-height: 44px; padding: 10px 12px;
+  border: 1px solid #76828f; border-radius: 10px; background: #fff; color: #151a21;
+  font-size: 15px; font-variant-numeric: tabular-nums;
+}
+.product-entry input::placeholder { color: #56626e; }
+.product-entry input[aria-invalid="true"] { border-color: #b42318; }
+.product-entry input:focus-visible { outline: 2px solid #1554b5; outline-offset: 1px; border-color: #1554b5; }
+.product-dialog [data-slot="dialog-title"] { font-size: 16px; font-weight: 800; letter-spacing: -.01em; color: #151a21; }
+.field-optional { color: #56626e; font-weight: 500; }
+.field-hint { margin-top: 6px; font-size: 13px; line-height: 20px; color: #56626e; }
+.field-error { margin-top: 6px; font-size: 13px; line-height: 20px; font-weight: 600; color: #b42318; }
+.form-error {
+  display: flex; gap: 8px; align-items: flex-start; padding: 12px;
+  border: 1px solid #b42318; border-radius: 10px; background: #fdeeec;
+  color: #8e1c12; font-size: 13px; line-height: 20px;
+}
+.entry-duration { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 8px; align-items: end; }
+.entry-duration > .field-error { grid-column: 1 / -1; }
 .entry-duration > input { width: 5rem; }
-.entry-icon { display: flex; align-items: center; justify-content: center; width: 48px; min-height: 48px; flex-shrink: 0; border-radius: 10px; background: #eff6ff; color: #1554b5; }
-.entry-link { min-height: 44px; color: #1554b5; font-size: 14px; font-weight: 550; }
+.entry-icon {
+  display: flex; align-items: center; justify-content: center; width: 44px; min-height: 44px;
+  flex: none; border-radius: 10px; background: #eaf1fc; color: #1554b5;
+}
+.entry-icon:disabled { opacity: .55; }
+.entry-link { display: inline-flex; align-items: center; min-height: 40px; color: #1554b5; font-size: 13px; font-weight: 600; }
 .entry-link:disabled { opacity: .55; }
-.entry-segment { display: flex; padding: 3px; border-radius: 10px; background: #f1f5f9; gap: 2px; }
-.entry-segment button { flex: 1; min-width: 0; min-height: 44px; border-radius: 8px; padding: .4rem .35rem; color: #475569; font-size: 14px; font-weight: 550; transition: background-color 160ms ease, color 160ms ease; }
+.entry-segment { display: flex; padding: 3px; border: 1px solid #dde2e8; border-radius: 10px; background: #f6f8fa; gap: 2px; }
+.entry-segment button {
+  flex: 1 1 0; min-width: 0; min-height: 38px; border-radius: 7px; padding: 6px 8px;
+  color: #424d59; font-size: 13px; font-weight: 600; transition: background-color 160ms ease, color 160ms ease;
+}
 .entry-segment button[aria-pressed="true"] { background: #1554b5; color: #fff; }
-.expiry-preview { position: relative; display: flex; flex-direction: column; gap: .4rem; padding: 1rem; border-radius: 12px; background: #f1f5f9; color: #475569; }
-.expiry-preview strong { font-size: 24px; font-weight: 650; color: #111827; font-variant-numeric: tabular-nums; }
-.expiry-preview svg { position: absolute; right: 1rem; top: 1rem; }
+.expiry-preview {
+  position: relative; display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 14px; border: 1px solid #dde2e8; border-radius: 10px; background: #f6f8fa;
+}
+.expiry-preview span { font-size: 13px; font-weight: 600; color: #56626e; }
+.expiry-preview strong {
+  font-size: 24px; line-height: 32px; font-weight: 800; letter-spacing: -.02em;
+  color: #151a21; font-variant-numeric: tabular-nums;
+}
+.expiry-preview svg { position: absolute; right: 14px; top: 14px; color: #1554b5; }
+.product-dialog-actions {
+  display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid #dde2e8;
+}
+.dialog-action-secondary {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px;
+  border: 1px solid #76828f; border-radius: 10px; background: #fff; color: #424d59;
+  font-size: 15px; font-weight: 600; transition: background-color 160ms ease;
+}
+.dialog-action-secondary:hover { background: #f6f8fa; }
+.dialog-action-secondary:disabled { opacity: .55; }
+.dialog-action-primary { flex: 1 1 auto; }
+@media (min-width: 768px) {
+  .product-dialog-actions { flex-direction: row; justify-content: flex-end; }
+  .dialog-action-primary { flex: 0 1 auto; }
+}
+/* ─── Excel import dialog ─────────────────────────────────────────────── */
+.import-drop {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%;
+  padding: 24px 16px; border: 2px dashed #76828f; border-radius: 12px; background: #f6f8fa;
+  color: #424d59; text-align: center; transition: border-color 160ms ease, background-color 160ms ease;
+}
+.import-drop:hover { border-color: #1554b5; background: #eaf1fc; }
+.import-drop-title { font-size: 15px; font-weight: 600; color: #151a21; }
+.import-drop-hint { font-size: 13px; color: #56626e; }
+.import-summary {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between;
+  padding: 12px 14px; border: 1px solid #dde2e8; border-radius: 10px; background: #f6f8fa;
+}
+.import-file-name { font-size: 14px; font-weight: 700; color: #151a21; overflow-wrap: anywhere; }
+.import-file-meta { font-size: 13px; color: #56626e; }
+.import-counts { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: #424d59; }
+.import-counts strong { font-variant-numeric: tabular-nums; }
+.import-count-error { color: #b42318; font-weight: 600; }
+.import-warning { padding: 10px 12px; border: 1px solid #f0d49a; border-radius: 10px; background: #fff7e6; }
+.import-warning-title { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 700; color: #8a520e; }
+.import-warning-list { margin-top: 4px; max-height: 96px; overflow-y: auto; font-size: 12px; line-height: 18px; color: #8a520e; }
+.import-warning-foot { margin-top: 6px; font-size: 12px; line-height: 18px; color: #8a520e; }
+.import-table-wrap { max-height: 240px; overflow-y: auto; border: 1px solid #dde2e8; border-radius: 10px; }
+.import-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.import-table th {
+  position: sticky; top: 0; background: #f6f8fa; color: #56626e; font-weight: 700;
+  text-align: left; padding: 8px 10px; white-space: nowrap;
+}
+.import-table td { padding: 6px 10px; border-top: 1px solid #dde2e8; color: #151a21; vertical-align: middle; }
+.import-cell-code { color: #56626e; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.import-cell-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-row-remove {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border-radius: 8px; color: #b42318;
+}
+.import-row-remove:hover { background: #fdeeec; }
+.import-more { padding: 6px; text-align: center; font-size: 12px; color: #56626e; }
 .inventory-record { transition: background-color 150ms ease; }
 .inventory-record-highlighted { background: #f1f5f9; }
 .inventory-row { border-radius: 12px; transition: background-color 150ms ease; }
@@ -373,10 +469,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     background: #fff;
   }
   .inventory-page [data-slot="button"] { min-height: 44px; }
-}
-@media (max-width: 374px) {
-  .entry-duration { flex-direction: column; }
-  .entry-duration > input { width: 100%; }
+  /* The team tab renders the shared StoreTeam; its fields keep the phone touch size. */
+  .settings-team [data-slot="input"],
+  .settings-team input:not([type="checkbox"]) { min-height: 44px; font-size: 16px; }
+  /* Phone: one column, readable 16px fields, actions pinned above the keyboard. */
+  .product-entry input { min-height: 48px; font-size: 16px; }
+  .entry-duration { grid-template-columns: minmax(0, 1fr); }
+  .dialog-action-primary { flex: none; width: 100%; }
+  .product-dialog-actions {
+    position: sticky;
+    bottom: calc(-1.5rem - env(safe-area-inset-bottom) - var(--keyboard-inset, 0px));
+    z-index: 2;
+    margin: 0 -1rem calc(-1.5rem - env(safe-area-inset-bottom) - var(--keyboard-inset, 0px));
+    padding: 10px 1rem calc(10px + env(safe-area-inset-bottom));
+    background: #fff;
+  }
 }
 @media (min-width: 768px) { .work-main { padding-bottom: 2rem; } }
 @media (prefers-reduced-motion: reduce) {
@@ -387,3 +494,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (max-width: 767px) {
   .admin-workspace input:not([type="checkbox"]) { min-height: 48px; font-size: 16px; }
 }
+
+/* Admin: a destructive action in the secondary shape — red border and label,
+   red-soft hover — so red marks danger only, never a regular action. */
+.dialog-action-danger {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px;
+  border: 1px solid #b42318; border-radius: 10px; background: #fff; color: #b42318;
+  font-size: 15px; font-weight: 600; transition: background-color 160ms ease;
+}
+.dialog-action-danger:hover { background: #fdeeec; }
+.dialog-action-danger:disabled { opacity: .55; cursor: not-allowed; }

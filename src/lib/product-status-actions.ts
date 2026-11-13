@@ -16,9 +16,9 @@ const ACTION_ORDER: readonly ProductStatusActionKey[] = ["edit", "defect", "acti
 
 const ACTION_LABELS: Readonly<Record<ProductStatusActionKey, string>> = {
   edit: "Изменить",
-  defect: "Брак",
-  active: "Активные",
-  archive: "Архив",
+  defect: "В Брак",
+  active: "В Активные",
+  archive: "В Архив",
 };
 
 /** Which button is highlighted for a given product status. Unknown statuses select nothing. */
