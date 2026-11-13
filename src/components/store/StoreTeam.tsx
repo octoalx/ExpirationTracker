@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { notifySettingsChanged } from "@/lib/inventory-settings";
 
 const MIN_PASSWORD = 8;
@@ -23,6 +24,10 @@ export default function StoreTeam({ data, refresh, currentUserId, variant = "pag
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [resetTarget, setResetTarget] = useState<any>(null);
+  const [resetValue, setResetValue] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [revokeTarget, setRevokeTarget] = useState<any>(null);
   const manager = data.role === "MANAGER";
   const inSettings = variant === "settings";
 
@@ -38,14 +43,24 @@ export default function StoreTeam({ data, refresh, currentUserId, variant = "pag
     finally { setBusy(false); }
   };
 
-  const resetPassword = async (member: any) => {
-    const password = window.prompt(`Новый пароль для ${member.user.name ?? member.user.email} (не менее ${MIN_PASSWORD} символов):`);
-    if (password === null) return;
-    if (password.length < MIN_PASSWORD) { setError(`Пароль должен быть не короче ${MIN_PASSWORD} символов.`); return; }
-    await request(`/api/store/members/${member.userId}/password`, "POST", { password }, "Пароль изменён. Передайте сотруднику новый пароль.");
+  const openReset = (member: any) => { setResetError(""); setResetValue(""); setResetTarget(member); };
+
+  /** The password comes from the manager in the application dialog, never a native one. */
+  const submitReset = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!resetTarget) return;
+    if (resetValue.length < MIN_PASSWORD) { setResetError(`Пароль должен быть не короче ${MIN_PASSWORD} символов.`); return; }
+    const saved = await request(`/api/store/members/${resetTarget.userId}/password`, "POST", { password: resetValue }, "Пароль изменён. Передайте сотруднику новый пароль.");
+    if (saved) { setResetTarget(null); setResetValue(""); }
   };
 
-  return <section className={inSettings ? "space-y-5" : "work-surface space-y-5 p-4 sm:p-6"}>
+  const submitRevoke = async () => {
+    if (!revokeTarget) return;
+    const saved = await request("/api/store/members", "DELETE", { userId: revokeTarget.userId }, "Доступ отозван.");
+    if (saved) setRevokeTarget(null);
+  };
+
+  return <section className={inSettings ? "space-y-5" : "space-y-5 rounded-xl border border-dash-line bg-dash-panel p-4 sm:p-6"}>
     {inSettings
       ? <div>
         <h2 className="text-lg font-bold text-foreground">Команда · {data.store.name}</h2>
@@ -54,8 +69,8 @@ export default function StoreTeam({ data, refresh, currentUserId, variant = "pag
           ? "Здесь вы добавляете сотрудников: каждый получает свой email-логин и пароль."
           : "Учётные записи сотрудников создаёт и отзывает руководитель отдела. Список ниже — только для просмотра."}</p>
       </div>
-      : <h2 className="text-lg font-semibold">Команда · {data.store.name}</h2>}
-    {!inSettings && <p className="text-sm text-muted-foreground">Таблица у отдела одна, её ведут все сотрудники. Учётные записи сотрудников создаёт и отзывает руководитель.</p>}
+      : <h2 className="text-base font-extrabold leading-5 text-dash-ink">Команда · {data.store.name}</h2>}
+    {!inSettings && <p className="text-[13px] font-medium leading-5 text-dash-muted">Таблица у отдела одна, её ведут все сотрудники. Учётные записи сотрудников создаёт и отзывает руководитель.</p>}
     {manager && inSettings && <form className="flex flex-wrap items-end gap-2 rounded-xl border p-3" onSubmit={async e => {
       e.preventDefault();
       const title = name.trim();
@@ -67,37 +82,73 @@ export default function StoreTeam({ data, refresh, currentUserId, variant = "pag
       </label>
       <Button variant="outline" disabled={busy || !name.trim() || name.trim() === data.store.name}>Переименовать отдел</Button>
     </form>}
-    <ul className="divide-y">{data.members.map((member: any) => <li key={member.userId} className="flex flex-wrap items-center justify-between gap-2 py-3">
+    <ul className="divide-y divide-dash-line">{data.members.map((member: any) => <li key={member.userId} className="flex flex-wrap items-center justify-between gap-2 py-3">
       <div className="min-w-0 break-all">
-        <p className="font-medium">{member.user.name ?? "Сотрудник"}{member.userId === currentUserId ? " · это вы" : ""}</p>
-        <p className="text-sm text-muted-foreground">{member.user.email} · {member.role === "MANAGER" ? "Руководитель отдела" : "Сотрудник"}</p>
+        <p className="text-[15px] font-bold leading-5 text-dash-ink">{member.user.name ?? "Сотрудник"}{member.userId === currentUserId ? " · это вы" : ""}</p>
+        <p className="text-[13px] leading-5 text-dash-muted">{member.user.email} · {member.role === "MANAGER" ? "Руководитель отдела" : "Сотрудник"}</p>
       </div>
       {manager && member.role !== "MANAGER" && <div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={busy} onClick={() => void resetPassword(member)}>Сбросить пароль</Button>
-        <Button variant="outline" disabled={busy} onClick={() => {
-          if (window.confirm(`Отозвать доступ у ${member.user.name ?? member.user.email}? Товары отдела сохранятся, авторство записей будет снято.`)) void request("/api/store/members", "DELETE", { userId: member.userId }, "Доступ отозван.");
-        }}>Отозвать доступ</Button>
+        <Button variant="outline" disabled={busy} onClick={() => openReset(member)}>Сбросить пароль</Button>
+        <Button variant="outline" disabled={busy} onClick={() => setRevokeTarget(member)}>Отозвать доступ</Button>
       </div>}
     </li>)}</ul>
-    {manager && <form className="space-y-3 border-t pt-5" onSubmit={async e => {
+    {manager && <form className="space-y-3 border-t border-dash-line pt-5" onSubmit={async e => {
       e.preventDefault();
       if (await request("/api/store/members", "POST", draft, "Сотрудник создан. Передайте ему email и пароль.")) setDraft({ name: "", email: "", password: "" });
     }}>
-      <h3 className="font-semibold">Новый сотрудник</h3>
+      <h3 className="text-base font-extrabold leading-5 text-dash-ink">Новый сотрудник</h3>
       <label className="block space-y-1"><span>Имя</span><Input required maxLength={120} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>
       <label className="block space-y-1"><span>Email (логин)</span><Input type="email" required value={draft.email} onChange={e => setDraft({ ...draft, email: e.target.value })} /></label>
       <label className="block space-y-1"><span>Пароль</span><Input type="text" required minLength={MIN_PASSWORD} value={draft.password} onChange={e => setDraft({ ...draft, password: e.target.value })} /></label>
-      <p className="text-sm text-muted-foreground">Пароль показывается один раз — передайте его сотруднику лично. Сменить пароль сотрудник может сам в настройках.</p>
+      <p className="text-[13px] leading-5 text-dash-muted">Пароль показывается один раз — передайте его сотруднику лично. Сменить пароль сотрудник может сам в настройках.</p>
       <Button disabled={busy}>Создать сотрудника</Button>
     </form>}
-    <form className="space-y-3 border-t pt-5" onSubmit={e => { e.preventDefault(); void request("/api/store/settings", "POST", { urgentThreshold: Number(urgent), warningThreshold: Number(warning) }, "Пороги сохранены."); }}>
-      <h3 className="font-semibold">Общие пороги контроля</h3>
+    <form className="space-y-3 border-t border-dash-line pt-5" onSubmit={e => { e.preventDefault(); void request("/api/store/settings", "POST", { urgentThreshold: Number(urgent), warningThreshold: Number(warning) }, "Пороги сохранены."); }}>
+      <h3 className="text-base font-extrabold leading-5 text-dash-ink">Общие пороги контроля</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="space-y-1"><span>Срочно, дней</span><Input type="number" min="0" required disabled={!manager} value={urgent} onChange={e => setUrgent(e.target.value)} /></label>
         <label className="space-y-1"><span>Внимание, дней</span><Input type="number" min={Number(urgent) || 0} required disabled={!manager} value={warning} onChange={e => setWarning(e.target.value)} /></label>
       </div>
-      {manager ? <Button disabled={busy}>Сохранить пороги</Button> : <p className="text-sm text-muted-foreground">Пороги меняет руководитель отдела.</p>}
+      {manager ? <Button disabled={busy}>Сохранить пороги</Button> : <p className="text-[13px] leading-5 text-dash-muted">Пороги меняет руководитель отдела.</p>}
     </form>
-    {message && <p role="status">{message}</p>}{error && <p role="alert" className="text-red-700">{error}</p>}
+    {message && <p role="status" className="rounded-[10px] border border-dash-line bg-dash-surface px-3 py-2 text-[13px] font-semibold leading-5 text-dash-ink-2">{message}</p>}
+    {error && <p role="alert" className="rounded-[10px] border border-dash-expired bg-dash-expired-soft px-3 py-2 text-[13px] font-semibold leading-5 text-dash-expired">{error}</p>}
+    <Dialog open={!!resetTarget} onOpenChange={open => { if (!open) setResetTarget(null); }}>
+      <DialogContent className="work-panel product-dialog product-entry sm:max-w-md" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Новый пароль для {resetTarget ? resetTarget.user.name ?? resetTarget.user.email : ""} (не менее {MIN_PASSWORD} символов)</DialogTitle>
+        </DialogHeader>
+        <form className="space-y-3" onSubmit={submitReset}>
+          <label className="block">
+            <span className="entry-label">Пароль</span>
+            <input
+              type="text"
+              required
+              minLength={MIN_PASSWORD}
+              autoComplete="new-password"
+              value={resetValue}
+              onChange={event => setResetValue(event.target.value)}
+            />
+          </label>
+          {resetError && <p className="field-error" role="alert">{resetError}</p>}
+          <div className="product-dialog-actions">
+            <button type="button" className="dialog-action-secondary" onClick={() => setResetTarget(null)}>Отмена</button>
+            <button type="submit" className="primary-action dialog-action-primary" disabled={busy}>Сбросить пароль</button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={!!revokeTarget} onOpenChange={open => { if (!open) setRevokeTarget(null); }}>
+      <DialogContent className="work-panel product-dialog product-entry sm:max-w-md" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Отозвать доступ у {revokeTarget ? revokeTarget.user.name ?? revokeTarget.user.email : ""}?</DialogTitle>
+          <DialogDescription className="text-[13px] leading-5 font-medium text-dash-ink-2">Товары отдела сохранятся, авторство записей будет снято.</DialogDescription>
+        </DialogHeader>
+        <div className="product-dialog-actions">
+          <button type="button" className="dialog-action-secondary" onClick={() => setRevokeTarget(null)}>Отмена</button>
+          <button type="button" className="primary-action dialog-action-primary" disabled={busy} onClick={() => void submitRevoke()}>Отозвать доступ</button>
+        </div>
+      </DialogContent>
+    </Dialog>
   </section>;
 }
