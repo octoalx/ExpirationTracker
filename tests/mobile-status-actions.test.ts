@@ -8,9 +8,9 @@ test("product status actions: order and labels match the owner copy", () => {
     actions.map((action) => [action.key, action.label]),
     [
       ["edit", "Изменить"],
-      ["defect", "Брак"],
-      ["active", "Активные"],
-      ["archive", "Архив"],
+      ["defect", "В Брак"],
+      ["active", "В Активные"],
+      ["archive", "В Архив"],
     ],
   );
 });

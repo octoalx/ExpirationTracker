@@ -7,6 +7,7 @@ import {
   DEFAULT_MOBILE_SORT,
   MOBILE_SORT_OPTIONS,
   getDaysLeft,
+  groupByExpiryStatus,
   mobileSortForStatusFilter,
   sortProductsForMobile,
 } from "../src/lib/days-left";
@@ -105,10 +106,8 @@ test("expiry status filters auto-select the soonest order, others keep newest", 
   assert.equal(mobileSortForStatusFilter("ACTIVE"), DEFAULT_MOBILE_SORT);
 });
 
-const renderMobile = (list: Product[], sortOption?: "newest" | "expiring-soonest" | "expiring-latest") =>
-  renderToStaticMarkup(
-    createElement(MobileProductList, { products: list, referenceDate, sortOption }),
-  );
+const renderMobile = (extra: Record<string, unknown> = {}) =>
+  renderToStaticMarkup(createElement(MobileProductList, { products, referenceDate, ...extra }));
 
 const orderOf = (html: string, names: string[]) =>
   names
@@ -116,22 +115,17 @@ const orderOf = (html: string, names: string[]) =>
     .sort((a, b) => a.index - b.index)
     .map((entry) => entry.name);
 
-test("mobile list renders the sort selector with all options", () => {
-  const html = renderMobile(products);
-  assert.ok(html.includes('aria-label="Сортировка"'));
-  for (const option of MOBILE_SORT_OPTIONS) {
-    assert.ok(html.includes(`>${option.label}<`), `missing option ${option.label}`);
-  }
+test("the phone list no longer offers a manual sort selector", () => {
+  const html = renderMobile();
+  assert.ok(!html.includes('aria-label="Сортировка"'));
+  assert.ok(!html.includes("Сначала новые"));
 });
 
-test("controlled mobile list renders rows in the requested order and keeps no-date last", () => {
-  const names = products.map((p) => p.name);
-  const soonest = renderMobile(products, "expiring-soonest");
-  assert.deepEqual(orderOf(soonest, names), ["Soon", "Middle", "Late", "NoDate"]);
-
-  const latest = renderMobile(products, "expiring-latest");
-  assert.deepEqual(orderOf(latest, names), ["Late", "Middle", "Soon", "NoDate"]);
-
-  const newest = renderMobile(products, "newest");
-  assert.deepEqual(orderOf(newest, names), ["Middle", "Soon", "Late", "NoDate"]);
+test("the phone list renders supplied expiry groups in FEFO order", () => {
+  const groups = groupByExpiryStatus(products, { now: referenceDate });
+  const html = renderMobile({ groups });
+  assert.deepEqual(orderOf(html, products.map((p) => p.name)), ["Soon", "Middle", "Late", "NoDate"]);
+  assert.ok(html.includes(">Срочно<"), "urgent group heading is rendered");
+  assert.ok(html.includes(">В норме<"), "safe group heading is rendered");
+  assert.ok(html.includes(">Без срока<"), "records without a date get their own group");
 });
