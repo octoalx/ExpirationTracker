@@ -469,6 +469,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     background: #fff;
   }
   .inventory-page [data-slot="button"] { min-height: 44px; }
+  /* The team tab renders the shared StoreTeam; its fields keep the phone touch size. */
+  .settings-team [data-slot="input"],
+  .settings-team input:not([type="checkbox"]) { min-height: 44px; font-size: 16px; }
   /* Phone: one column, readable 16px fields, actions pinned above the keyboard. */
   .product-entry input { min-height: 48px; font-size: 16px; }
   .entry-duration { grid-template-columns: minmax(0, 1fr); }
