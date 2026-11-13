@@ -64,4 +64,20 @@ Spec gate: `npm run check:spec`
 
 ## Result and handoff
 
-- AC1 → PENDING
+Проверено 13.11.2026 на production-сборке (`next start` на 3115), одноразовая SQLite `C:/tmp/et-admin-check.db`, Chromium 1440×900 и 375×812, вход под `admin@test.local`.
+
+- AC1 → PASS. Шесть вкладок на токенах редизайна: контейнер `inventory-page … max-w-7xl`, шапка `work-page-title` с `entry-icon`, ряд вкладок с подчёркиванием `bg-dash-accent`, панели `border-dash-line bg-dash-panel`. Снимки `redesign/admin-1440-{users,departments,logs,catalog,backup,telegram}.png` и те же шесть на 375.
+- AC2 → PASS. Поиск `USER`, `ADMIN`, `Timestamp`, `Level`, `Message`, `Meta`, `No logs found` по видимому тексту всех 12 экранов — 0 совпадений. Роли: «Сотрудник / Администратор», действия «Назначить администратором / Снять права администратора», сводка «Администраторов: 1». Коды `USER`/`ADMIN` остались только значениями формы и API.
+- AC3 → PASS. `src/pages/admin` содержит только `index.tsx`; `src/components/admin/issues/` удалены (3 файла); в `pages-manifest.json` есть `/admin` и нет `/admin/issues`; API `/api/admin/issues` не тронут (вкладка «Журнал» читает `/api/admin/logs`).
+- AC4 → PASS. `grep -rn "window.confirm\|window.prompt\|window.alert" src/pages/admin src/components/admin src/components/CatalogImport.tsx` пуст (exit 1). Шесть необратимых действий идут через общий диалог `ConfirmAction`: удаление пользователя, удаление отдела (с вводом названия), очистка журнала, восстановление копии, удаление копии, остановка/возобновление Telegram. Снимок диалога — `redesign/admin-1440-confirm.png`.
+- AC5 → PASS. «Сохранить каталог» — `primary-action` (синяя #1554b5), зелёная кнопка убрана; красный остался только у опасных действий (класс `.dialog-action-danger` — рамка и текст #b42318, и красная кнопка подтверждения). Снимки `admin-1440-catalog.png`, `admin-375-catalog-save.png`.
+- AC6 → PASS. На 375 `scrollWidth` = 375 на всех шести вкладках (на 1440 — 1440). Минимальная высота цели 44 px (Telegram 45, «Сохранить каталог» 48 при увеличенном кегле), ни одного элемента ниже 44. Вкладки в сетке 3×2, не обрезаны. Таблица пользователей на телефоне — карточки `md:hidden`, десктопная таблица скрыта. На дне прокрутки контент выше фиксированной нижней навигации на 31–32 px.
+- AC7 → PASS. `npm run typecheck` — 0 ошибок; `npm run test:app` — 170 тестов, 170 pass, 0 fail; `npm run build` — успешно, `/admin` 4.48 kB.
+
+Файлы: `src/pages/admin/index.tsx`, `src/components/admin/{UsersTab,DepartmentsTab,LogsTab,BackupTab,TelegramStatus}.tsx`, `src/components/admin/ConfirmAction.tsx` (новый), `src/components/CatalogImport.tsx`, `src/lib/admin-labels.ts` (новый), `src/styles/globals.css` (`.dialog-action-danger`), `tests/admin-redesign.test.ts` (новый, 7 тестов). Удалено: `src/pages/admin/issues.tsx`, `src/components/admin/issues/{IssueTable,Columns,DataTable}.tsx`.
+
+`out-of-spec: src/components/admin/ConfirmAction.tsx, общий диалог подтверждения для пяти вкладок вместо пяти копий разметки`
+`out-of-spec: src/styles/globals.css, класс .dialog-action-danger — утилиты не перебивают неразмеченные правила .dialog-action-secondary`
+`out-of-spec: package.json, регистрация tests/admin-redesign.test.ts в test:app`
+
+Ограничения: экранная клавиатура телефона не проверялась; Telegram-вкладка на стенде без настроенного бота показывает «Бот ещё не настроен на сервере» при активной кнопке «Остановить обработку» — это прежняя логика, вне задачи; на 375 в полноэкранных снимках фиксированная нижняя навигация скрыта только на время снимка (её зазор измерен отдельно); очистка журнала, удаление отдела и восстановление копии на стенде до конца не выполнялись — проверена форма подтверждения, не результат запроса; `src/components/admin/users/` остался неиспользуемым (не входил в задачу).

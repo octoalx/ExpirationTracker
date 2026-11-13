@@ -1,13 +1,13 @@
 import { useState, useCallback, useEffect } from "react";
-import { motion } from "framer-motion";
 import {
   Download, Upload, Database, AlertTriangle,
   FileJson, CheckCircle, Loader2, History, Clock,
   RotateCcw, Save, Trash2
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { IntegrationSwitch } from "@/components/IntegrationCard";
+import ConfirmAction from "@/components/admin/ConfirmAction";
 
 interface AutoBackup {
   name: string;
@@ -15,6 +15,13 @@ interface AutoBackup {
   createdAt: string;
   path: string;
 }
+
+/** The dashboard field look: control border, a 44 px target, the same focus ring. */
+const FIELD =
+  "w-full min-w-0 min-h-11 rounded-[10px] border border-dash-control bg-white px-3 py-2 text-[15px] leading-5 text-dash-ink tabular-nums transition-colors placeholder:text-dash-muted focus-visible:border-dash-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-accent/35 disabled:cursor-not-allowed disabled:border-dash-line disabled:bg-dash-surface disabled:text-dash-ink-2";
+
+const ICON_ACTION =
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-[10px] text-dash-ink-2 transition-colors hover:bg-dash-surface hover:text-dash-ink disabled:opacity-55";
 
 /** Formats byte count into a human-readable size string. */
 function formatSize(bytes: number): string {
@@ -33,6 +40,21 @@ function formatDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** Section heading: an accent icon, a bold title and a one-line note. */
+function SectionTitle({ icon: Icon, title, note }: { icon: React.ElementType; title: string; note: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-dash-soft text-dash-accent" aria-hidden="true">
+        <Icon className="size-5" />
+      </span>
+      <div className="min-w-0">
+        <h3 className="text-[15px] font-extrabold leading-5 text-dash-ink">{title}</h3>
+        <p className="mt-1 text-[13px] leading-5 text-dash-muted">{note}</p>
+      </div>
+    </div>
+  );
 }
 
 /** Admin tab for database export/import and automatic backup management. */
@@ -56,6 +78,10 @@ export default function BackupTab() {
   const [restoring, setRestoring] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [deletingBackup, setDeletingBackup] = useState<string | null>(null);
+
+  // Restoring and deleting a copy ask in the app dialog, not in a browser window.
+  const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   // Backup schedule settings
   const [backupTime, setBackupTime] = useState("03:00");
@@ -140,9 +166,6 @@ export default function BackupTab() {
   };
 
   const handleRestoreBackup = async (filename: string) => {
-    if (!confirm(`Восстановить базу из бэкапа "${filename}"?\n\nТекущие данные будут заменены.`)) {
-      return;
-    }
     setRestoring(filename);
     try {
       const res = await fetch(`/api/admin/auto-backups/${encodeURIComponent(filename)}`, {
@@ -153,6 +176,7 @@ export default function BackupTab() {
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
         const skipped = Number(data?.skippedProducts ?? 0);
+        setRestoreTarget(null);
         toast.success(skipped > 0
           ? `База восстановлена. ${skipped} товаров пропущено: нет отдела. Перезагрузка...`
           : "База восстановлена. Перезагрузка...");
@@ -169,15 +193,13 @@ export default function BackupTab() {
   };
 
   const handleDeleteBackup = async (filename: string) => {
-    if (!confirm(`Удалить бэкап "${filename}"?`)) {
-      return;
-    }
     setDeletingBackup(filename);
     try {
       const res = await fetch(`/api/admin/auto-backups/${encodeURIComponent(filename)}`, {
         method: "DELETE",
       });
       if (res.ok) {
+        setDeleteTarget(null);
         toast.success("Бэкап удален");
         fetchAutoBackups();
       } else {
@@ -274,202 +296,124 @@ export default function BackupTab() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Auto Backups Section */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-4 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-blue-100 dark:bg-blue-900/50 p-3">
-              <History className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">Автоматические бэкапы</h3>
-              <p className="text-sm text-slate-500">
-                {backupEnabled ? `Ежедневно в ${backupTime}, хранится 30 копий` : "Автобэкапы отключены"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Enable toggle */}
-            <button
-              onClick={() => setBackupEnabled(!backupEnabled)}
-              className={cn(
-                "relative h-6 w-11 rounded-full transition-colors",
-                backupEnabled ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
-              )}
-              title={backupEnabled ? "Отключить" : "Включить"}
-            >
-              <span
-                className={cn(
-                  "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
-                  backupEnabled ? "translate-x-5" : "translate-x-0"
-                )}
-              />
+    <div className="space-y-4">
+      {/* Auto Backups */}
+      <section className="space-y-4 rounded-xl border border-dash-line bg-dash-panel p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <SectionTitle
+            icon={History}
+            title="Автоматические бэкапы"
+            note={backupEnabled ? `Ежедневно в ${backupTime}, хранится 30 копий` : "Автобэкапы отключены"}
+          />
+          <div className="flex items-center gap-1">
+            <IntegrationSwitch label="Автоматические бэкапы" checked={backupEnabled} onChange={setBackupEnabled} />
+            <button type="button" onClick={handleCreateBackup} disabled={creating} className="dialog-action-secondary gap-2">
+              {creating ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Save className="size-4" aria-hidden="true" />}
+              Создать сейчас
             </button>
-            <Button
-              onClick={handleCreateBackup}
-              disabled={creating}
-              variant="outline"
-              className="border-blue-200 hover:bg-blue-50"
-            >
-            {creating ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Создать сейчас
-            </Button>
           </div>
         </div>
 
         {/* Time settings */}
-        <div className="mb-4 flex flex-wrap items-center gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-slate-400" />
-            <span className="text-sm text-slate-600 dark:text-slate-400">Время бэкапа:</span>
+        <div className="flex flex-wrap items-end gap-3 rounded-[10px] border border-dash-line bg-dash-surface p-3">
+          <label className="min-w-40">
+            <span className="mb-1.5 block text-[13px] font-semibold leading-5 text-dash-ink-2">Время бэкапа</span>
             <input
               type="time"
               value={backupTime}
               onChange={(e) => setBackupTime(e.target.value)}
               disabled={!backupEnabled}
-              className="rounded-lg border border-slate-300 dark:border-slate-600 px-2 py-1 text-sm bg-white dark:bg-slate-800 disabled:opacity-50"
+              aria-label="Время бэкапа"
+              className={cn(FIELD, "w-auto")}
             />
-          </div>
-          <Button
-            size="sm"
-            onClick={saveBackupSettings}
-            disabled={savingSettings}
-            className="bg-[#1554b5] hover:bg-[#12479a] text-white"
-          >
-            {savingSettings ? (
-              <Loader2 className="h-3 w-3 animate-spin mr-1" />
-            ) : null}
+          </label>
+          <button type="button" onClick={saveBackupSettings} disabled={savingSettings} className="primary-action gap-2 text-[15px]">
+            {savingSettings && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
             Сохранить
-          </Button>
+          </button>
         </div>
 
         {loadingBackups ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-          </div>
+          <p role="status" className="flex items-center justify-center gap-2 py-6 text-[13px] leading-5 text-dash-muted">
+            <Loader2 className="size-4 animate-spin text-dash-accent" aria-hidden="true" />
+            Загружаем копии…
+          </p>
         ) : autoBackups.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
-            <Clock className="h-10 w-10 mx-auto mb-2 text-slate-300" />
-            <p className="text-sm">Автобэкапов пока нет</p>
-            <p className="text-xs mt-1">Проверьте расписание автоматического резервного копирования.</p>
+          <div className="py-6 text-center text-dash-muted">
+            <Clock className="mx-auto mb-2 size-8 opacity-40" aria-hidden="true" />
+            <p className="text-sm leading-5 text-dash-ink-2">Автобэкапов пока нет</p>
+            <p className="mt-1 text-[13px] leading-5">Проверьте расписание автоматического резервного копирования.</p>
           </div>
         ) : (
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <ul className="max-h-64 divide-y divide-dash-line overflow-y-auto rounded-[10px] border border-dash-line">
             {autoBackups.map((backup) => (
-              <div
-                key={backup.name}
-                className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <Database className="h-4 w-4 text-slate-400" />
-                  <div>
-                    <p className="text-sm font-medium">{formatDate(backup.createdAt)}</p>
-                    <p className="text-xs text-slate-500">{formatSize(backup.size)}</p>
+              <li key={backup.name} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Database className="size-4 shrink-0 text-dash-muted" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold leading-5 tabular-nums text-dash-ink">{formatDate(backup.createdAt)}</p>
+                    <p className="text-[12px] leading-4 tabular-nums text-dash-muted">{formatSize(backup.size)}</p>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleDownloadBackup(backup.name)}
-                    className="size-11 p-0"
-                    title="Скачать"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleRestoreBackup(backup.name)}
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => handleDownloadBackup(backup.name)} className={ICON_ACTION} title="Скачать" aria-label="Скачать копию">
+                    <Download className="size-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRestoreTarget(backup.name)}
                     disabled={restoring === backup.name}
-                    className="size-11 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                    title="Восстановить"
+                    className={cn(ICON_ACTION, "text-dash-accent hover:bg-dash-soft hover:text-dash-accent")}
+                    title="Восстановить" aria-label="Восстановить из копии"
                   >
-                    {restoring === backup.name ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RotateCcw className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleDeleteBackup(backup.name)}
+                    {restoring === backup.name ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <RotateCcw className="size-4" aria-hidden="true" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(backup.name)}
                     disabled={deletingBackup === backup.name}
-                    className="size-11 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                    title="Удалить"
+                    className={cn(ICON_ACTION, "text-dash-expired hover:bg-dash-expired-soft hover:text-dash-expired")}
+                    title="Удалить" aria-label="Удалить копию"
                   >
-                    {deletingBackup === backup.name ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
+                    {deletingBackup === backup.name ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />}
+                  </button>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
 
-        <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
-          <Clock className="h-3 w-3" />
-          <span>Всего: {autoBackups.length} / 30 бэкапов</span>
-        </div>
-      </div>
+        <p className="flex items-center gap-2 text-[13px] leading-5 tabular-nums text-dash-muted">
+          <Clock className="size-3" aria-hidden="true" />
+          Всего: {autoBackups.length} / 30 бэкапов
+        </p>
+      </section>
 
       {/* Export */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-4 sm:p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="rounded-xl bg-blue-100 dark:bg-blue-900/50 p-3">
-            <Download className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-foreground">Экспорт данных</h3>
-            <p className="text-sm text-slate-500">Скачать полный бэкап базы данных</p>
-          </div>
-        </div>
-        <Button
-          onClick={handleExport}
-          disabled={exporting}
-          className="bg-[#1554b5] hover:bg-[#12479a] text-white"
-        >
-          {exporting ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <Download className="h-4 w-4 mr-2" />
-          )}
+      <section className="space-y-4 rounded-xl border border-dash-line bg-dash-panel p-4 md:p-5">
+        <SectionTitle icon={Download} title="Экспорт данных" note="Скачать полный бэкап базы данных" />
+        <button type="button" onClick={handleExport} disabled={exporting} className="primary-action gap-2 text-[15px]">
+          {exporting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Download className="size-4" aria-hidden="true" />}
           {exporting ? "Экспорт..." : "Скачать JSON"}
-        </Button>
-      </div>
+        </button>
+      </section>
 
       {/* Import */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-4 sm:p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="rounded-xl bg-blue-100 dark:bg-blue-900/50 p-3">
-            <Upload className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-foreground">Импорт данных</h3>
-            <p className="text-sm text-slate-500">Восстановление из JSON бэкапа</p>
-          </div>
-        </div>
+      <section className="space-y-4 rounded-xl border border-dash-line bg-dash-panel p-4 md:p-5">
+        <SectionTitle icon={Upload} title="Импорт данных" note="Восстановление из JSON бэкапа" />
 
-        {/* Mode selector */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Режим импорта">
           {["merge", "replace"].map((mode) => (
             <button
               key={mode}
+              type="button"
+              aria-pressed={importMode === mode}
               onClick={() => setImportMode(mode as "merge" | "replace")}
               className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                "inline-flex min-h-11 items-center rounded-[10px] border px-3 text-[13px] font-semibold transition-colors",
                 importMode === mode
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                  ? "border-dash-accent bg-dash-soft text-dash-accent"
+                  : "border-dash-line bg-dash-panel text-dash-ink-2 hover:bg-dash-surface hover:text-dash-ink",
               )}
             >
               {mode === "merge" ? "Объединить" : "Заменить всё"}
@@ -478,102 +422,113 @@ export default function BackupTab() {
         </div>
 
         {importMode === "replace" && (
-          <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>Режим "Заменить" удалит все текущие данные перед импортом</span>
+          <div className="import-warning">
+            <p className="import-warning-title">
+              <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
+              Режим &quot;Заменить&quot; удалит все текущие данные перед импортом
+            </p>
           </div>
         )}
 
-        {/* Drop zone */}
         <div
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          className={cn(
-            "relative rounded-xl border-2 border-dashed p-8 text-center transition-colors",
-            dragActive
-              ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
-              : "border-slate-300 dark:border-slate-600 hover:border-slate-400"
-          )}
+          className={cn("import-drop relative", dragActive && "border-dash-accent bg-dash-soft")}
         >
           <input
             type="file"
             accept=".json"
+            aria-label="Файл JSON для импорта"
             onChange={handleFileInput}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
           />
-          <FileJson className="h-10 w-10 mx-auto mb-3 text-slate-400" />
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Перетащите JSON файл или нажмите для выбора
-          </p>
-          <p className="text-xs text-slate-500 mt-1">Поддерживаются файлы от 0.1 до 50 MB</p>
+          <FileJson className="size-8 text-dash-muted" aria-hidden="true" />
+          <p className="import-drop-title">Перетащите JSON файл или нажмите для выбора</p>
+          <p className="import-drop-hint">Поддерживаются файлы от 0.1 до 50 MB</p>
         </div>
 
         {importing && (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-            <span className="ml-2 text-sm text-slate-600">Импорт данных...</span>
-          </div>
+          <p role="status" className="flex items-center justify-center gap-2 py-2 text-[13px] leading-5 text-dash-muted">
+            <Loader2 className="size-4 animate-spin text-dash-accent" aria-hidden="true" />
+            Импорт данных...
+          </p>
         )}
 
-        {/* Import results */}
         {importResult && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30"
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <CheckCircle className="h-5 w-5 text-blue-600" />
-              <span className="font-medium text-blue-900 dark:text-blue-400">Импорт завершен</span>
-            </div>
+          <div className="space-y-3 rounded-[10px] border border-dash-line bg-dash-surface p-3">
+            <p className="flex items-center gap-2 text-[15px] font-extrabold leading-5 text-dash-ink">
+              <CheckCircle className="size-5 text-dash-accent" aria-hidden="true" />
+              Импорт завершен
+            </p>
             {importResult.results && (
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="bg-white dark:bg-slate-800 rounded-lg p-2">
-                  <p className="text-slate-500 text-xs">Пользователи</p>
-                  <p className="font-medium">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="rounded-[10px] border border-dash-line bg-dash-panel px-3 py-2">
+                  <p className="text-[12px] leading-4 text-dash-muted">Пользователи</p>
+                  <p className="text-sm font-semibold tabular-nums text-dash-ink">
                     +{importResult.results.users.created} / ~{importResult.results.users.updated}
                   </p>
                 </div>
-                <div className="bg-white dark:bg-slate-800 rounded-lg p-2">
-                  <p className="text-slate-500 text-xs">Товары</p>
-                  <p className="font-medium">
+                <div className="rounded-[10px] border border-dash-line bg-dash-panel px-3 py-2">
+                  <p className="text-[12px] leading-4 text-dash-muted">Товары</p>
+                  <p className="text-sm font-semibold tabular-nums text-dash-ink">
                     +{importResult.results.products.created} / ~{importResult.results.products.updated}
                   </p>
                 </div>
-                <div className="bg-white dark:bg-slate-800 rounded-lg p-2">
-                  <p className="text-slate-500 text-xs">Настройки</p>
-                  <p className="font-medium">
+                <div className="rounded-[10px] border border-dash-line bg-dash-panel px-3 py-2">
+                  <p className="text-[12px] leading-4 text-dash-muted">Настройки</p>
+                  <p className="text-sm font-semibold tabular-nums text-dash-ink">
                     +{importResult.results.settings.created} / ~{importResult.results.settings.updated}
                   </p>
                 </div>
               </div>
             )}
             {importResult.results?.products.missingDepartment > 0 && (
-              <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
+              <p className="text-[13px] leading-5 text-dash-amber-ink">
                 {importResult.results.products.missingDepartment} товаров пропущено: нет отдела.
               </p>
             )}
-          </motion.div>
+          </div>
         )}
-      </div>
+      </section>
 
       {/* Info */}
-      <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4 text-sm text-slate-600 dark:text-slate-400">
+      <section className="rounded-xl border border-dash-line bg-dash-surface p-4 md:p-5">
         <div className="flex items-start gap-2">
-          <Database className="h-4 w-4 mt-0.5" />
-          <div>
-            <p className="font-medium mb-1">О бэкапах</p>
-            <ul className="space-y-1 text-xs">
+          <Database className="mt-0.5 size-4 shrink-0 text-dash-muted" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="mb-1 text-[13px] font-extrabold leading-5 text-dash-ink">О бэкапах</p>
+            <ul className="space-y-1 text-[13px] leading-5 text-dash-ink-2">
               <li>• Бэкап включает: пользователей, товары, настройки, логи</li>
-              <li>• Режим "Объединить" — обновляет существующие, добавляет новые</li>
-              <li>• Режим "Заменить" — полная очистка перед импортом</li>
+              <li>• Режим &quot;Объединить&quot; — обновляет существующие, добавляет новые</li>
+              <li>• Режим &quot;Заменить&quot; — полная очистка перед импортом</li>
               <li>• JSON не содержит паролей. При объединении пароли существующих пользователей сохраняются; после замены потребуется восстановить доступ.</li>
             </ul>
           </div>
         </div>
-      </div>
+      </section>
+
+      <ConfirmAction
+        open={!!restoreTarget}
+        title={`Восстановить базу из бэкапа "${restoreTarget ?? ""}"?`}
+        description="Текущие данные будут заменены. После восстановления страница перезагрузится."
+        confirmLabel="Восстановить"
+        danger
+        onCancel={() => setRestoreTarget(null)}
+        onConfirm={() => { if (restoreTarget) void handleRestoreBackup(restoreTarget); }}
+      />
+
+      <ConfirmAction
+        open={!!deleteTarget}
+        title={`Удалить бэкап "${deleteTarget ?? ""}"?`}
+        description="Копия будет удалена из хранилища. Действие необратимо."
+        confirmLabel="Удалить копию"
+        busy={deletingBackup !== null}
+        danger
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget) void handleDeleteBackup(deleteTarget); }}
+      />
     </div>
   );
 }
