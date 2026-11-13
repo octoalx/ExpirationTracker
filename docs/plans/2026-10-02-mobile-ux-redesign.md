@@ -1,5 +1,8 @@
 # Mobile-first inventory UX redesign
 
+Status: PARTIAL
+Evidence: `cc76ef9` snapshot with no dedicated commit; lineage broken by `28719b8` and restored in `c34c6c5`
+
 ## Goal and acceptance criteria
 
 Enable the owner and store colleagues to find or register an expiration-tracked product quickly on a phone while retaining desktop table workflows.

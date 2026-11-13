@@ -1,5 +1,8 @@
 # DBF barcode reference extraction — 2026-10-03
 
+Status: DONE
+Evidence: commit `7166c49`
+
 ## Goal and acceptance criteria
 Read the supplied legacy database without modifying it. Identify product-name and
 barcode relationships, export a readable complete reference, and reconcile all

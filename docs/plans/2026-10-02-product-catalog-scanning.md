@@ -1,5 +1,8 @@
 # Product catalog, barcode scanning, and legacy inventory import
 
+Status: PARTIAL
+Evidence: `cc76ef9` snapshot; `7bf3c59` (2026-05-10) later removed the barcode scanner
+
 ## Goal and acceptance criteria
 
 - Import the supplied Windows-1251 semicolon-separated catalog (106 products plus a numeric total footer) into a persistent catalog owned by the authenticated user.

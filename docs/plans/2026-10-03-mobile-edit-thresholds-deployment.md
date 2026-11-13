@@ -1,5 +1,8 @@
 # Mobile editing, thresholds and scanner deployment — 2026-10-03
 
+Status: DONE
+Evidence: commit `4e3cf91`
+
 ## Authorized goal
 Deploy the reviewed working tree to the existing production server for owner phone
 testing. Preserve production users, integrations, inventory and catalog. Do not

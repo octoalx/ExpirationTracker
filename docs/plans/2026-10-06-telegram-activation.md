@@ -1,5 +1,8 @@
 # Telegram activation preparation — 2026-10-06
 
+Status: DONE
+Evidence: commit `235f4e7`
+
 ## Goal and acceptance criteria
 
 The owner authorized launch preparation without production changes. Produce a

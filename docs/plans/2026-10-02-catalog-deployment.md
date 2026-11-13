@@ -1,5 +1,8 @@
 # Catalog deployment to the existing VPS
 
+Status: DONE
+Evidence: commits `71c7e17`..`cc76ef9`; deployment recorded in `memory-bank/activeContext.md`
+
 ## Goal and acceptance criteria
 
 Deploy the reviewed catalog/camera/TXT implementation to the existing expiry.axnode.xyz service at the owner's explicit request. Apply the additive catalog migration and import the supplied 106 catalog entries and 272 non-OLD batches into the sole existing account. Verify health, ownership boundaries, source counts and calculated dates.

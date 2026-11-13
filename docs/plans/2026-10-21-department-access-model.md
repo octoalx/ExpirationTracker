@@ -1,8 +1,12 @@
 # Department-scoped access model
 
-Dated: 2026-10-21. Specification only — no code has been written and no production
-data has been touched. Owner decisions from 2026-10-21 are recorded in "Decisions
-taken". Open points that still need an owner answer are in "Open decisions".
+Status: DONE
+Evidence: PR #22 (`0c1a771`)
+
+Dated: 2026-10-21. Written as a specification only; the implementation followed in
+PR #22 (`0c1a771`) and the department purge in PR #23 (`f744cfa`). Owner decisions
+from 2026-10-21 are recorded in "Decisions taken". Open points that still need an
+owner answer are in "Open decisions".
 
 ## Goal and acceptance criteria
 

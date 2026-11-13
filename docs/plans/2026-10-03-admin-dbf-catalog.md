@@ -1,5 +1,8 @@
 # Administrator DBF reference updates — 2026-10-03
 
+Status: DONE
+Evidence: commit `7166c49`
+
 ## Goal and acceptance criteria
 Administrators independently update the scanner reference using only goods.dbf
 (names) and barcode.dbf (barcodes) from the same legacy export. Ignore the other

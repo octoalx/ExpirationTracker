@@ -27,6 +27,8 @@ autonomously; ask only for missing material product decisions or authorization.
   failures, skips and unverified behavior accurately; never equate SKIP with PASS.
 - Update `memory-bank/activeContext.md` at meaningful milestones within its 150-line
   cap (`check:context`). Load it only when resuming work; archive detail in plans.
+- **One task = one session.** State comes from `activeContext.md`, `git log`, open
+  PRs and the plan, never a chat or an off-repo handoff; close by updating them.
 
 ## Project map
 
@@ -65,9 +67,9 @@ autonomously; ask only for missing material product decisions or authorization.
 
 - Dev loop: run the nearest behavioral test for changed logic.
 - Task completion: touched tests, relevant static checks and diff review. For
-  contract/tooling changes run `npm run check:context` and `npm run test:harness`.
-  `npm run check:spec` gates a pull request and must pass locally before pushing.
-  For TypeScript changes run `npm run typecheck` after dependencies are installed.
+  contract/tooling changes run `npm run check:context` and `npm run test:harness`;
+  TypeScript changes add `npm run typecheck`. `npm run check:spec` gates a pull
+  request and must pass locally before pushing.
 - Release preparation: `npm run verify:release` plus the checks and manual
   evidence in `docs/engineering/release.md`. The gate currently fails closed for
   missing application tests or dependencies. A local report is not release approval.

@@ -1,5 +1,8 @@
 # Final UX and administration verification — 2026-10-02
 
+Status: ABANDONED
+Evidence: none found in git log
+
 ## Goal and acceptance
 Close outstanding local verification for the approved redesign. Inspect authentication, settings, import and expanded inventory on phone and desktop sizes. Exercise administrator role/password operations and JSON recovery using disposable SQLite only. Run the release gate and isolated production build. Verify Windows plugin hook exit status separately from project code.
 

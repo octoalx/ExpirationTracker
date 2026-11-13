@@ -1,5 +1,8 @@
 # Admin account creation — 2026-10-03
 
+Status: DONE
+Evidence: commit `4e3cf91`
+
 ## Goal and acceptance criteria
 
 - Administrators can create an account from Admin > Users with name, email, password and USER/ADMIN role; USER is the default.

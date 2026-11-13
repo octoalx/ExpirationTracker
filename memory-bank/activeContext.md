@@ -109,21 +109,20 @@ the hook builds its two guard modules for development; production keeps the unch
 The first deploy of this workflow needs the previous one to ship the commit once,
 because the running release has no `/api/version` yet.
 
-## Dashboard: phone-first toolbar, phone sign-out (2026-11-13, spec `2026-11-13-mobile-signout-desktop-scan`)
+## Dashboard, dialogs, store, stats, settings, admin (2026-11-13)
 
-The scanner is a phone tool: `useIsDesktop()` (`src/lib/media-query.ts`, Tailwind `md`) keeps the
-«Сканировать товар» button, its dialog and the add-form camera button out of the desktop render;
-search and manual barcode entry stay everywhere. The phone header carries a sibling 44 px sign-out.
+Design refresh on direction C «Пульт» with the phone list from «Полка»: `DashboardSummary` (three cells
+that also filter), FEFO groups, one delete toast with undo, export of the current filter; add, edit and
+import dialogs on `product-dialog-*`; `/store`, `/stats`, `/settings` and `/admin` on the same shell
+(`max-w-7xl`, `work-page-title`, dash panels). No `window.confirm/prompt/alert` in the app; admin roles
+read «Сотрудник / Администратор»; `/admin/issues` removed. Scanner stays a phone tool via `useIsDesktop()`
+(`src/lib/media-query.ts`, Tailwind `md`), the phone header carries a sibling 44 px sign-out.
+Specs: `docs/specs/2026-11-13-*.md`; report: `redesign/REPORT-REDESIGN.md`.
+## Task continuity (2026-10-23)
 
-## Dashboard, its dialogs, then store and stats (2026-11-13)
-
-The dashboard moved to direction C «Пульт»: `DashboardSummary` (three cells that also filter),
-FEFO groups, one delete toast with undo (`src/lib/pending-delete.ts`), export of the current
-filter; its add, edit and import dialogs took the `product-dialog-*` tokens. `/store` and
-`/stats` share that shell (`max-w-7xl`, `work-page-title`, dash panels): the walk summary is a
-cell strip, the statistics indicators are four cells of the same block, and `/store` has no
-`window.confirm/prompt/alert` — the closing result, the password reset and the revocation each
-open the application dialog. Specs: `docs/specs/2026-11-13-{dashboard-redesign,dashboard-dialogs,store-and-stats-redesign}.md`.
+One task = one session; state comes from this file, `git log` and open PRs, never a
+chat. Closing a task updates this file and the plan's `Status:`/`Evidence:`
+(`scripts/check-plan-status.sh`). Spec: `docs/specs/2026-10-23-task-continuity.md`.
 
 ## Open threads
 

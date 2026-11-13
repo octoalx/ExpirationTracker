@@ -1,5 +1,8 @@
 # CD helper delivery on a first deploy
 
+Status: DONE
+Evidence: commit `7cd06f3`
+
 ## Problem
 
 The first dry run of `deploy-production.yml` (2026-10-13 06:33 UTC, SHA `73fa3f6`)

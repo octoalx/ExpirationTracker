@@ -1,5 +1,8 @@
 # Settings and pending import deployment — 2026-10-06
 
+Status: DONE
+Evidence: commit `1e7ef4e`
+
 ## Goal and acceptance criteria
 
 Owner authorized committing current changes and deploying to the existing server.

@@ -1,5 +1,8 @@
 # Restore the mobile-first inventory interface
 
+Status: DONE
+Evidence: commit `c34c6c5`
+
 Dated: 2026-10-14. Owner report: "слетело отображение для мобильной версии;
 до миграции и внедрения CI/CD все работало отлично."
 

@@ -1,5 +1,8 @@
 # Reproducible local baseline
 
+Status: DONE
+Evidence: commit `71c7e17` — traced through the snapshot, not through a per-file proof; treat as PARTIAL if challenged
+
 ## Goal
 
 Install and lock existing dependencies, generate Prisma client, run TypeScript and

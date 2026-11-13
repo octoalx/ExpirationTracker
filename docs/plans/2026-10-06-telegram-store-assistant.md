@@ -1,5 +1,8 @@
 # Telegram store assistant — 2026-10-06
 
+Status: DONE
+Evidence: commit `235f4e7`
+
 ## Goal and acceptance criteria
 
 Implement one shared store with individual accounts, manager-controlled membership

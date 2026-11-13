@@ -1,5 +1,8 @@
 # App visual system refinement — 2026-10-02
 
+Status: PARTIAL
+Evidence: `cc76ef9` is the snapshot that carried it, but `3a36715` on 2026-05-07 removed the dark theme first and the light redesign was never a single commit — no direct proof
+
 ## Goal and acceptance
 Apply the owner's selected light graphite/blue direction across inventory, settings, authentication, statistics and administration. Brand and page headings use stronger Manrope weights. Approaching expiry uses a warm amber marker with a darker readable label. Product state remains distinct from expiry urgency. Mobile controls retain readable labels and adequate touch targets; desktop tables remain available.
 

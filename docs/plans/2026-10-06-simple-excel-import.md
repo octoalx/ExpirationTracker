@@ -1,5 +1,8 @@
 # Simple Excel product import
 
+Status: DONE
+Evidence: commit `d4909d5`
+
 ## Goal and acceptance criteria
 
 Import a first-sheet table with a header row and fixed columns: barcode, name,

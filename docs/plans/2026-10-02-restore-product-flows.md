@@ -1,5 +1,8 @@
 # Restore existing flows and handle unknown expiry
 
+Status: PARTIAL
+Evidence: `cc76ef9` snapshot; no dedicated commit found
+
 Date: 2026-10-02
 
 ## Goal and acceptance criteria

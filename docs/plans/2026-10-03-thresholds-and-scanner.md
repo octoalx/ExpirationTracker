@@ -1,5 +1,8 @@
 # Inventory thresholds and scanner — 2026-10-03
 
+Status: DONE
+Evidence: commit `4e3cf91`
+
 ## Goal and acceptance criteria
 - Inventory reads the nested settings response and uses saved urgent/warning
   thresholds consistently for desktop, mobile, filters and counts.

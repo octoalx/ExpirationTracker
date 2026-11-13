@@ -1,5 +1,8 @@
 # Mobile design deployment — 2026-10-02
 
+Status: PARTIAL
+Evidence: `cc76ef9` snapshot, then `4e3cf91`, `15f9338`; deployment to expiry.axnode.xyz
+
 ## Authorized goal and acceptance
 The owner explicitly requested deployment to the existing server for phone testing. Deploy the current reviewed working tree to expiry.axnode.xyz; preserve inventory, catalog, users and settings. Require fresh release checks, a Linux image build, isolated candidate startup/authentication checks, production health and row reconciliation. Keep existing Cloudflare Access.
 

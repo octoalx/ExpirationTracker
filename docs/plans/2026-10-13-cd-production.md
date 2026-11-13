@@ -1,5 +1,8 @@
 # Continuous delivery for production
 
+Status: DONE
+Evidence: commit `7cd06f3`
+
 ## Goal and acceptance criteria
 
 Production can be released by a GitHub Actions workflow that a human starts

@@ -1,5 +1,8 @@
 # Partial settings saves — 2026-10-06
 
+Status: DONE
+Evidence: commit `235f4e7`
+
 Save only changed fields from the active settings tab. Keep other tab drafts and
 mark unsaved tabs. The authenticated API accepts partial profile/settings updates,
 merges dependent validation with stored values, and writes only submitted fields.

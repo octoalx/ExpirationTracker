@@ -1,5 +1,8 @@
 # Database robustness: WAL enforcement, journal quarantine, interruption-safe backups
 
+Status: DONE
+Evidence: commit `5dc9f7d`
+
 ## Goal and acceptance criteria
 
 Make failed/half-finished backups and migrations unable to leave the SQLite
