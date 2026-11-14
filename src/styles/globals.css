@@ -307,7 +307,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .primary-action:hover { background: #12479a; }
 .primary-action:active { transform: translateY(1px) scale(.985); }
-.primary-action:disabled { opacity: .55; cursor: wait; transform: none; }
+.primary-action:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+/* The wait cursor marks work in progress only; a button disabled for missing input stays neutral. */
+.primary-action[data-busy="true"]:disabled { cursor: wait; }
+.primary-action:disabled:hover { background: #1554b5; }
 /* ─── Dialogs: "Пульт" tokens (redesign/DIRECTIONS.md, direction C) ───── */
 .product-entry { font-size: 14px; line-height: 20px; color: #151a21; }
 /* Keep centering in one transform: production CSS optimization can merge
