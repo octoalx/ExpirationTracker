@@ -88,6 +88,8 @@ export default function CatalogImport() {
   const [barcodeNameError, setBarcodeNameError] = useState("");
   const pending = useRef<PendingUpload | null>(null);
   const mounted = useRef(true);
+  const goodsInput = useRef<HTMLInputElement | null>(null);
+  const barcodeInput = useRef<HTMLInputElement | null>(null);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const fail = (text: string) => { setMessage(text); setFailed(true); };
@@ -166,7 +168,10 @@ export default function CatalogImport() {
       pending.current = null;
       if (!mounted.current) return;
       setMessage(`В каталог загружено товаров: ${result.imported}. Строк в goods.dbf: ${result.goodsRows}; в barcode.dbf: ${result.barcodeRows}. Удалённые строки пропущены: ${(result.deletedGoods ?? 0) + (result.deletedBarcodes ?? 0)}. Повторные одинаковые штрих-коды объединены: ${result.duplicateBarcodes}.`);
-      setGoodsFile(null); setBarcodeFile(null);
+      // Reset both inputs to their untouched state: React state alone leaves the picked file names on screen.
+      setGoodsFile(null); setBarcodeFile(null); setGoodsNameError(""); setBarcodeNameError("");
+      if (goodsInput.current) goodsInput.current.value = "";
+      if (barcodeInput.current) barcodeInput.current.value = "";
     } catch (error) {
       if (mounted.current) fail(error instanceof Error ? `${error.message} Повторное сохранение продолжит загрузку с места обрыва.` : `Ошибка сети. ${retryHint}`);
     } finally { if (mounted.current) { setBusy(false); setPhase("idle"); } }
@@ -181,16 +186,16 @@ export default function CatalogImport() {
       <p className="text-[13px] leading-5 text-dash-muted">Каталог подставляет название по штрих-коду. Это единственный способ пополнить его: нужны только <strong>goods.dbf</strong> и <strong>barcode.dbf</strong> из одной свежей выгрузки. Остальные файлы загружать не нужно.</p>
       <label className="block">
         <span className="mb-1.5 block text-[13px] font-semibold leading-5 text-dash-ink-2">goods.dbf — названия товаров</span>
-        <input type="file" accept=".dbf" disabled={busy} className={fileInput} onChange={pickFile(GOODS_NAME, setGoodsFile, setGoodsNameError)} />
+        <input ref={goodsInput} type="file" accept=".dbf" disabled={busy} className={fileInput} onChange={pickFile(GOODS_NAME, setGoodsFile, setGoodsNameError)} />
         {goodsNameError && <p role="alert" className="mt-1 text-[12px] leading-4 text-dash-expired">{goodsNameError}</p>}
       </label>
       <label className="block">
         <span className="mb-1.5 block text-[13px] font-semibold leading-5 text-dash-ink-2">barcode.dbf — штрих-коды товаров</span>
-        <input type="file" accept=".dbf" disabled={busy} className={fileInput} onChange={pickFile(BARCODE_NAME, setBarcodeFile, setBarcodeNameError)} />
+        <input ref={barcodeInput} type="file" accept=".dbf" disabled={busy} className={fileInput} onChange={pickFile(BARCODE_NAME, setBarcodeFile, setBarcodeNameError)} />
         {barcodeNameError && <p role="alert" className="mt-1 text-[12px] leading-4 text-dash-expired">{barcodeNameError}</p>}
       </label>
       <p className="text-[12px] leading-4 text-dash-muted">Файлы отправляются на сервер частями по 90 МБ при сохранении и разбираются там. При ошибке разбора каталог не изменится. Каждый DBF — не больше 256 МБ, до 1 000 000 строк.</p>
-      <button type="button" disabled={busy || !goodsFile || !barcodeFile} className="primary-action gap-2 text-[15px]" onClick={() => void save()}>
+      <button type="button" disabled={busy || !goodsFile || !barcodeFile} data-busy={busy} className="primary-action gap-2 text-[15px]" onClick={() => void save()}>
         {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         {busy ? "Загрузка…" : "Сохранить каталог"}
       </button>

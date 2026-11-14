@@ -5,6 +5,15 @@ import { join } from "node:path";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const screen = read("src/components/CatalogImport.tsx");
+const styles = read("src/styles/globals.css");
+
+/** Declarations of one CSS rule, e.g. `.primary-action:disabled`. */
+function ruleDeclarations(source: string, selector: string): Record<string, string> {
+  const start = source.indexOf(`${selector} {`);
+  assert.ok(start >= 0, `rule ${selector} exists`);
+  const body = source.slice(source.indexOf("{", start) + 1, source.indexOf("}", start));
+  return Object.fromEntries(body.split(";").map(part => part.split(":")).filter(pair => pair.length === 2).map(([prop, value]) => [prop.trim(), value.trim()]));
+}
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap(name => {
@@ -43,4 +52,21 @@ test("every response is read with its status and checked for JSON before parsing
 test("failures report how many records are confirmed and that repeating the pair is safe", () => {
   assert.ok(screen.includes("Подтверждено записей"), "confirmed count is shown");
   assert.ok(screen.includes("дубликаты не появятся"), "retry safety is stated");
+});
+
+test("a saved catalog clears both file inputs, not only their React state", () => {
+  assert.equal((screen.match(/ref=\{(goods|barcode)Input\}/g) ?? []).length, 2, "both inputs are bound to a ref");
+  assert.ok(/goodsInput\.current\.value = ""/.test(screen), "the goods input value is reset");
+  assert.ok(/barcodeInput\.current\.value = ""/.test(screen), "the barcode input value is reset");
+  const reset = screen.indexOf("setGoodsFile(null); setBarcodeFile(null);");
+  assert.ok(reset > 0, "the file state is cleared after a successful import");
+  assert.ok(screen.indexOf('goodsInput.current.value = ""') > reset, "the inputs are cleared together with the state");
+});
+
+test("a disabled save button is neutral; the wait cursor means work in progress", () => {
+  const disabled = ruleDeclarations(styles, ".primary-action:disabled");
+  assert.equal(disabled.cursor, "not-allowed", "a disabled primary action shows a plain cursor");
+  assert.equal(ruleDeclarations(styles, '.primary-action[data-busy="true"]:disabled').cursor, "wait", "only a busy button shows the wait cursor");
+  assert.equal(ruleDeclarations(styles, ".primary-action:disabled:hover").background, "#1554b5", "hover keeps the disabled background");
+  assert.ok(screen.includes("data-busy={busy}"), "the save button marks its busy state");
 });
