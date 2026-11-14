@@ -1,7 +1,7 @@
 # Remove the personal catalog (CatalogEntry and POST /api/catalog)
 
-Status: DRAFT
-Owner approval:
+Status: APPROVED
+Owner approval: Алекс, 14.11.2026, в чате: «APPROVED» (вариант B)
 Type: contract
 Branch: local/remove-personal-catalog
 Spec gate: `npm run check:spec`
