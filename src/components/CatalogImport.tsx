@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Loader2, Database } from "lucide-react";
 import { CATALOG_UPLOAD_HEADER_BYTES, MAX_DBF_BYTES, buildCatalogUploadBody, planChunks } from "@/lib/catalog-upload-format";
 
@@ -10,10 +10,19 @@ interface UploadSuccess { imported: number; goodsRows: number; barcodeRows: numb
 interface ByteRange { start: number; end: number }
 /** A started upload for one exact pair of files; kept after a failure so the next save resumes it. */
 interface PendingUpload { key: string; uploadId: string; totalBytes: number; chunkBytes: number }
+/** `sending` has a real byte percentage; `finalizing` is server-side work with no observable progress. */
+type Phase = "idle" | "sending" | "finalizing";
 
 const pairKey = (goods: File, barcodes: File) => [goods.name, goods.size, goods.lastModified, barcodes.name, barcodes.size, barcodes.lastModified].join("|");
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const retryHint = "Повторите загрузку этой же пары файлов — дубликаты не появятся.";
+const GOODS_NAME = "goods.dbf";
+const BARCODE_NAME = "barcode.dbf";
+
+/** Checks a picked file's name against the exact expected DBF name, case-insensitive. */
+function wrongNameError(file: File, expected: string): string | null {
+  return file.name.toLowerCase() === expected ? null : `Это не ${expected}: выбран файл «${file.name}». Выберите именно ${expected} из выгрузки.`;
+}
 
 /**
  * Reads a response as text first and parses JSON only when the server says it is JSON.
@@ -71,14 +80,35 @@ export default function CatalogImport() {
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [percent, setPercent] = useState(0);
   const [goodsFile, setGoodsFile] = useState<File | null>(null);
   const [barcodeFile, setBarcodeFile] = useState<File | null>(null);
+  const [goodsNameError, setGoodsNameError] = useState("");
+  const [barcodeNameError, setBarcodeNameError] = useState("");
   const pending = useRef<PendingUpload | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const fail = (text: string) => { setMessage(text); setFailed(true); };
   const progress = (text: string) => { if (mounted.current) setMessage(text); };
+
+  /** Shared handler for both file inputs: rejects a wrong name at selection time, before Save is ever reachable. */
+  const pickFile = (expected: string, setFile: (file: File | null) => void, setNameError: (text: string) => void) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0] ?? null;
+      setMessage(""); setFailed(false);
+      if (!file) { setNameError(""); setFile(null); return; }
+      const error = wrongNameError(file, expected);
+      if (error) {
+        setNameError(error);
+        setFile(null);
+        event.target.value = "";
+        return;
+      }
+      setNameError("");
+      setFile(file);
+    };
 
   const save = async () => {
     if (!goodsFile || !barcodeFile) return;
@@ -90,6 +120,7 @@ export default function CatalogImport() {
       return fail("Каждый DBF-файл должен быть не больше 256 МБ");
     }
     setBusy(true);
+    setPhase("sending"); setPercent(0);
     progress("Загрузка каталога… Не закрывайте вкладку.");
     try {
       const body = buildCatalogUploadBody(goodsFile, barcodeFile);
@@ -117,12 +148,15 @@ export default function CatalogImport() {
       const toSend = parts.filter(part => isMissing(part.offset, part.length, status.missing));
       const sentBefore = parts.length - toSend.length;
       let sent = parts.slice(0, sentBefore).reduce((sum, part) => sum + part.length, 0);
+      setPercent(Math.round((sent / upload.totalBytes) * 100));
       for (const part of toSend) {
         progress(`Отправлено ${Math.round(sent / MIB)} из ${Math.round(upload.totalBytes / MIB)} МБ…`);
         await sendChunk(upload.uploadId, part.offset, body.slice(part.offset, part.offset + part.length));
         sent += part.length;
+        if (mounted.current) setPercent(Math.round((sent / upload.totalBytes) * 100));
       }
 
+      setPhase("finalizing");
       progress("Разбор и запись каталога на сервере…");
       const response = await fetch(`/api/admin/catalog-upload/finalize?uploadId=${encodeURIComponent(upload.uploadId)}`, { method: "POST" });
       const result = await readJson<Partial<UploadSuccess>>(response);
@@ -135,7 +169,7 @@ export default function CatalogImport() {
       setGoodsFile(null); setBarcodeFile(null);
     } catch (error) {
       if (mounted.current) fail(error instanceof Error ? `${error.message} Повторное сохранение продолжит загрузку с места обрыва.` : `Ошибка сети. ${retryHint}`);
-    } finally { if (mounted.current) setBusy(false); }
+    } finally { if (mounted.current) { setBusy(false); setPhase("idle"); } }
   };
 
   return <section className="rounded-xl border border-dash-line bg-dash-panel">
@@ -147,17 +181,29 @@ export default function CatalogImport() {
       <p className="text-[13px] leading-5 text-dash-muted">Каталог подставляет название по штрих-коду. Это единственный способ пополнить его: нужны только <strong>goods.dbf</strong> и <strong>barcode.dbf</strong> из одной свежей выгрузки. Остальные файлы загружать не нужно.</p>
       <label className="block">
         <span className="mb-1.5 block text-[13px] font-semibold leading-5 text-dash-ink-2">goods.dbf — названия товаров</span>
-        <input type="file" accept=".dbf" disabled={busy} className={fileInput} onChange={event => { setGoodsFile(event.target.files?.[0] ?? null); setMessage(""); setFailed(false); }} />
+        <input type="file" accept=".dbf" disabled={busy} className={fileInput} onChange={pickFile(GOODS_NAME, setGoodsFile, setGoodsNameError)} />
+        {goodsNameError && <p role="alert" className="mt-1 text-[12px] leading-4 text-dash-expired">{goodsNameError}</p>}
       </label>
       <label className="block">
         <span className="mb-1.5 block text-[13px] font-semibold leading-5 text-dash-ink-2">barcode.dbf — штрих-коды товаров</span>
-        <input type="file" accept=".dbf" disabled={busy} className={fileInput} onChange={event => { setBarcodeFile(event.target.files?.[0] ?? null); setMessage(""); setFailed(false); }} />
+        <input type="file" accept=".dbf" disabled={busy} className={fileInput} onChange={pickFile(BARCODE_NAME, setBarcodeFile, setBarcodeNameError)} />
+        {barcodeNameError && <p role="alert" className="mt-1 text-[12px] leading-4 text-dash-expired">{barcodeNameError}</p>}
       </label>
       <p className="text-[12px] leading-4 text-dash-muted">Файлы отправляются на сервер частями по 90 МБ при сохранении и разбираются там. При ошибке разбора каталог не изменится. Каждый DBF — не больше 256 МБ, до 1 000 000 строк.</p>
       <button type="button" disabled={busy || !goodsFile || !barcodeFile} className="primary-action gap-2 text-[15px]" onClick={() => void save()}>
         {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         {busy ? "Загрузка…" : "Сохранить каталог"}
       </button>
+      {phase !== "idle" && (
+        <div className="space-y-1" role="progressbar" aria-valuenow={phase === "sending" ? percent : undefined} aria-valuemin={0} aria-valuemax={100} aria-label="Сохранение каталога">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-dash-line">
+            {phase === "sending"
+              ? <div className="h-full rounded-full bg-dash-accent transition-[width] duration-300" style={{ width: `${percent}%` }} />
+              : <div className="h-full w-full animate-pulse rounded-full bg-dash-accent" />}
+          </div>
+          <p className="text-[12px] leading-4 text-dash-muted">{phase === "sending" ? `${percent}%` : "Разбор на сервере…"}</p>
+        </div>
+      )}
       <p role={failed ? "alert" : "status"} className={`text-[13px] leading-5 ${failed ? "text-dash-expired" : "text-dash-ink-2"}`}>{message}</p>
     </div>
   </section>;
