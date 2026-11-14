@@ -67,4 +67,16 @@ Standing checks: `npm run typecheck`, `npm run test:app`, `npm run check:context
 
 ## Result and handoff
 
-Pending approval.
+Checked 14.11.2026 on disposable SQLite and a production build.
+
+- AC1 -> PARTIAL — `tests/admin-catalog-update.test.ts` asserts two `.dbf` inputs and the worker wiring; `next build` passes and emits the worker chunk (`.next/static/chunks/255.*.js` contains the parser). No browser run.
+- AC2 -> PARTIAL — parser errors covered by existing `tests/catalog-dbf.test.ts`; the screen shows counts, sample and blocks saving by construction. Not walked in a browser.
+- AC3 -> PASS (logic) — `tests/catalog-import.test.ts` (500-entry batches, progress, partial failure, retry); the screen reports confirmed records and retry safety (`tests/admin-catalog-update.test.ts`).
+- AC4 -> PASS — `tests/catalog-api.test.cjs`: ADMIN save is read by another account via `GET /api/catalog`; rename in place, neighbour kept, no duplicates.
+- AC5 -> PASS — the CSV/Excel input is gone; the only caller of `/api/admin/catalog` is `CatalogImport.tsx` (source scan); personal `CatalogEntry` and `Product` counts unchanged in the API test.
+- AC6 -> PASS — `tests/catalog-api.test.cjs`: 401 without a session, 403 for non-ADMIN, nothing written.
+- AC7 -> SKIP — no 1440/375 screenshots or manual layout check; the 256 MiB DBF limit message is asserted in `tests/admin-redesign.test.ts`.
+
+Commands: `npm run typecheck` 0 errors; `npm run test:app` 177/177; `npm run test:harness` 14/14; `npm run check:context` PASS; `npm run build` OK.
+
+Limitations: no real `goods.dbf`/`barcode.dbf` and no browser walk-through (AC1, AC2, AC7); run one real pair on a disposable database before release. Follow-up: remove the now-unused personal `POST /api/catalog` and `CatalogEntry` in a separate spec with a migration.
