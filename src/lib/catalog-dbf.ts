@@ -1,7 +1,7 @@
 import type { CatalogEntryInput } from "./catalog-parser";
+import { MAX_DBF_BYTES } from "./catalog-upload-format";
 
 const MAX_RECORDS = 1000000;
-export const MAX_DBF_BYTES = 256 * 1024 * 1024;
 
 interface Field { name: string; type: string; offset: number; length: number }
 interface Table { bytes: Uint8Array; count: number; headerSize: number; recordSize: number; fields: Map<string, Field> }
