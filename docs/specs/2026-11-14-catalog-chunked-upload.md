@@ -1,7 +1,7 @@
 # Shared catalog: upload the DBF pair in chunks
 
-Status: DRAFT
-Owner approval:
+Status: APPROVED
+Owner approval: Алекс, 14.11.2026, в чате: «Все твои решения, предложенные на пути, да, так и сделать.» (все решения D1–D10, решения по трём открытым пунктам: nginx-location входит в эту задачу, старый эндпоинт удаляется, риск памяти измеряется в AC12)
 Type: contract
 Branch: claude/catalog-chunked-upload
 Spec gate: `npm run check:spec`
@@ -88,8 +88,8 @@ this file. Until then no code and no test edits. Supersedes D1 and AC1 of
 
 ## Out of scope
 
-- Изменения `nginx/` и `docker-compose.yml` (отдельно, по решению владельца о порту
-  и сетевой схеме).
+- Изменения `docker-compose.yml` и сетевой схемы (порт, туннель). Изменение `nginx/`
+  ограничено отдельным `location` для путей chunked-загрузки (см. Files and Risks).
 - Изменения лимитов Cloudflare, тарифа или DNS.
 - Фоновый импорт с опросом статуса (D4 предыдущей спеки сохраняется: запрос открыт до конца).
 - Удаление старого `POST /api/admin/catalog`, миграции и схема Prisma.
@@ -112,6 +112,10 @@ this file. Until then no code and no test edits. Supersedes D1 and AC1 of
 - `src/components/CatalogImport.tsx` — нарезка, прогресс, повтор
 - `tests/catalog-upload-chunks.test.cjs` (новый) — AC2–AC9, AC12
 - `tests/admin-catalog-update.test.ts` — переписан под протокол из трёх шагов (AC1)
+- `nginx/nginx.conf`, `nginx/nginx-ssl.conf.example` — `location` для префикса
+  `/api/admin/catalog-upload/` с `client_max_body_size 100m`, без изменения общего `location /`
+- `tests/catalog-upload.test.cjs` — старый тест маршрута `catalog-upload.ts` удаляется; тесты библиотеки `importCatalogUpload` остаются
+- `package.json` — `test:app`: добавить `tests/catalog-upload-chunks.test.cjs`
 - `docs/engineering/catalog-updates.md` — описание протокола
 
 ## Contract change
@@ -135,10 +139,9 @@ this file. Until then no code and no test edits. Supersedes D1 and AC1 of
 - Concurrency: одновременные `chunk` для одного `uploadId` сериализуются записью по `offset`;
   два `finalize` одновременно не выполняются (блокировка по `uploadId`).
 - Timezone, cron, notifications: не затрагиваются.
-- Nginx: `client_max_body_size 520m` остаётся, но на путь `/api/admin/catalog-upload/chunk`
-  нужен отдельный `location` с размером не меньше 90 МБ. Изменение `nginx/` вне этой спеки:
-  либо оно сюда и добавляется (через `out-of-spec`), либо остаётся общий `location /` с
-  лимитом по умолчанию 1 МБ, что сломает загрузку. Решение владельца нужно до `APPROVED`.
+- Nginx: старый `location = /api/admin/catalog-upload` удаляется вместе с эндпоинтом;
+  новый `location ^~ /api/admin/catalog-upload/` задаёт `client_max_body_size 100m`
+  (куски 90 МБ + запас). Общий `location /` с лимитом 1 МБ не меняется.
 
 ## Verification plan
 
@@ -154,4 +157,21 @@ Standing checks: `npm run typecheck`, `npm run test:app`, `npm run check:context
 
 ## Result and handoff
 
-Not started. Waiting for owner approval.
+Checked 14.11.2026 on Node 22 with a disposable SQLite (every migration applied).
+
+- AC1 → PASS — `tests/catalog-upload-chunks.test.cjs` (planChunks: 90 MiB parts, last part shorter); `tests/admin-catalog-update.test.ts` (init/chunk/status/finalize, one fetch per part)
+- AC2 → PASS — chunks test: wrong magic, length mismatch and oversize refused by init with 400/413; no file created
+- AC3 → PASS — chunks test: part past the end and truncated part refused with 400
+- AC4 → PASS — chunks test: the same part sent twice; status lists merged ranges; file completes correctly
+- AC5 → PASS — chunks test: finalize with gaps answers 409 with the missing range and makes zero writes
+- AC6 → PASS — chunks test: 1,010-row pair imported in batches, counts returned; route cycle test returns 200 with imported = 4
+- AC7 → PASS — chunks test: second batch fails → confirmed 500; repeat finalize converges to 1,010 rows with no duplicates
+- AC8 → PASS — route test: 405, 401 and 403 with `readableDidRead === false` (body not read before the session check); ADMIN completes the cycle
+- AC9 → PARTIAL — temporary files removed after success (AC6 check) and by TTL on init/cleanup (D8 test); init replaces the previous upload (D6 test). Not done: an explicit cancel endpoint (none was specified in the routes list) and cleanup on process start (D8 says "при старте": only the init path runs it)
+- AC10 → PARTIAL — schema and migrations unchanged. The Product check only shows the count stays 0, because the fixture seeds no products; it does not prove that existing rows survive. Not verified with seeded products
+- AC11 → SKIP — no browser walk-through with 230 MB files on a dev server was run
+- AC12 → PASS (measured, memory risk open) — synthetic pair 232.7 MB (205 MB goods, 27.7 MB barcode, 1,000,000 rows) via the chunk protocol: 1,000,000 rows imported, finalize 41.2 s, finalize peak RSS 1,743 MB (sampled, source buffers released). The production host has 1.9 GB RAM shared with the app, so the margin is small. This remains an open risk, as in the previous spec's AC8
+
+Commands: `npm run typecheck` exit 0; `npm run test:app` 199/199; `npm run test:harness` 14/14; `npm run check:context` PASS (150 lines); `npm run build` OK, the four new routes are in the bundle.
+
+Limitations: AC9 cancel and startup cleanup, AC10 with seeded products, AC11 browser run, and production memory are open. nginx `location ^~ /api/admin/catalog-upload/` with 100 MB was checked by reading the config only: `nginx -t` is not available in this container. The deployed nginx and Cloudflare plan must be checked before a real upload.
