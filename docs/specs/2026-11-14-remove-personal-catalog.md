@@ -48,6 +48,9 @@ Option B: before the table is dropped, personal rows whose barcode is absent fro
 - `tests/purge-departments.test.mjs` — remove `CatalogEntry` inserts and counts
 - `docs/engineering/catalog-updates.md` — one-line statement (AC6)
 
+- `tests/personal-catalog-migration.test.cjs` — new migration data-preservation suite (AC3); `package.json` — add it to `test:app`
+- out-of-spec: `tests/product-dates-api.test.cjs`, its migration-range filters skipped `20261003000000_add_shared_catalog` (same prefix as `product_manufacture_date`), which the new migration needs; the test now applies it explicitly, no assertion changed
+
 ## Contract change
 
 Existing assertions in `tests/catalog-api.test.cjs` and `tests/department-access.test.cjs` assert that a personal entry is returned before the shared one, that `POST /api/catalog` upserts under the session owner, and that another account does not see it. These become wrong because the personal catalog no longer exists. Replacement: shared-only lookup, 405 for `POST`, and a migration data-preservation test (AC3). Each removed assertion is listed in the PR body.
@@ -71,4 +74,15 @@ Standing checks: `npm run typecheck`, `npm run test:app`, `npm run check:context
 
 ## Result and handoff
 
-Pending approval.
+Checked 14.11.2026 on disposable SQLite and a production build, branch based on `origin/main` (without the admin DBF branch).
+
+- AC1 -> PASS — `tests/catalog-api.test.cjs`, `tests/department-access.test.cjs`: shared-only lookup, 200/404/400/401.
+- AC2 -> PASS — same suites: POST/PUT/DELETE give 405 with `Allow: GET`; no source file writes a personal catalog (`catalogEntry` has no matches in `src`, `tests`).
+- AC3 -> PASS — `tests/personal-catalog-migration.test.cjs`: all other tables keep their counts, shared rows keep id/barcode/name, absent barcodes are copied, a barcode with two personal names yields the latest one, empty-table case applies cleanly, `foreign_key_check` is empty.
+- AC4 -> PASS — `tests/purge-departments.test.mjs` without `CatalogEntry`; shared catalog still preserved.
+- AC5 -> PASS — `npx prisma validate`; `npm run typecheck` 0 errors.
+- AC6 -> PASS — `docs/engineering/catalog-updates.md` says the shared base is the only catalog and that CSV/Excel import no longer exists.
+
+Commands: `npm run test:app` 175/175; `npm run test:harness` 14/14; `npm run check:context` PASS; `npm run build` OK.
+
+Limitations: not run on production data; the production `CatalogEntry` row count is unknown and must be read after a verified backup before the migration is released. This branch must merge after `local/admin-dbf-catalog` (the remaining caller of `POST /api/catalog` lives there); both edit the `test:app` line in `package.json` and `tests/catalog-api.test.cjs`, so the second to merge needs a rebase.
