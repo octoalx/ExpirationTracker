@@ -56,11 +56,21 @@ $ grep -n ':disabled' src/styles/globals.css
 310:.primary-action:disabled { opacity: .55; cursor: wait; transform: none; }
 ```
 
-The first shows nothing resets the file inputs after the import; the second shows
-the wait cursor on any disabled primary button. A browser walk-through of the
-screen is the manual counterpart: after a successful save the inputs still name
-`goods.dbf`/`barcode.dbf`, the button is disabled and its cursor is the wait
-spinner.
+The same two assertions inside `tests/admin-catalog-update.test.ts`, with the
+source changes stashed and the new tests in place:
+
+```
+$ git stash push -- src/components/CatalogImport.tsx src/styles/globals.css
+$ node --import tsx --test tests/admin-catalog-update.test.ts
+✖ a saved catalog clears both file inputs, not only their React state
+  AssertionError [ERR_ASSERTION]: both inputs are bound to a ref
+✖ a disabled save button is neutral; the wait cursor means work in progress
+  AssertionError [ERR_ASSERTION]: a disabled primary action shows a plain cursor
+ℹ pass 4
+ℹ fail 2
+
+$ git stash pop
+```
 
 ## Acceptance criteria
 
@@ -118,7 +128,19 @@ none
 
 ## Result and handoff
 
-- AC1 → (pending)
-- AC2 → (pending)
-- AC3 → (pending)
-- AC4 → (pending)
+- AC1 → PASS — `tests/admin-catalog-update.test.ts` "a saved catalog clears both file
+  inputs, not only their React state": red before the fix, green after; the two inputs
+  now carry `ref={goodsInput}` / `ref={barcodeInput}` and their `value` is reset with the state.
+- AC2 → PASS — same file, "a disabled save button is neutral; the wait cursor means work
+  in progress": `.primary-action:disabled` has `cursor: not-allowed`, the wait cursor lives
+  on `.primary-action[data-busy="true"]:disabled`, and the built CSS
+  (`.next/static/css`) keeps all three rules after cssnano.
+- AC3 → PASS — the same test checks `.primary-action:disabled:hover { background: #1554b5 }`.
+- AC4 → PASS — `npm run test:app` 201/201, `npm run test:harness` 14/14, `npm run typecheck`,
+  `npm run check:context`, `npm run build` all clean.
+
+Limitations: no browser walk-through on a dev server (no local stand with a 230 MB pair in
+this session); the fix is verified by static assertions and the production CSS build. The
+deployment is not part of this task — it follows the merged PR and the release workflow.
+Next useful step: after the merge, one manual save on production to confirm the inputs
+clear on screen.
