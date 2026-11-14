@@ -38,9 +38,9 @@ function disposableDatabase() {
   return { dir, url, prisma: new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) }) };
 }
 
-// Production surfaces: src/pages/api/catalog/index.ts (GET lookup, POST upsert) and
+// Production surfaces: src/pages/api/catalog/index.ts (GET lookup of the shared catalog) and
 // src/pages/api/products/import.ts (inventory batch import).
-test('catalog lookup and import APIs scope data to the verified owner and validate before writes', async () => {
+test('catalog lookup is shared-only and read-only; inventory import validates before writes', async () => {
   const { dir, prisma } = disposableDatabase();
   let session = null;
   const authModules = {
@@ -49,7 +49,6 @@ test('catalog lookup and import APIs scope data to the verified owner and valida
     '../../../lib/auth': { authOptions: {} },
     '@/lib/prisma': { prisma },
     '../../../lib/prisma': { prisma },
-    '@/lib/catalog-parser': load('src/lib/catalog-parser.ts', {}),
     '@/lib/server/inventory': require('../src/lib/server/inventory.ts'),
     '@/lib/server/api': require('../src/lib/server/errors.ts'),
     '@/lib/expiry-calendar': require('../src/lib/expiry-calendar.ts'),
@@ -67,55 +66,38 @@ test('catalog lookup and import APIs scope data to the verified owner and valida
     for (const id of ['owner', 'other']) {
       await prisma.user.create({ data: { id, email: `${id}@example.invalid` } });
     }
-    // The department membership is the product scope; the catalog stays per account.
     await prisma.store.create({ data: { id: 'dep', name: 'Отдел' } });
     await prisma.storeMembership.create({ data: { userId: 'owner', storeId: 'dep', role: 'MANAGER' } });
+    await prisma.sharedCatalogEntry.create({ data: { barcode: '2000000000001', name: 'Catalog A' } });
 
-    // Unauthenticated requests mutate nothing and disclose nothing.
+    // Unauthenticated requests disclose and mutate nothing.
     assert.equal((await call(catalog, 'GET', {}, { barcode: '2000000000001' })).code, 401);
-    assert.equal((await call(catalog, 'POST', { entries: [{ barcode: '2000000000001', name: 'Catalog A' }] })).code, 401);
     assert.equal((await call(inventory, 'POST', { products: [{ name: 'Batch', barcode: '2000000000001' }] })).code, 401);
-    assert.equal(await prisma.catalogEntry.count(), 0);
     assert.equal(await prisma.product.count(), 0);
 
-    // Unsupported methods are rejected with an explicit Allow header.
-    const unsupported = response();
-    unsupported.headers = {};
-    unsupported.setHeader = (key, value) => { unsupported.headers[key] = value; };
-    await catalog({ method: 'DELETE' }, unsupported);
-    assert.equal(unsupported.code, 405);
+    // The personal write endpoint is gone: every method but GET is 405 with an Allow header.
+    for (const method of ['POST', 'PUT', 'DELETE']) {
+      const rejected = response();
+      rejected.headers = {};
+      rejected.setHeader = (key, value) => { rejected.headers[key] = value; };
+      await catalog({ method, body: { entries: [{ barcode: '2000000000002', name: 'New' }] }, query: {} }, rejected);
+      assert.equal(rejected.code, 405);
+      assert.equal(rejected.headers.Allow, 'GET');
+    }
+    assert.equal(await prisma.sharedCatalogEntry.count(), 1);
 
-    // Invalid payloads are rejected before any write.
-    session = { user: { id: 'owner' } };
-    assert.equal((await call(catalog, 'POST', { entries: [] })).code, 400);
-    assert.equal((await call(catalog, 'POST', { entries: [{ barcode: 'abc', name: 'Bad' }] })).code, 400);
-    assert.equal((await call(catalog, 'GET', {}, { barcode: 'not-a-barcode' })).code, 400);
-    assert.equal((await call(inventory, 'POST', { products: [] })).code, 400);
-    assert.equal(await prisma.catalogEntry.count(), 0);
-    assert.equal(await prisma.product.count(), 0);
-
-    // A valid catalog import upserts under the session owner, ignoring a spoofed userId.
-    const entries = [
-      { barcode: '2000000000001', name: 'Catalog A' },
-      { barcode: '2000000000002', name: 'Catalog B' },
-    ];
-    const imported = await call(catalog, 'POST', { entries, userId: 'other' });
-    assert.equal(imported.code, 200);
-    assert.equal(imported.data.imported, 2);
-    assert.equal(await prisma.catalogEntry.count(), 2);
-    assert.equal(await prisma.catalogEntry.count({ where: { userId: 'owner' } }), 2);
-    assert.equal(await prisma.catalogEntry.count({ where: { userId: 'other' } }), 0);
-
-    // Re-importing the same barcodes updates in place instead of duplicating.
-    assert.equal((await call(catalog, 'POST', { entries: [{ barcode: '2000000000001', name: 'Catalog A renamed' }] })).code, 200);
-    assert.equal(await prisma.catalogEntry.count(), 2);
-
-    // Lookup returns only the owner's entry; another account never sees it.
+    // Lookup reads the shared reference for any authenticated account.
+    session = { user: { id: 'other' } };
     const found = await call(catalog, 'GET', {}, { barcode: '2000000000001' });
     assert.equal(found.code, 200);
-    assert.equal(found.data.name, 'Catalog A renamed');
-    session = { user: { id: 'other' } };
-    assert.equal((await call(catalog, 'GET', {}, { barcode: '2000000000001' })).code, 404);
+    assert.deepEqual(found.data, { barcode: '2000000000001', name: 'Catalog A' });
+    assert.equal((await call(catalog, 'GET', {}, { barcode: '2000000000009' })).code, 404);
+    assert.equal((await call(catalog, 'GET', {}, { barcode: 'not-a-barcode' })).code, 400);
+
+    // Invalid inventory payloads are rejected before any write.
+    session = { user: { id: 'owner' } };
+    assert.equal((await call(inventory, 'POST', { products: [] })).code, 400);
+    assert.equal(await prisma.product.count(), 0);
 
     // Inventory import stays owner-scoped even when the body claims another account.
     session = { user: { id: 'owner' } };

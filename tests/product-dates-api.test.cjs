@@ -35,6 +35,8 @@ test('manufacture metadata survives edits; migration preserves legacy records an
   for (const key of Object.keys(before)) assert.equal(after[key], before[key]);
   assert.equal(after.manufacturingDate, null);
   const department = '20261021000000_department_access_model';
+  // add_shared_catalog shares the 20261003000000 prefix, so the range filters above skip it.
+  db.exec(fs.readFileSync(path.join(migrations, '20261003000000_add_shared_catalog/migration.sql'), 'utf8'));
   for (const name of names.filter(name => name > "20261003000000_product_manufacture_date" && name <= department)) db.exec(fs.readFileSync(path.join(migrations, name, "migration.sql"), "utf8"));
   // Each account works its own department table; a foreign row must stay invisible.
   // The mandatory-storeId migration refuses a row without a department, so the legacy

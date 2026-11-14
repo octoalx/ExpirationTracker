@@ -164,15 +164,13 @@ test('the administrator runs departments, opens one logged support visit at a ti
   assert.equal((await call(route, 'POST', { operation: 'unknown' })).code, 400);
 });
 
-test('barcode lookup falls back to the shared reference and keeps the personal name first', async t => {
+test('barcode lookup reads only the shared reference and the personal write endpoint is gone', async t => {
   const { db, call, login } = await fixture(t, true);
   const catalog = 'src/pages/api/catalog/index.ts';
   await db.sharedCatalogEntry.create({ data: { barcode: '4000000000001', name: 'Общее название' } });
-  await db.catalogEntry.create({ data: { userId: 'employee', barcode: '4000000000001', name: 'Моё название' } });
-  await db.catalogEntry.create({ data: { userId: 'employee', barcode: '4000000000002', name: 'Только моё' } });
   login('employee');
-  assert.equal((await call(catalog, 'GET', {}, { barcode: '4000000000001' })).data.name, 'Моё название');
-  assert.equal((await call(catalog, 'GET', {}, { barcode: '4000000000002' })).data.name, 'Только моё');
+  assert.equal((await call(catalog, 'GET', {}, { barcode: '4000000000001' })).data.name, 'Общее название');
+  assert.equal((await call(catalog, 'POST', { entries: [{ barcode: '4000000000002', name: 'Моё' }] })).code, 405);
   login('outsider');
   assert.equal((await call(catalog, 'GET', {}, { barcode: '4000000000001' })).data.name, 'Общее название');
   assert.equal((await call(catalog, 'GET', {}, { barcode: '4000000000002' })).code, 404);
