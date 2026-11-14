@@ -53,14 +53,17 @@ const SELECTED_ACTION_STYLES: Record<ProductStatusActionKey, string> = {
   archive: "border-slate-600 bg-slate-600 text-white",
 };
 
-/** Left marker colour for each phone group. */
+/**
+ * Left status bar colour for each phone group. The bar is a separate absolutely positioned
+ * element inside the record, so it is not clipped by the rounded corners of the card.
+ */
 const GROUP_MARKER: Record<string, string> = {
-  expired: "border-l-dash-expired",
-  today: "border-l-dash-expired",
-  urgent: "border-l-dash-expired",
-  warning: "border-l-dash-amber-bar",
-  safe: "border-l-dash-control",
-  none: "border-l-dash-control",
+  expired: "bg-dash-expired",
+  today: "bg-dash-expired",
+  urgent: "bg-dash-expired",
+  warning: "bg-dash-amber-bar",
+  safe: "bg-dash-control",
+  none: "bg-dash-control",
 };
 
 interface GestureState {
@@ -327,7 +330,8 @@ export default function MobileProductList(props: Props) {
                       onPointerUp={handlePointerUp}
                       onPointerCancel={handlePointerCancel}
                     >
-                      <div className={cn("flex items-center gap-1 border-l-4", GROUP_MARKER[group.key] ?? "border-l-transparent")}>
+                      <span aria-hidden="true" className={cn("pointer-events-none absolute inset-y-3 left-0 w-1 rounded-r-full", GROUP_MARKER[group.key] ?? "bg-transparent")} />
+                      <div className="flex items-center gap-1 border-l-4 border-transparent">
                         <button
                           type="button"
                           aria-expanded={open}
