@@ -141,3 +141,62 @@ test('catalog lookup and import APIs scope data to the verified owner and valida
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Production surface: src/pages/api/admin/catalog.ts (shared scanner reference, ADMIN only).
+test('administrator upserts the shared catalog that other accounts read, without touching personal data', async () => {
+  const { dir, prisma } = disposableDatabase();
+  let session = null;
+  const modules = {
+    'next-auth/next': { getServerSession: async () => session },
+    '@/lib/auth': { authOptions: {} },
+    '@/lib/prisma': { prisma },
+    '@/lib/catalog-parser': load('src/lib/catalog-parser.ts', {}),
+  };
+  const admin = load('src/pages/api/admin/catalog.ts', modules).default;
+  const lookup = load('src/pages/api/catalog/index.ts', modules).default;
+  const call = async (handler, method, body = {}, query = {}) => {
+    const res = response();
+    await handler({ method, body, query }, res);
+    return res;
+  };
+  const entries = [{ barcode: '2000000000011', name: 'Shared A' }, { barcode: '2000000000012', name: 'Shared B' }];
+
+  try {
+    for (const id of ['admin', 'employee']) await prisma.user.create({ data: { id, email: `${id}@example.invalid` } });
+    await prisma.catalogEntry.create({ data: { userId: 'admin', barcode: '2000000000099', name: 'Personal' } });
+
+    // No session: 401. Not an administrator: 403. Nothing is written either way.
+    assert.equal((await call(admin, 'POST', { entries })).code, 401);
+    session = { user: { id: 'employee', role: 'USER' } };
+    assert.equal((await call(admin, 'POST', { entries })).code, 403);
+    assert.equal(await prisma.sharedCatalogEntry.count(), 0);
+
+    // Invalid payload is rejected before any write.
+    session = { user: { id: 'admin', role: 'ADMIN' } };
+    assert.equal((await call(admin, 'POST', { entries: [{ barcode: 'bad', name: 'x' }] })).code, 400);
+    assert.equal(await prisma.sharedCatalogEntry.count(), 0);
+
+    // The save is visible to an account that has no personal entry.
+    const saved = await call(admin, 'POST', { entries });
+    assert.equal(saved.code, 200);
+    assert.equal(saved.data.imported, 2);
+    session = { user: { id: 'employee', role: 'USER' } };
+    const found = await call(lookup, 'GET', {}, { barcode: '2000000000011' });
+    assert.equal(found.code, 200);
+    assert.equal(found.data.name, 'Shared A');
+
+    // Repeat with a renamed entry and a new code: renamed in place, neighbour kept, no duplicates.
+    session = { user: { id: 'admin', role: 'ADMIN' } };
+    assert.equal((await call(admin, 'POST', { entries: [{ barcode: '2000000000011', name: 'Shared A renamed' }, { barcode: '2000000000013', name: 'Shared C' }] })).code, 200);
+    assert.equal(await prisma.sharedCatalogEntry.count(), 3);
+    assert.equal((await prisma.sharedCatalogEntry.findUnique({ where: { barcode: '2000000000011' } })).name, 'Shared A renamed');
+    assert.equal((await prisma.sharedCatalogEntry.findUnique({ where: { barcode: '2000000000012' } })).name, 'Shared B');
+
+    // Personal catalog and inventory are untouched by the shared update.
+    assert.equal(await prisma.catalogEntry.count(), 1);
+    assert.equal(await prisma.product.count(), 0);
+  } finally {
+    await prisma.$disconnect();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
