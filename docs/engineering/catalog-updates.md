@@ -1,7 +1,8 @@
 # Shared scanner catalog updates
 
-The scanner reads `SharedCatalogEntry`, shared by all users. Only administrators
-write this reference. `Product` is each user's inventory and is not modified by
+The scanner reads `SharedCatalogEntry`, shared by all users. It is the only barcode
+catalog: there is no personal catalog, and `GET /api/catalog` reads nothing else.
+Only administrators write this reference, and only through the DBF pair below. `Product` is each user's inventory and is not modified by
 catalog updates.
 
 ## Original DBF bundle
@@ -31,7 +32,7 @@ user inventory and the ordinary user Excel import are independent.
 
 A failed connection can leave already confirmed batches saved. Repeat the same
 pair: upserts do not create duplicates. There is no automatic deletion or full
-database replacement. Excel and CSV catalog import remain available as alternatives.
+database replacement. CSV and Excel catalog import no longer exist.
 
 ## Maintenance
 

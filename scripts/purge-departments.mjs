@@ -40,7 +40,6 @@ const CONFIRMATION = "PURGE-DEPARTMENTS";
 /**
  * Deletion order follows the foreign keys: claims and Telegram queues first, then
  * products, then memberships, then departments, then the accounts that owned them.
- * CatalogEntry is personal data of an account, so it leaves with its owner.
  */
 const PURGED_TABLES = [
   "ProductClaim",
@@ -54,7 +53,6 @@ const PURGED_TABLES = [
   "Product",
   "StoreMembership",
   "Store",
-  "CatalogEntry",
 ];
 
 /** Tables whose row counts are compared before and after the purge. */
@@ -121,7 +119,7 @@ function inventory(db, adminEmail) {
     JOIN Store ON Store.id = StoreMembership.storeId ORDER BY User.email`).all();
   const personal = db.prepare('SELECT COUNT(*) AS n FROM Product WHERE storeId IS NULL').get().n;
   const telegramLinks = db.prepare("SELECT userId,displayName FROM TelegramLink").all();
-  const before = readCounts(db, ["CatalogEntry", "TelegramWarning", "TelegramLinkRequest", "ProductClaim"]);
+  const before = readCounts(db, ["TelegramWarning", "TelegramLinkRequest", "ProductClaim"]);
   // Settings rows leave with their account through the cascade, so the expected
   // survivor count is a subtraction rather than a constant.
   const settingsRemoved = doomed.length

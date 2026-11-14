@@ -43,8 +43,6 @@ function fixture(t) {
     INSERT INTO SharedCatalogEntry (id,barcode,name,createdAt,updatedAt) VALUES
       ('c1','4600000000001','Молоко',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
       ('c2','4600000000002','Хлеб',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
-    INSERT INTO CatalogEntry (id,barcode,name,createdAt,updatedAt,userId) VALUES
-      ('ce1','4600000000003','Сыр',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'admin');
     INSERT INTO SystemLog (id,level,message) VALUES ('l1','INFO','started');`);
   db.close();
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -58,7 +56,7 @@ function run(...args) {
 function counts(db) {
   const count = table => db.prepare(`SELECT COUNT(*) AS n FROM "${table}"`).get().n;
   return { users: count("User"), stores: count("Store"), memberships: count("StoreMembership"), products: count("Product"),
-    events: count("ProductEvent"), claims: count("ProductClaim"), catalog: count("CatalogEntry"),
+    events: count("ProductEvent"), claims: count("ProductClaim"),
     shared: count("SharedCatalogEntry"), settings: count("Settings"), links: count("TelegramLink"),
     updates: count("TelegramUpdate"), deliveries: count("TelegramDelivery"), buttons: count("TelegramButton"),
     warnings: count("TelegramWarning"), logs: count("SystemLog") };
@@ -84,7 +82,7 @@ test("the purge script reports without deleting, and refuses to delete without t
 
   const untouched = open();
   assert.deepEqual(counts(untouched), { users: 4, stores: 1, memberships: 3, products: 2, events: 1, claims: 1,
-    catalog: 1, shared: 2, settings: 4, links: 1, updates: 1, deliveries: 1, buttons: 1, warnings: 1, logs: 1 });
+    shared: 2, settings: 4, links: 1, updates: 1, deliveries: 1, buttons: 1, warnings: 1, logs: 1 });
   untouched.close();
 
   const refused = run("--db", source, "--admin", "admin@localhost", "--backup-dir", backupDir, "--apply");
@@ -103,7 +101,7 @@ test("the purge keeps the administrator and the shared catalog, and removes ever
 
   const db = open();
   const after = counts(db);
-  assert.deepEqual(after, { users: 1, stores: 0, memberships: 0, products: 0, events: 0, claims: 0, catalog: 0,
+  assert.deepEqual(after, { users: 1, stores: 0, memberships: 0, products: 0, events: 0, claims: 0,
     shared: 2, settings: 1, links: 0, updates: 0, deliveries: 0, buttons: 0, warnings: 0, logs: 2 });
   assert.equal(db.prepare("SELECT email FROM User").get().email, "admin@localhost");
   assert.equal(db.prepare("SELECT userId FROM Settings").get().userId, db.prepare("SELECT id FROM User").get().id);
