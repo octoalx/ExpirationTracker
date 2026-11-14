@@ -113,7 +113,7 @@ test("the catalog save button is the main blue action, red stays for danger", ()
   const emerald = /(bg|text|border)-emerald-\d{2,3}/;
   assert.equal(emerald.test(catalog), false, "the green button is gone");
   assert.ok(catalog.includes("Сохранить каталог"), "the wording is kept");
-  assert.ok(catalog.includes("Файл превышает 2 МБ"), "the size error is kept");
+  assert.ok(catalog.includes("не больше 256 МБ"), "the DBF size error replaces the CSV one");
   // Red is only on destructive controls.
   assert.equal((users.match(/\bbg-dash-expired(?!-soft)/g) ?? []).length, 0, "no red fills in the accounts tab");
   assert.ok(confirm.includes("bg-dash-expired"), "the irreversible confirm carries the red fill");
