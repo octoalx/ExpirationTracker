@@ -146,7 +146,14 @@ this file. Until then no code and no test edits. Supersedes D1 and AC1 of
 ## Verification plan
 
 - AC1 → `tests/admin-catalog-update.test.ts`, asserts 3-шаговый протокол, куски по 90 МБ
-- AC2–AC9 → `tests/catalog-upload-chunks.test.cjs` на disposable SQLite
+- AC2 → `tests/catalog-upload-chunks.test.cjs` на disposable SQLite
+- AC3 → `tests/catalog-upload-chunks.test.cjs` на disposable SQLite
+- AC4 → `tests/catalog-upload-chunks.test.cjs` на disposable SQLite
+- AC5 → `tests/catalog-upload-chunks.test.cjs` на disposable SQLite
+- AC6 → `tests/catalog-upload-chunks.test.cjs` на disposable SQLite
+- AC7 → `tests/catalog-upload-chunks.test.cjs` на disposable SQLite
+- AC8 → `tests/catalog-upload-chunks.test.cjs` на disposable SQLite, маршруты 405/401/403 без чтения тела
+- AC9 → `tests/catalog-upload-chunks.test.cjs` на disposable SQLite
 - AC10 → `tests/catalog-upload-chunks.test.cjs`, счётчики `Product` не меняются
 - AC11 → manual: dev-сервер, администратор, пара 230 МБ, обрыв сети на середине → повтор
   продолжает с недостающих кусков (SKIP, если не выполнено)
