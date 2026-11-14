@@ -63,11 +63,6 @@ Standing checks: `npm run typecheck`, `npm run test:app`, `npm run check:context
 
 ## Result and handoff
 
-Not started. Spec is DRAFT. Root cause is a hypothesis from code until a browser
-walk-through confirms it.
-
-## Result and handoff
-
 Checked 14.11.2026 on a disposable SQLite seeded with four products (expired, warning, two safe), `next build` and `next start` with `DISABLE_BACKGROUND_JOBS=true`, Playwright at 375 px.
 
 Root cause confirmed in the browser before the fix: the 4 px coloured border sat on the header row inside the rounded card (radius 14 px, `overflow: hidden`), so the stripe bent at the corners and did not cover the expanded part of the card.
