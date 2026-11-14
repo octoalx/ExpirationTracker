@@ -124,13 +124,14 @@ One task = one session; state comes from this file, `git log` and open PRs, neve
 chat. Closing a task updates this file and the plan's `Status:`/`Evidence:`
 (`scripts/check-plan-status.sh`). Spec: `docs/specs/2026-10-23-task-continuity.md`.
 
+## Chunked catalog upload (2026-11-14, `claude/catalog-chunked-upload`)
+Spec `docs/specs/2026-11-14-catalog-chunked-upload.md`. Open: AC11 browser check; prod memory (1.74 GB peak, 1M rows).
+
 ## Open threads
 
 1. Feature checks removed during the production sync are restored one at a time,
    never in bulk.
 2. Browser UI and the native iOS date picker remain unverified.
-3. Re-audit the process on 2026-11-06 against the metrics in
-   `docs/engineering/workflow.md`.
 
 ## Operational context
 
