@@ -17,18 +17,27 @@ test("the Catalog tab takes only the goods.dbf + barcode.dbf pair", () => {
   assert.equal((screen.match(/type="file"/g) ?? []).length, 2, "exactly two file inputs");
   assert.equal((screen.match(/accept="\.dbf"/g) ?? []).length, 2, "both accept DBF only");
   assert.ok(!/\.csv|\.xlsx?|parseCatalogCsv|parseExcelFile/i.test(screen), "no CSV or Excel path");
-  assert.ok(screen.includes("catalog-dbf.worker"), "parsing runs in the worker");
-  assert.ok(screen.includes("Проверить файлы базы") && screen.includes("Сохранить каталог"));
+  assert.ok(screen.includes("Сохранить каталог"), "the save action is kept");
+  assert.ok(!screen.includes("Проверить файлы"), "no separate preview step");
 });
 
-test("only the DBF flow reaches the shared catalog endpoint, in batches", () => {
-  const callers = sources("src").filter(path => /["'`]\/api\/admin\/catalog["'`]/.test(read(path)));
+test("saving sends the pair in one request to the server upload route; the browser does not parse DBF", () => {
+  assert.ok(screen.includes('"/api/admin/catalog-upload"'), "upload route is used");
+  assert.ok(screen.includes("buildCatalogUploadBody"), "the framed body is built from the files");
+  assert.ok(!screen.includes("catalog-dbf"), "no browser DBF parser or worker");
+  assert.ok(!screen.includes("Worker("), "no worker");
+  const callers = sources("src").filter(path => /["'`]\/api\/admin\/catalog-upload["'`]/.test(read(path)));
   assert.deepEqual(callers, [join("src", "components", "CatalogImport.tsx")]);
-  assert.ok(screen.includes("importCatalogBatches"), "saving goes through the 500-entry batches");
-  assert.ok(!screen.includes('"/api/catalog"'), "the personal catalog endpoint is not used");
 });
 
-test("the screen tells how many records are confirmed when saving fails", () => {
+test("every response is read with its status and checked for JSON before parsing", () => {
+  assert.ok(screen.includes('headers.get("content-type")'), "content type is checked");
+  assert.ok(screen.includes("Код ответа ${response.status}"), "non-JSON answers show the status code");
+  assert.ok(screen.includes("413"), "a 413 gets its own message");
+  assert.ok(screen.indexOf("isJson") < screen.indexOf("JSON.parse(text)"), "JSON is parsed only after the check");
+});
+
+test("failures report how many records are confirmed and that repeating the pair is safe", () => {
   assert.ok(screen.includes("Подтверждено записей"), "confirmed count is shown");
   assert.ok(screen.includes("дубликаты не появятся"), "retry safety is stated");
 });
