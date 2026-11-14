@@ -235,14 +235,14 @@ jobs:
           # intention, and the health check used to compare it with itself.
           docker compose build --build-arg BUILD_REVISION="$SHA"
           docker compose up -d
-          # app is recreated above because its image hash changed; nginx only
-          # bind-mounts nginx.conf and never rebuilds, so `up -d` alone leaves a
-          # running nginx container pinned to the OLD file inode after Git
-          # replaces nginx.conf on checkout. Force it every deploy so a
-          # config-only change always takes effect (see
+          printf '%s\n' "$SHA" > .release-version
+          # nginx only bind-mounts nginx.conf and never rebuilds, so `up -d` alone
+          # leaves a running nginx container pinned to the OLD file inode after
+          # Git replaces nginx.conf on checkout; `up -d` does not recreate a
+          # service whose image/config hash did not change. Force it every
+          # deploy so a config-only change always takes effect (see
           # docs/specs/2026-11-14-deploy-recreate-mounted-config.md).
           docker compose up -d --force-recreate nginx
-          printf '%s\n' "$SHA" > .release-version
           REMOTE
 
       - name: Wait for the app to become healthy
@@ -346,10 +346,10 @@ jobs:
           # host marker is written only once the stack has started on that revision.
           docker compose build --build-arg BUILD_REVISION="$PREV"
           docker compose up -d
+          printf '%s\n' "$PREV" > .release-version
           # Same reason as the deploy step: recreate nginx unconditionally so a
           # rollback also re-binds mounted config, not just the app image.
           docker compose up -d --force-recreate nginx
-          printf '%s\n' "$PREV" > .release-version
           REMOTE
           # Sent from this checkout: the rollback target may be an older revision
           # that never had this script, and the check still has to judge whether the
