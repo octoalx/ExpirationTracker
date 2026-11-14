@@ -16,9 +16,11 @@ interface FloatingInputProps {
   icon?: React.ReactNode;
 }
 
+const FLOATED_LABEL =
+  "-top-2.5 text-[11px] font-semibold bg-white dark:bg-slate-900 px-1.5 rounded text-blue-600 dark:text-blue-400";
+
 function FloatingInput({ id, label, value, onChange, type = "text", icon }: FloatingInputProps) {
   const [focused, setFocused] = useState(false);
-  const floated = focused || value.length > 0;
 
   return (
     <div className="relative group">
@@ -51,14 +53,16 @@ function FloatingInput({ id, label, value, onChange, type = "text", icon }: Floa
         )}
         placeholder={label}
       />
+      {/* Focus is React state; "has a value" is read from the DOM, so a browser autofill
+          that never fires onChange still lifts the label above the text. */}
       <label
         htmlFor={id}
         className={cn(
           "absolute transition-all duration-200 pointer-events-none text-slate-500",
           icon ? "left-10" : "left-4",
-          floated
-            ? "-top-2.5 text-[11px] font-semibold bg-white dark:bg-slate-900 px-1.5 rounded text-blue-600 dark:text-blue-400"
-            : "top-3.5 text-sm",
+          focused
+            ? FLOATED_LABEL
+            : "top-3.5 text-sm peer-[:not(:placeholder-shown)]:-top-2.5 peer-[:not(:placeholder-shown)]:text-[11px] peer-[:not(:placeholder-shown)]:font-semibold peer-[:not(:placeholder-shown)]:bg-white peer-[:not(:placeholder-shown)]:px-1.5 peer-[:not(:placeholder-shown)]:rounded peer-[:not(:placeholder-shown)]:text-blue-600 peer-[:not(:placeholder-shown)]:dark:bg-slate-900 peer-[:not(:placeholder-shown)]:dark:text-blue-400",
         )}
       >
         {label}
