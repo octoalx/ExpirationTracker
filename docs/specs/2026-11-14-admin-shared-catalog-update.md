@@ -1,7 +1,7 @@
 # Admin update of the shared scanner catalog (DBF pair)
 
-Status: DRAFT
-Owner approval:
+Status: APPROVED
+Owner approval: Алекс, 14.11.2026, в чате: «Подтверждаю, правь»
 Type: feature
 Branch: local/admin-dbf-catalog
 Spec gate: `npm run check:spec`
