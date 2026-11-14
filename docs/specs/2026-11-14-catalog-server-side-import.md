@@ -130,4 +130,18 @@ Standing checks: `npm run typecheck`, `npm run test:app`, `npm run check:context
 
 ## Result and handoff
 
-Pending implementation.
+Checked 14.11.2026 on a disposable SQLite with every migration, synthetic DBF pairs, Node 22.
+
+- AC1 → PASS — `tests/admin-catalog-update.test.ts`: one `fetch` to `/api/admin/catalog-upload`, no worker, no preview
+- AC2 → PASS — `tests/catalog-upload.test.cjs`: bad magic, length mismatch and empty file refused before writes; oversize refused with 413 (`maxBytes` option, 1 byte under the real body)
+- AC3 → PASS — `tests/catalog-upload.test.cjs` (AC3/AC5): synthetic pair → `imported`, `goodsRows`, `barcodeRows`, `duplicateBarcodes`; stored name checked
+- AC4 → PARTIAL — `tests/admin-catalog-update.test.ts` asserts that `Content-Type` is checked before `JSON.parse` and that status 413 has its own message; no browser run of an HTML response
+- AC5 → PASS — flaky second batch: 500 confirmed, error carries `confirmed: 500`; retry converges to 1010 rows with no duplicates
+- AC6 → PASS — route test: 405, 401, 403 write nothing; ADMIN 200; temporary files removed after success and failure
+- AC7 → PASS — `Product` count unchanged. `CatalogEntry` no longer exists (removed by `remove-personal-catalog`), so the personal-table part of AC7 is void
+- AC8 → FAIL (risk on production hardware) — local, not prod-like: 443,701 rows, 23.7 s, peak RSS 912 MB; 1,000,000 rows, 62.7 s, peak RSS 1.73 GB. Production has 1.9 GB RAM shared with Next.js and SQLite, so the current 443,701-row file is borderline and the 1,000,000-row maximum does not fit. Not resolved in this PR; see Limitations
+- AC9 → SKIP — no `nginx` binary in this container (`apt-get install nginx` failed); both configs were edited and reviewed by hand only
+
+Commands: `npm run typecheck` 0 errors; `npm run test:app` 186/186; `npm run test:harness` 14/14; `npm run check:context` PASS; `npm run build` OK.
+
+Limitations: no real `goods.dbf`/`barcode.dbf`; no browser walk-through of the upload or the HTML error path; AC8 is open. Before a deploy with a large file, measure free memory on the production host and decide whether to lower the row limit or move to a streaming parser (separate spec). Routine production steps stay with the owner.
