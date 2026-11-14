@@ -8,8 +8,8 @@ import { parseDbfCatalog, type DbfCatalogResult } from "../catalog-dbf";
 import type { CatalogEntryInput } from "../catalog-parser";
 import {
   CATALOG_UPLOAD_HEADER_BYTES,
-  CATALOG_UPLOAD_MAGIC,
-  MAX_DBF_BYTES,
+  MAX_UPLOAD_BYTES,
+  parseCatalogUploadHeader,
 } from "../catalog-upload-format";
 
 /** Batch size of one INSERT ... ON CONFLICT statement; one statement is one atomic unit. */
@@ -32,7 +32,7 @@ export interface CatalogWriter {
 }
 
 /** Streams the request body to a temporary file, refusing anything above the allowed total. */
-async function receiveToFile(body: Readable, target: string, maxBytes: number): Promise<void> {
+export async function receiveToFile(body: Readable, target: string, maxBytes: number): Promise<void> {
   const handle = await fs.open(target, "wx");
   let total = 0;
   try {
@@ -62,19 +62,13 @@ async function readRange(handle: fs.FileHandle, position: number, length: number
 /** Reads and checks the framed body: magic, two lengths, exact total size. */
 async function readFrame(handle: fs.FileHandle, totalBytes: number) {
   if (totalBytes < CATALOG_UPLOAD_HEADER_BYTES) throw new CatalogUploadError(400, "Загрузка повреждена: нет заголовка");
-  const header = Buffer.alloc(CATALOG_UPLOAD_HEADER_BYTES);
+  const header = new Uint8Array(CATALOG_UPLOAD_HEADER_BYTES);
   await handle.read(header, 0, CATALOG_UPLOAD_HEADER_BYTES, 0);
-  if (header.subarray(0, 8).toString("ascii") !== CATALOG_UPLOAD_MAGIC) {
-    throw new CatalogUploadError(400, "Загрузка повреждена: неизвестный формат");
+  try {
+    return parseCatalogUploadHeader(header, totalBytes);
+  } catch (error) {
+    throw new CatalogUploadError(400, error instanceof Error ? error.message : "Загрузка повреждена");
   }
-  const goodsLength = header.readBigUInt64LE(8), barcodeLength = header.readBigUInt64LE(16);
-  if (goodsLength === 0n || barcodeLength === 0n || goodsLength > BigInt(MAX_DBF_BYTES) || barcodeLength > BigInt(MAX_DBF_BYTES)) {
-    throw new CatalogUploadError(400, "goods.dbf и barcode.dbf должны быть непустыми и не больше 256 МБ каждый");
-  }
-  if (BigInt(CATALOG_UPLOAD_HEADER_BYTES) + goodsLength + barcodeLength !== BigInt(totalBytes)) {
-    throw new CatalogUploadError(400, "Размер загрузки не совпадает с заголовком");
-  }
-  return { goodsLength: Number(goodsLength), barcodeLength: Number(barcodeLength) };
 }
 
 /** Writes one batch as a single statement: either every row of it is stored, or none. */
@@ -88,8 +82,43 @@ export async function upsertSharedCatalogBatch(writer: CatalogWriter, batch: Cat
 }
 
 /**
- * Receives the goods.dbf + barcode.dbf pair, validates it completely, then writes it in
- * 500-row batches. Parsing finishes before the first write, so a bad pair changes nothing.
+ * Parses an assembled upload file completely, then writes it in 500-row batches. Parsing
+ * finishes before the first write, so a bad pair changes nothing. The file is not removed here.
+ */
+export async function importCatalogFile(target: string, writer: CatalogWriter): Promise<CatalogUploadResult> {
+  const stat = await fs.stat(target);
+  if (stat.size > MAX_UPLOAD_BYTES) throw new CatalogUploadError(413, "Файлы больше 256 МБ каждый или слишком большие для загрузки");
+  const handle = await fs.open(target, "r");
+  let parsed: DbfCatalogResult;
+  try {
+    const { goodsLength, barcodeLength } = await readFrame(handle, stat.size);
+    const goods = await readRange(handle, CATALOG_UPLOAD_HEADER_BYTES, goodsLength);
+    const barcodes = await readRange(handle, CATALOG_UPLOAD_HEADER_BYTES + goodsLength, barcodeLength);
+    try {
+      parsed = parseDbfCatalog(goods, barcodes);
+    } catch (error) {
+      throw new CatalogUploadError(400, error instanceof Error ? error.message : "Не удалось прочитать DBF");
+    }
+  } finally {
+    await handle.close();
+  }
+
+  const { entries, ...counts } = parsed;
+  const now = Date.now();
+  let confirmed = 0;
+  try {
+    for (let offset = 0; offset < entries.length; offset += CATALOG_BATCH_SIZE) {
+      confirmed += await upsertSharedCatalogBatch(writer, entries.slice(offset, offset + CATALOG_BATCH_SIZE), now);
+    }
+  } catch {
+    throw new CatalogUploadError(500, "Не удалось сохранить общий каталог", confirmed);
+  }
+  return { ...counts, imported: confirmed };
+}
+
+/**
+ * Receives a whole body in one stream (used by tests and by callers that already hold the
+ * complete body), then imports it. The temporary file is always removed.
  */
 export async function importCatalogUpload(
   body: Readable,
@@ -97,36 +126,10 @@ export async function importCatalogUpload(
   options: { maxBytes?: number } = {},
 ): Promise<CatalogUploadResult> {
   const target = path.join(os.tmpdir(), `catalog-upload-${randomUUID()}.bin`);
-  const maxBytes = options.maxBytes ?? CATALOG_UPLOAD_HEADER_BYTES + 2 * MAX_DBF_BYTES;
+  const maxBytes = options.maxBytes ?? MAX_UPLOAD_BYTES;
   try {
     await receiveToFile(body, target, maxBytes);
-    const stat = await fs.stat(target);
-    const handle = await fs.open(target, "r");
-    let parsed: DbfCatalogResult;
-    try {
-      const { goodsLength, barcodeLength } = await readFrame(handle, stat.size);
-      const goods = await readRange(handle, CATALOG_UPLOAD_HEADER_BYTES, goodsLength);
-      const barcodes = await readRange(handle, CATALOG_UPLOAD_HEADER_BYTES + goodsLength, barcodeLength);
-      try {
-        parsed = parseDbfCatalog(goods, barcodes);
-      } catch (error) {
-        throw new CatalogUploadError(400, error instanceof Error ? error.message : "Не удалось прочитать DBF");
-      }
-    } finally {
-      await handle.close();
-    }
-
-    const { entries, ...counts } = parsed;
-    const now = Date.now();
-    let confirmed = 0;
-    try {
-      for (let offset = 0; offset < entries.length; offset += CATALOG_BATCH_SIZE) {
-        confirmed += await upsertSharedCatalogBatch(writer, entries.slice(offset, offset + CATALOG_BATCH_SIZE), now);
-      }
-    } catch {
-      throw new CatalogUploadError(500, "Не удалось сохранить общий каталог", confirmed);
-    }
-    return { ...counts, imported: confirmed };
+    return await importCatalogFile(target, writer);
   } finally {
     await fs.rm(target, { force: true });
   }

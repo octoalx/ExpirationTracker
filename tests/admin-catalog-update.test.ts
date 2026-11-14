@@ -21,12 +21,15 @@ test("the Catalog tab takes only the goods.dbf + barcode.dbf pair", () => {
   assert.ok(!screen.includes("Проверить файлы"), "no separate preview step");
 });
 
-test("saving sends the pair in one request to the server upload route; the browser does not parse DBF", () => {
-  assert.ok(screen.includes('"/api/admin/catalog-upload"'), "upload route is used");
+test("saving uploads the pair in parts through the chunked routes; the browser does not parse DBF", () => {
+  for (const step of ["init", "chunk", "status", "finalize"]) {
+    assert.ok(screen.includes(`/api/admin/catalog-upload/${step}`), `${step} route is used`);
+  }
   assert.ok(screen.includes("buildCatalogUploadBody"), "the framed body is built from the files");
+  assert.ok(screen.includes("planChunks"), "the body is cut into parts");
   assert.ok(!screen.includes("catalog-dbf"), "no browser DBF parser or worker");
   assert.ok(!screen.includes("Worker("), "no worker");
-  const callers = sources("src").filter(path => /["'`]\/api\/admin\/catalog-upload["'`]/.test(read(path)));
+  const callers = sources("src").filter(path => /\/api\/admin\/catalog-upload/.test(read(path)));
   assert.deepEqual(callers, [join("src", "components", "CatalogImport.tsx")]);
 });
 
